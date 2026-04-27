@@ -1,0 +1,59 @@
+# Supabase 로컬 개발 설정 — algolink-mvp
+# 실행: pnpm supabase:start (사전: supabase CLI 설치 필요)
+
+project_id = "algolink-mvp"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 16
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["https://127.0.0.1:3000"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+# 로컬 개발용 PII 키 — 운영에서는 절대 사용 금지.
+# 본 키는 SET LOCAL을 위해 supabase/seed.sql 또는 애플리케이션이 매 connection 시작 시 주입한다.
+[db.seed]
+enabled = true
+sql_paths = ["./seed/dev_setup.sql"]
+
+[experimental]
+orioledb_version = ""
