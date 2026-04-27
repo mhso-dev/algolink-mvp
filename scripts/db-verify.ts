@@ -202,10 +202,13 @@ async function main() {
     `;
     if (rows.length === 0) return; // seed에 없으면 skip
     const r = rows[0];
-    const expected = Math.floor((r.instructor_fee_krw * Number(r.withholding_tax_rate)) / 100);
+    // postgres-js 는 bigint 컬럼을 string 으로 반환하므로 Number 캐스팅 후 비교.
+    const fee = Number(r.instructor_fee_krw);
+    const actual = Number(r.withholding_tax_amount_krw);
+    const expected = Math.floor((fee * Number(r.withholding_tax_rate)) / 100);
     assert(
-      r.withholding_tax_amount_krw === expected,
-      `withholding_tax_amount_krw ${r.withholding_tax_amount_krw} ≠ ${expected}`,
+      actual === expected,
+      `withholding_tax_amount_krw ${actual} ≠ ${expected}`,
     );
   });
 
@@ -270,14 +273,19 @@ async function main() {
   });
 
   await check("AC-DB001-PII-02: 암호화-복호화 라운드트립", async () => {
-    // app.pii_encryption_key 설정.
-    await sql`SELECT set_config('app.pii_encryption_key', 'dev-only-32byte-secret-XXXXXXXXXXXX', true)`;
-    const [r] = await sql<{ original: string; decrypted: string | null }[]>`
-      SELECT
-        '900101-1234567' AS original,
-        pgp_sym_decrypt(app.encrypt_pii('900101-1234567'),
-                        current_setting('app.pii_encryption_key')) AS decrypted
-    `;
+    // set_config(..., true)는 트랜잭션 로컬이므로 동일 트랜잭션 내에서 set + select 를 묶는다.
+    // pgcrypto 는 extensions 스키마에 위치하므로 schema-qualified 호출 사용.
+    const [r] = await sql.begin(async (tx) => {
+      await tx`SELECT set_config('app.pii_encryption_key', 'dev-only-32byte-secret-XXXXXXXXXXXX', true)`;
+      return tx<{ original: string; decrypted: string | null }[]>`
+        SELECT
+          '900101-1234567' AS original,
+          extensions.pgp_sym_decrypt(
+            app.encrypt_pii('900101-1234567'),
+            current_setting('app.pii_encryption_key')
+          ) AS decrypted
+      `;
+    });
     assert(r.decrypted === r.original, `복호화 결과 ${r.decrypted} ≠ ${r.original}`);
   });
 

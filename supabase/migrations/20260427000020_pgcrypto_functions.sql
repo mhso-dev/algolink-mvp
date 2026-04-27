@@ -31,7 +31,7 @@ RETURNS text
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog, public, extensions
 AS $$
   SELECT coalesce(
     (auth.jwt() ->> 'role'),
@@ -48,7 +48,7 @@ CREATE OR REPLACE FUNCTION app.encrypt_pii(plaintext text)
 RETURNS bytea
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog, public, extensions
 AS $$
 BEGIN
   IF plaintext IS NULL THEN
@@ -70,7 +70,7 @@ CREATE OR REPLACE FUNCTION app.decrypt_pii(ciphertext bytea, target_id uuid)
 RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog, public, extensions
 AS $$
 DECLARE
   v_role text;
