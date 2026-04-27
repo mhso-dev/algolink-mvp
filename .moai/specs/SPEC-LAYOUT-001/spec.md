@@ -6,7 +6,7 @@ created: 2026-04-27
 updated: 2026-04-27
 author: 철
 priority: high
-issue_number: null
+issue_number: 3
 ---
 
 # SPEC-LAYOUT-001: 공통 앱 셸 + 디자인 시스템 토큰화 + UI 프리미티브 (App Shell + Design Tokens + UI Primitives)
