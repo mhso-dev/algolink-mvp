@@ -10,7 +10,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "sh -c 'tsc --noEmit'",
-    "test:unit": "tsx --test src/auth/__tests__/*.test.ts src/lib/validation/__tests__/*.test.ts",
+    "test:unit": "tsx --test src/auth/__tests__/*.test.ts src/lib/validation/__tests__/*.test.ts src/lib/ai/__tests__/*.test.ts src/lib/instructor/__tests__/*.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:push": "drizzle-kit push",
@@ -22,6 +22,7 @@
     "supabase:stop": "supabase stop"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
