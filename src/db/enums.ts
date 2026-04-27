@@ -50,12 +50,14 @@ export const audience = pgEnum("audience", ["instructor", "internal"]);
 export const entityType = pgEnum("entity_type", ["project", "instructor", "client"]);
 
 // 인앱 알림 종류 (SPEC §2.10 REQ-DB001-NOTIFICATIONS-TYPE).
+// SPEC-PROJECT-001 §5: assignment_request 추가 (ADD VALUE IF NOT EXISTS).
 export const notificationType = pgEnum("notification_type", [
   "assignment_overdue",
   "schedule_conflict",
   "low_satisfaction_assignment",
   "dday_unprocessed",
   "settlement_requested",
+  "assignment_request",
 ]);
 
 // 강사-기술 매핑 난이도.

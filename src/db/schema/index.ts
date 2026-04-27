@@ -9,6 +9,7 @@ export * from "./resume";
 export * from "./skill-taxonomy";
 export * from "./client";
 export * from "./project";
+export * from "./project-required-skills";
 export * from "./schedule";
 export * from "./settlement";
 export * from "./notes";

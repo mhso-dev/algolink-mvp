@@ -10,7 +10,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "sh -c 'tsc --noEmit'",
-    "test:unit": "tsx --test src/auth/__tests__/*.test.ts src/lib/validation/__tests__/*.test.ts",
+    "test:unit": "tsx --test src/auth/__tests__/*.test.ts src/lib/validation/__tests__/*.test.ts src/lib/projects/__tests__/*.test.ts src/lib/recommend/__tests__/*.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:push": "drizzle-kit push",
