@@ -1,74 +1,359 @@
 # Design Specification
 
-_TBD — Complete this file with IA and frame-by-frame specs before running `/moai design`._
+알고링크 AI Agentic 업무 지원 시스템의 정보 구조(IA), 화면별 사양, 우선순위. lms_docs/ 7개 화면 + 노션 요구사항을 기반으로 한 frame-by-frame 설계서.
 
 ---
 
 ## Functional Inventory
 
-_TBD — List all features and pages in the current product that are in scope for redesign._
-
-| Feature / Page | Current Status | In Scope |
-|---------------|---------------|---------|
-| _TBD_ | | |
+| Feature / Page | Current Status | In Scope (MVP) | Persona |
+|----------------|----------------|----------------|---------|
+| 로그인 | src/app/login 기본 구현 (LoginForm) | YES — 비주얼 업그레이드 | 모두 |
+| 홈 (역할 분기) | src/app/page.tsx placeholder | YES | 모두 |
+| 담당자 메인 대시보드 (칸반) | 없음 | YES | 담당자/관리자 |
+| 강사 대시보드 (일정·정산 요약) | 없음 | YES | 강사 |
+| 교육 프로젝트 리스트 | 없음 | YES | 담당자/관리자 |
+| 교육 프로젝트 입력/상세 | 없음 | YES | 담당자/관리자 |
+| 강사 관리 테이블 | 없음 | YES | 담당자/관리자 |
+| 강사 상세 (사이드 패널) | 없음 | YES | 담당자/관리자 |
+| 강사 이력서 양식 | 없음 | YES | 강사 (담당자 열람) |
+| 일정 캘린더 | 없음 | YES (간단) | 강사 + 담당자 |
+| 정산 화면 (강사) | 없음 | YES | 강사 |
+| 정산 관리 (담당자) | 없음 | YES | 담당자/관리자 |
+| 고객사 관리 | 없음 | YES (간단) | 담당자/관리자 |
+| 알림 센터 | 없음 | YES (인앱) | 모두 |
+| 명령 팔레트 ⌘K | 없음 | YES | 모두 |
+| 회원/권한 관리 | 없음 | NO (Phase 2) | 관리자 |
+| 매출 통계 대시보드 | 없음 | NO (Phase 2) | 관리자 |
+| 알림톡/알고레터/게시판 | 없음 | NO (Out-of-Scope) | - |
 
 ## Information Architecture
 
-_TBD — Define the top-level navigation structure and page hierarchy._
-
 ```
-Root
-├── _TBD_
-└── _TBD_
+Root (/)
+├── /login                          (모두) 로그인 분할 레이아웃
+├── /  (역할 분기)                   (모두) 강사→/me, 담당자/관리자→/dashboard
+│
+├── (강사 영역)
+│   ├── /me                         강사 대시보드 (일정·정산 요약)
+│   ├── /me/resume                  이력서 양식
+│   ├── /me/schedule                일정 (캘린더)
+│   └── /me/settlements             내 정산
+│
+├── (담당자/관리자 영역)
+│   ├── /dashboard                  메인 칸반 + KPI 위젯
+│   ├── /projects                   교육 프로젝트 리스트
+│   │   ├── /projects/new           새 프로젝트 입력
+│   │   └── /projects/[id]          프로젝트 상세 (사이드 패널)
+│   ├── /instructors                강사 관리 테이블
+│   │   ├── /instructors/new        강사 등록
+│   │   └── /instructors/[id]       강사 상세 (사이드 패널)
+│   ├── /clients                    고객사 관리
+│   ├── /settlements                정산 관리
+│   └── /notifications              알림 센터
+│
+└── (관리자 전용 — Phase 2)
+    ├── /admin/users                회원/권한
+    └── /admin/analytics            매출/매입
 ```
 
 ## Frame-by-Frame Redesign
 
-_TBD — For each page/frame in scope, describe the redesign goals and key interactions._
+### Frame: 로그인 (`/login`) — Priority High
 
-### Frame: _TBD_
+**Goal**: 모든 페르소나가 30초 이내 로그인. 첫인상에서 신뢰감 전달.
 
-**Goal**: _TBD_
+**Layout**: split-left (좌측 다크 패널 브랜딩 + 우측 폼)
 
 **Key interactions**:
-- _TBD_
+- 이메일 + 비밀번호 입력 → 로그인 버튼 (server action)
+- 비밀번호 표시 토글 (eye 아이콘)
+- "비밀번호 찾기" 링크 (Phase 2)
+- 로그인 후 역할에 따라 자동 분기 (강사→/me, 담당자/관리자→/dashboard)
 
 **Content hierarchy**:
-- _TBD_
+1. 좌측 패널: Algolink 로고 + "AI가 도와주는 교육 컨설팅 워크플로우" 한 줄 카피
+2. 우측 폼: 이메일/비밀번호 인풋, 로그인 버튼, 개발용 안내 (개발 모드만)
 
-## New Frames
-
-_TBD — Describe any new pages or views that do not exist in the current product._
-
-### New Frame: _TBD_
-
-**Purpose**: _TBD_
-
-**Entry points**: _TBD_
-
-## Empty State Design
-
-_TBD — Define the empty state experience for key views (first-run, no results, error)._
-
-| View | Empty State Message | CTA |
-|------|-------------------|-----|
-| _TBD_ | | |
-
-## Implementation Priority
-
-_TBD — Rank frames by implementation priority: High / Medium / Low._
-
-| Frame | Priority | Dependencies |
-|-------|----------|-------------|
-| _TBD_ | | |
-
-## Acceptance Criteria
-
-_TBD — Define what "done" looks like for this design specification._
-
-- [ ] _TBD_
+**Empty state**: 해당 없음
 
 ---
 
-_Last updated: _TBD__
-_Populated by: human specification or `/moai design` flow_
+### Frame: 담당자 메인 대시보드 (`/dashboard`) — Priority High
+
+**Goal**: 출근 직후 5초 안에 "오늘 처리할 일"과 "이슈 있는 항목"을 인지.
+
+**Layout**: 사이드바 + Top bar + Main(KPI 위젯 영역 + 칸반 + 캘린더 탭)
+
+**Key interactions**:
+- KPI 위젯 3종 (정산대기·배정대기·이슈알림) 클릭 → 해당 필터로 리스트 점프
+- 칸반 컬럼 5개 (과정의뢰 / 강사제안 / 배정확정 / 교육중 / 교육종료)
+- 카드 드래그 앤 드롭으로 상태 변경 (담당자 권한)
+- 카드 클릭 → 우측 슬라이드 Sheet 패널로 프로젝트 상세
+- 탭 전환: 진행현황(칸반) ↔ 교육중(캘린더 간트)
+- 우상단 [새로 만들기] → /projects/new
+- 검색·정렬·필터 (우상단 툴바)
+
+**Content hierarchy**:
+1. KPI 위젯 3종 (가로 배치, 카운트 + 라벨 + 색상 배지)
+2. 탭 (진행현황 / 교육중)
+3. 칸반 5컬럼: 컬럼 헤더(상태명 + 카운트), 카드 스택
+4. 카드: 제목 / 일정 / 담당자 아바타 / 상태 점
+
+**Empty state**: 컬럼별 — "현재 의뢰가 없어요. 새 프로젝트를 만들어 보세요. [+ 새로 만들기]"
+
+---
+
+### Frame: 강사 대시보드 (`/me`) — Priority High
+
+**Goal**: 강사가 로그인 직후 다가오는 일정 + 미정산 합계 즉시 확인.
+
+**Layout**: 사이드바 + Top bar + Main(2컬럼 그리드)
+
+**Key interactions**:
+- 좌측 위젯: 다가오는 일정 7일치 리스트, 클릭 시 캘린더로 점프
+- 우측 위젯: 미정산 합계, 클릭 시 정산 페이지로
+- 알림 배너 (배정 요청 미응답 등)
+- 빠른 액션: [이력서 보기] [일정 추가]
+
+**Content hierarchy**:
+1. 환영 메시지 + 로그아웃
+2. 알림 배너 (있을 때만)
+3. 위젯 그리드: 일정 / 정산 / 만족도(있다면)
+4. 최근 강의 이력 (최대 5건)
+
+**Empty state**: "아직 일정이 없어요." / "정산 내역이 없어요."
+
+---
+
+### Frame: 교육 프로젝트 입력 (`/projects/new`) — Priority High
+
+**Goal**: 의뢰 내용을 5분 내 입력 + AI 강사 추천 받기.
+
+**Layout**: 메인 영역 풀폼 + 우측 사이드 (진행상황 + AI 이메일 초안)
+
+**Key interactions**:
+- 필드 입력: 교육일정(날짜 picker, 반복 옵션), 고객사(텍스트 + DB 검색), 사업명, 과정명, 교육시간, 시수(자동 계산), 강사이름(텍스트 + 강사 찾기 모달 → AI 추천 5명), 사업비, 강사비(텍스트 + DB 검색), 마진(자동), 알고링크 담당자, 메모(강사용·내부용 — 마크다운 + 임베딩)
+- 진행상황 드롭다운 (상태 전환)
+- [AI 이메일 초안 작성] 버튼 → Claude API 호출 → 이메일 textarea에 채움
+- 자동 저장 (5초 debounce, 로컬 스토리지 fallback)
+- [저장] / [저장 후 강사 추천] / [취소]
+
+**Content hierarchy**:
+1. 헤더: "새 교육 프로젝트" + 자동저장 indicator
+2. 기본 정보 그리드 (2컬럼: 일정/고객사, 사업명/과정명, 시간/시수)
+3. 강사·금액 그리드 (강사이름/사업비/강사비/마진)
+4. 메모 (강사용 / 내부용 탭)
+5. 사이드: 진행상황 select + AI 이메일 영역
+
+**Empty state**: 신규 폼이라 빈 상태 = 정상
+
+---
+
+### Frame: 교육 프로젝트 리스트 (`/projects`) — Priority High
+
+**Goal**: 모든 프로젝트를 한 화면에 + 검색/필터/정렬 + 셀 인라인 편집.
+
+**Layout**: 사이드바 + 메인(툴바 + 테이블 + 정산내역 흐름표)
+
+**Key interactions**:
+- 검색 인풋 (사업명/과정명/강사 통합 검색)
+- 필터: 사업/담당자/기관별, 상태별
+- 정렬: 일정·금액·강사명·상태
+- 행 클릭 → 사이드 Sheet 패널
+- 셀 더블클릭 → 인라인 편집 (구글시트 패턴)
+- [일정추가] 버튼 → /projects/new
+
+**Content hierarchy**:
+1. 툴바: 검색 + 필터 + 정렬 + [일정추가]
+2. 테이블 컬럼: 일정 / 고객사 / 사업명 / 과정명 / 강사 / 사업비 / 강사비 / 시수 / 마진 / 진행단계 / 액션
+3. 페이지네이션 또는 무한스크롤
+4. 하단: 정산 내역 흐름 참고표 (기업교육 vs 정부교육 흐름·세율)
+
+**Empty state**: "아직 등록된 프로젝트가 없어요. [+ 일정추가]"
+
+---
+
+### Frame: 강사 관리 테이블 (`/instructors`) — Priority Medium
+
+**Goal**: 100명 강사를 빠르게 검색·필터하고, 행 클릭 시 즉시 상세 확인.
+
+**Layout**: 사이드바 + 메인(툴바 + 테이블)
+
+**Key interactions**:
+- 검색: 이름/이메일/기술스택
+- 필터: 기술스택(대단위/중단위/소단위), 만족도 범위, 강의가능 도메인
+- 행 클릭 → 사이드 Sheet (강사 상세 + 이력서 미리보기 + 정산정보 펼치기)
+- "이력서 보기" 클릭 → 새 탭 PDF 또는 풀페이지 이력서 뷰
+- "AI 역량 요약" 셀 → 호버 시 풀텍스트 토오ltip
+- [강사 등록] 버튼
+
+**Content hierarchy**:
+1. 툴바: 검색 / 기술스택 필터 / 만족도 정렬 / [강사 등록]
+2. 테이블 컬럼: 이름 / 나이 / 학력 / 경력(현업) / 경력(강의) / 최근만족도 / 기술스택(대·중·소단위 칩) / AI 역량 요약 / 이력서 보기 / 정산정보(마스킹)
+3. 사이드 패널: 강사 상세 — 진행 이력 / 정산 합계 / 만족도 평균 / AI 만족도 요약
+
+**Empty state**: "등록된 강사가 없어요. [+ 강사 등록]"
+
+---
+
+### Frame: 강사 이력서 양식 (`/me/resume` 또는 `/instructors/[id]/resume`) — Priority Medium
+
+**Goal**: 9 섹션 이력을 가독성 좋게 입력 + AI 파싱으로 시작 + PDF 다운로드.
+
+**Layout**: 메인 영역 폼 + 좌측 섹션 네비게이션
+
+**Key interactions**:
+- 좌측 sticky 네비: 9 섹션(기본사항/학력/자격/현업경력/강의경력/프로젝트/기타활동/저서/강의가능분야)
+- 상단 [PDF/Word 업로드 → AI 자동 채움]
+- 각 섹션은 행 단위 — 행 우측 (+) 클릭 시 새 행 추가
+- 강의경력 행: "성과(만족도)" 클릭 시 별도 페이지/모달로 상세 결과
+- 강의가능분야: 12+ 카테고리 (프로그래밍/운영체제/프론트엔드/백엔드/모바일/데이터분석/인공지능/생성형AI/인프라/클라우드/자동화/산업도메인) × 세부 입력 + 난이도 셀렉트, 전체선택 체크박스
+- 자동 저장 (debounce)
+- [PDF 다운로드] — 마스킹 옵션 (주소/연락처 제외) 토글
+- [Word 다운로드] (Phase 2)
+- 첨부자료 업로드 영역 (보수교육 이수증 등)
+
+**Content hierarchy**:
+1. 헤더: 강사명 + [PDF 업로드] [PDF 다운로드 (마스킹 옵션)]
+2. 좌측 섹션 네비
+3. 각 섹션: 헤더 + 표 입력(행 추가 가능)
+4. 마지막: 첨부자료 업로드 + 강의력/성향/소프트스킬 자유 텍스트
+
+**Empty state**: 새 이력서 — "기존 이력서 PDF가 있다면 업로드해 주세요. AI가 양식을 자동으로 채워드릴게요. [+ PDF 업로드]"
+
+---
+
+### Frame: 일정 캘린더 (`/me/schedule`) — Priority Medium
+
+**Goal**: 강사 본인 일정 한눈에 + 알고링크 강의 vs 개인 일정 시각 구분.
+
+**Layout**: 메인(툴바 + 월/주/일 캘린더 뷰 + 사이드 일정 상세)
+
+**Key interactions**:
+- 월/주/일 뷰 토글
+- 일정 클릭 → 사이드 패널 상세
+- 빈 셀 클릭 → 새 개인 일정 추가 모달
+- 시스템 일정(알고링크)은 읽기 전용, 개인 일정은 편집 가능
+- 충돌 시 빨간 테두리
+
+**Content hierarchy**:
+1. 툴바: 월/주/일 / [오늘] / [+ 일정 추가]
+2. 캘린더 그리드
+3. 사이드 패널: 선택된 일정 상세 (시스템/개인 구분)
+
+---
+
+### Frame: 정산 화면 — 강사 (`/me/settlements`) — Priority Medium
+
+**Goal**: 본인 정산 흐름 한눈에 + 지급정보 등록.
+
+**Layout**: 메인(요약 카드 + 정산 리스트 + 지급정보 섹션)
+
+**Key interactions**:
+- 요약 카드: 미정산 합계 / 이번달 지급 / 연간 누적
+- 정산 리스트: 프로젝트명 / 강사비 / 처리방식(인건비 3.3%·8.8% / 세금계산서 부가세별도·포함) / 상태(전·요청·완료·보류)
+- 처리방식 클릭 → 변경 모달
+- [지급정보 등록] — 인건비: 통장사본 + 주민번호 / 세금계산서: 사업자등록증 + 이메일
+
+**Content hierarchy**:
+1. 요약 카드 3종
+2. 정산 리스트 테이블
+3. 지급정보 섹션 (마스킹 + [수정])
+
+---
+
+### Frame: 정산 관리 — 담당자 (`/settlements`) — Priority Medium
+
+**Goal**: 미정산 건 일괄 처리 + 매입매출 한눈에.
+
+**Layout**: 메인(필터 툴바 + 테이블 + 정산흐름 참고)
+
+**Key interactions**:
+- 필터: 정산 상태(전·요청·완료·보류) / 강사 / 기간
+- 행 선택 (체크박스) → [일괄 정산 요청] 버튼 활성화
+- 1-클릭 정산 요청 → 강사에게 메일링 (스텁: 콘솔 로그 + 인앱 알림)
+- 매입매출 흐름표: 기업교육 / 정부교육 흐름 + 세율 표시
+
+**Content hierarchy**:
+1. 필터 + [일괄 정산 요청]
+2. 정산 테이블: 체크 / 프로젝트 / 강사 / 사업비 / 강사비 / 마진 / 원천세 / 상태 / 액션
+3. 매입매출 흐름표 (참고)
+
+---
+
+### Frame: 고객사 관리 (`/clients`) — Priority Low (간단)
+
+**Goal**: 고객사 등록·조회·메모 — 인수인계용 히스토리.
+
+**Key fields**: 사업장명 / 사업자등록번호 / 주요사업 / 담당자정보(이름/전화/이메일) / 메모
+
+---
+
+## New Frames
+
+### New Frame: 명령 팔레트 (`⌘K`) — Priority High
+
+**Purpose**: 키보드만으로 검색·점프·새 항목.
+
+**Entry points**: ⌘K / Ctrl+K 글로벌 단축키
+
+**Content**: 인풋 + 결과 그룹 (강사 / 프로젝트 / 페이지 / 액션)
+
+---
+
+### New Frame: 알림 센터 (`/notifications`) — Priority Medium
+
+**Purpose**: 인앱 알림 누적 — 배정 요청, 컨펌, 정산 요청, 일정 충돌 등.
+
+**Layout**: 리스트 + 읽음/안읽음 필터
+
+---
+
+## Empty State Design
+
+| View | Message | CTA |
+|------|---------|-----|
+| 칸반 컬럼 (의뢰 없음) | "현재 의뢰가 없어요." | [+ 새 프로젝트] |
+| 강사 리스트 (0명) | "아직 등록된 강사가 없어요." | [+ 강사 등록] |
+| 정산 리스트 (정산 전 0건) | "정산 대기 중인 건이 없어요." | (없음) |
+| 강사 대시보드 (일정 없음) | "다가오는 일정이 없어요. 일정을 추가해 보세요." | [+ 일정 추가] |
+| 검색 결과 0건 | "'{query}'에 해당하는 항목이 없어요. 다른 키워드로 검색해 보세요." | [필터 초기화] |
+| 알림 센터 (모두 읽음) | "모든 알림을 확인했어요. ✓" | (없음) |
+
+## Implementation Priority
+
+| Frame | Priority | Dependencies |
+|-------|----------|--------------|
+| 디자인 토큰 + 앱 셸 (사이드바·헤더) | P0 | — |
+| 로그인 비주얼 업그레이드 | P0 | 디자인 토큰 |
+| 담당자 메인 대시보드 (칸반) | P1 | 앱 셸 |
+| 교육 프로젝트 입력 / 리스트 | P1 | 칸반 |
+| 강사 관리 테이블 + 사이드 패널 | P2 | 앱 셸 |
+| 강사 이력서 양식 | P2 | 강사 관리 |
+| 강사 대시보드 + 일정 + 본인 정산 | P2 | 앱 셸 |
+| 정산 관리 (담당자) | P2 | 프로젝트 |
+| 명령 팔레트 ⌘K | P3 | 앱 셸 |
+| 알림 센터 / 고객사 관리 | P3 | — |
+
+## Acceptance Criteria
+
+- [ ] Lighthouse Performance ≥ 80 (LCP < 2.5s on 4G)
+- [ ] Lighthouse Accessibility ≥ 90 (WCAG 2.1 AA)
+- [ ] 모든 인터랙션 키보드만으로 가능 (Tab 순서 = 시각 순서)
+- [ ] 색상 대비 본문 4.5:1 이상, UI 컴포넌트 3:1 이상
+- [ ] 로그인 후 역할별 자동 분기 동작
+- [ ] 담당자 대시보드: 칸반 5컬럼 + KPI 위젯 3종 표시
+- [ ] 프로젝트 입력: 9 필수 필드 + 자동 저장 + AI 이메일 초안 영역
+- [ ] 강사 리스트: 검색 + 필터 + 행 클릭 시 사이드 패널
+- [ ] 이력서: 9 섹션 + 행 추가 + PDF 업로드 영역 + 마스킹 옵션
+- [ ] 정산: 인건비/세금계산서 처리방식 분기 표시
+- [ ] 모든 빈 상태 다음 액션 CTA 명시
+- [ ] dev 서버 정상 부팅, typecheck/lint 0 에러
+- [ ] Pretendard + JetBrains Mono 적용
+- [ ] 라이트/다크 모드 prefers-color-scheme 자동 대응
+
+---
+
+_Last updated: 2026-04-27_
+_Populated by: /moai design 자동 채움 (lms_docs 7화면 + 노션 IA + product.md F-기능 종합)_
