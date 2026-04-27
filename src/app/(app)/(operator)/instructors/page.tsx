@@ -1,43 +1,81 @@
-import { cookies } from "next/headers";
+// SPEC-INSTRUCTOR-001 §2.1 — 강사 리스트 (operator/admin).
+
 import Link from "next/link";
-import { Plus, Search, Filter, Sparkles, FileText, Users } from "lucide-react";
-import { createClient } from "@/utils/supabase/server";
+import { Plus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { requireUser } from "@/lib/auth";
-import { formatRating, formatKoreanPhone } from "@/lib/utils";
+import {
+  getAllSkillCategories,
+  listInstructorsForOperator,
+} from "@/lib/instructor/queries";
+import { instructorListFilterSchema } from "@/lib/validation/instructor";
+import { InstructorListFilters } from "@/components/instructor/instructor-list-filters";
+import { InstructorListTable } from "@/components/instructor/instructor-list-table";
+import { InstructorPagination } from "@/components/instructor/pagination";
+import type { InstructorListSort } from "@/lib/instructor/types";
 
 export const dynamic = "force-dynamic";
 
-type InstructorSafe = {
-  id: string;
-  name_kr: string | null;
-  email: string | null;
-  phone: string | null;
-};
+type SearchParams = Record<string, string | string[] | undefined>;
 
-export default async function InstructorsPage() {
+function parseSkillIds(raw: string | string[] | undefined): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.flatMap((v) => v.split(","));
+  return raw.split(",").filter(Boolean);
+}
+
+export default async function InstructorsPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
   await requireUser();
-  const supabase = createClient(await cookies());
+  const sp = await searchParams;
 
-  const { data, error } = await supabase
-    .from("instructors_safe")
-    .select("id, name_kr, email, phone")
-    .order("name_kr", { ascending: true })
-    .returns<InstructorSafe[]>();
+  const parsed = instructorListFilterSchema.safeParse({
+    name: typeof sp.name === "string" ? sp.name : undefined,
+    skillIds: parseSkillIds(sp.skillIds),
+    scoreMin: sp.scoreMin,
+    scoreMax: sp.scoreMax,
+    sort: typeof sp.sort === "string" ? sp.sort : undefined,
+    dir: typeof sp.dir === "string" ? sp.dir : undefined,
+    page: sp.page ?? 1,
+    pageSize: 20,
+  });
 
-  const instructors = data ?? [];
+  if (!parsed.success) {
+    return (
+      <div className="mx-auto max-w-[1440px] px-6 py-6">
+        <p className="text-sm text-[var(--color-state-alert)]" role="alert">
+          {parsed.error.issues[0]?.message ?? "잘못된 필터입니다."}
+        </p>
+      </div>
+    );
+  }
+
+  const filter = parsed.data;
+  const sort: InstructorListSort = filter.sort ?? "name_kr";
+  const dir = filter.dir ?? "asc";
+
+  const [{ rows, total }, skills] = await Promise.all([
+    listInstructorsForOperator({
+      ...filter,
+      sort,
+      dir,
+    }),
+    getAllSkillCategories(),
+  ]);
+
+  const baseSearch = new URLSearchParams();
+  if (filter.name) baseSearch.set("name", filter.name);
+  if (filter.skillIds && filter.skillIds.length > 0)
+    baseSearch.set("skillIds", filter.skillIds.join(","));
+  if (filter.scoreMin !== undefined)
+    baseSearch.set("scoreMin", String(filter.scoreMin));
+  if (filter.scoreMax !== undefined)
+    baseSearch.set("scoreMax", String(filter.scoreMax));
+  baseSearch.set("sort", sort);
+  baseSearch.set("dir", dir);
 
   return (
     <div className="mx-auto max-w-[1440px] px-6 py-6 flex flex-col gap-5">
@@ -48,114 +86,38 @@ export default async function InstructorsPage() {
             강사 관리
           </h1>
           <p className="text-sm text-[var(--color-text-muted)] mt-1">
-            강사진 {instructors.length}명 — 검색·필터·만족도 정렬로 빠르게 찾으세요.
+            강사진 {total}명 — 검색·필터·정렬로 빠르게 찾으세요.
           </p>
         </div>
-        <Button>
-          <Plus /> 강사 등록
+        <Button asChild>
+          <Link href="/instructors/new">
+            <Plus /> 강사 등록
+          </Link>
         </Button>
       </header>
 
-      <Card className="p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px] max-w-md">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-subtle)]" />
-            <Input placeholder="이름·이메일·기술스택 검색" className="pl-8" />
-          </div>
-          <Button variant="outline" size="sm">
-            <Filter className="h-3.5 w-3.5" /> 기술스택
-          </Button>
-          <Button variant="outline" size="sm">
-            <Filter className="h-3.5 w-3.5" /> 만족도
-          </Button>
-        </div>
-      </Card>
+      <InstructorListFilters
+        skills={skills}
+        initialName={filter.name}
+        initialSkillIds={filter.skillIds}
+        initialScoreMin={filter.scoreMin}
+        initialScoreMax={filter.scoreMax}
+        resultCount={total}
+      />
 
-      <Card className="overflow-hidden">
-        {error ? (
-          <p className="p-6 text-sm text-[var(--color-state-alert)]">
-            데이터 조회 오류: {error.message}
-          </p>
-        ) : instructors.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="text-sm font-medium mb-2">등록된 강사가 없어요</p>
-            <p className="text-xs text-[var(--color-text-muted)] mb-4">
-              새 강사를 등록하거나 PDF 이력서를 업로드해 시작해 보세요.
-            </p>
-            <Button>
-              <Plus /> 강사 등록
-            </Button>
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>이름</TableHead>
-                <TableHead>연락처</TableHead>
-                <TableHead>경력</TableHead>
-                <TableHead>최근 만족도</TableHead>
-                <TableHead>주요 기술스택</TableHead>
-                <TableHead className="w-44">AI 역량 요약</TableHead>
-                <TableHead className="w-24 text-right">액션</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {instructors.map((inst) => (
-                <TableRow key={inst.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar>
-                        <AvatarFallback>{(inst.name_kr ?? "?").slice(0, 1)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <span className="font-medium text-sm">{inst.name_kr ?? "(이름 미공개)"}</span>
-                        <span className="text-xs text-[var(--color-text-muted)]">
-                          {inst.email ?? "—"}
-                        </span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm font-tabular">
-                    {formatKoreanPhone(inst.phone)}
-                  </TableCell>
-                  <TableCell className="text-sm text-[var(--color-text-muted)]">
-                    이력서 미입력
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    <Badge variant="settled" className="font-tabular">
-                      {formatRating(null)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      <Badge variant="secondary" className="text-[10px]">
-                        준비 중
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-                      <Sparkles className="h-3 w-3 text-[var(--color-primary)]" />
-                      <span className="line-clamp-1">강의이력 누적 시 자동 생성</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/instructors/${inst.id}`}>
-                        <FileText className="h-3.5 w-3.5" /> 상세
-                      </Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+      <InstructorListTable
+        rows={rows}
+        currentSort={sort}
+        currentDir={dir}
+        baseSearch={baseSearch}
+      />
 
-      <p className="text-xs text-[var(--color-text-muted)] text-center">
-        강사 클릭 시 상세 사이드 패널(진행 이력 / 정산 합계 / 만족도 평균 / AI 만족도 요약)이 열립니다. (다음 단계)
-      </p>
+      <InstructorPagination
+        page={filter.page}
+        pageSize={filter.pageSize}
+        total={total}
+        baseSearch={baseSearch}
+      />
     </div>
   );
 }
