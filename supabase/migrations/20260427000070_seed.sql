@@ -17,7 +17,96 @@ EXCEPTION
 END $$;
 
 -- ===========================================
--- 관리자 1명 + 운영자 1명 (auth.users는 Supabase CLI seed에서 생성, 본 seed는 profile만)
+-- PRE-SEED: auth.users 사전 생성 (FK 의존성 충족)
+-- public.users.id 는 auth.users(id) 를 FK 참조하므로,
+-- 본 seed migration 이 트랜잭션 내에서 통과하려면 auth.users 행이 먼저 존재해야 한다.
+-- 본 블록은 auth 스키마가 존재하는 환경(supabase 로컬/원격)에서만 실행되며
+-- ON CONFLICT DO NOTHING 으로 멱등성을 보장한다.
+-- 운영 환경에서는 supabase signup 흐름으로 auth.users 가 생성되므로 본 INSERT 는 모두 noop 이 된다.
+-- ===========================================
+DO $auth_seed$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'auth')
+     AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'users') THEN
+    INSERT INTO auth.users (
+      instance_id, id, aud, role, email, encrypted_password,
+      email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+      created_at, updated_at,
+      confirmation_token, recovery_token, email_change, email_change_token_new
+    ) VALUES
+      (
+        '00000000-0000-0000-0000-000000000000',
+        '00000000-0000-0000-0000-00000000aaaa',
+        'authenticated', 'authenticated',
+        'admin@algolink.local',
+        crypt('algolink-dev-1234', gen_salt('bf')),
+        NOW(),
+        '{"provider":"email","providers":["email"]}'::jsonb,
+        '{"role":"admin"}'::jsonb,
+        NOW(), NOW(),
+        '', '', '', ''
+      ),
+      (
+        '00000000-0000-0000-0000-000000000000',
+        '00000000-0000-0000-0000-00000000bbbb',
+        'authenticated', 'authenticated',
+        'operator@algolink.local',
+        crypt('algolink-dev-1234', gen_salt('bf')),
+        NOW(),
+        '{"provider":"email","providers":["email"]}'::jsonb,
+        '{"role":"operator"}'::jsonb,
+        NOW(), NOW(),
+        '', '', '', ''
+      ),
+      (
+        '00000000-0000-0000-0000-000000000000',
+        '00000000-0000-0000-0000-00000000cccc',
+        'authenticated', 'authenticated',
+        'instructor1@algolink.local',
+        crypt('algolink-dev-1234', gen_salt('bf')),
+        NOW(),
+        '{"provider":"email","providers":["email"]}'::jsonb,
+        '{"role":"instructor"}'::jsonb,
+        NOW(), NOW(),
+        '', '', '', ''
+      )
+    ON CONFLICT (id) DO NOTHING;
+
+    INSERT INTO auth.identities (
+      id, user_id, provider_id, provider, identity_data,
+      last_sign_in_at, created_at, updated_at
+    ) VALUES
+      (
+        gen_random_uuid(),
+        '00000000-0000-0000-0000-00000000aaaa',
+        'admin@algolink.local',
+        'email',
+        jsonb_build_object('sub', '00000000-0000-0000-0000-00000000aaaa', 'email', 'admin@algolink.local', 'email_verified', true, 'phone_verified', false),
+        NOW(), NOW(), NOW()
+      ),
+      (
+        gen_random_uuid(),
+        '00000000-0000-0000-0000-00000000bbbb',
+        'operator@algolink.local',
+        'email',
+        jsonb_build_object('sub', '00000000-0000-0000-0000-00000000bbbb', 'email', 'operator@algolink.local', 'email_verified', true, 'phone_verified', false),
+        NOW(), NOW(), NOW()
+      ),
+      (
+        gen_random_uuid(),
+        '00000000-0000-0000-0000-00000000cccc',
+        'instructor1@algolink.local',
+        'email',
+        jsonb_build_object('sub', '00000000-0000-0000-0000-00000000cccc', 'email', 'instructor1@algolink.local', 'email_verified', true, 'phone_verified', false),
+        NOW(), NOW(), NOW()
+      )
+    ON CONFLICT (provider_id, provider) DO NOTHING;
+  END IF;
+END
+$auth_seed$;
+
+-- ===========================================
+-- 관리자 1명 + 운영자 1명 + 강사 1명 (public.users — auth.users 사전 생성 후)
 -- ===========================================
 INSERT INTO users (id, role, name_kr, email) VALUES
   ('00000000-0000-0000-0000-00000000aaaa', 'admin',     '관리자',   'admin@algolink.local'),
