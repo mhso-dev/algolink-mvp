@@ -1,26 +1,279 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Pretendard Variable은 layout.tsx의 <link>로 로드 (CSS @import 위치 제약 회피) */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ============================================================
+   Algolink 디자인 토큰 (단일 진실 소스: .moai/design/tokens.json)
+   ============================================================ */
+
+:root {
+  /* Color — Brand */
+  --color-primary: #2563EB;
+  --color-primary-hover: #1D4ED8;
+  --color-primary-active: #1E40AF;
+  --color-primary-foreground: #FFFFFF;
+  --color-primary-muted: #DBEAFE;
+  --color-primary-muted-foreground: #1E3A8A;
+
+  --color-secondary: #0F172A;
+  --color-secondary-hover: #1E293B;
+  --color-secondary-foreground: #F8FAFC;
+  --color-secondary-muted: #F1F5F9;
+  --color-secondary-muted-foreground: #475569;
+
+  --color-accent: #F59E0B;
+  --color-accent-hover: #D97706;
+  --color-accent-foreground: #1E293B;
+  --color-accent-muted: #FEF3C7;
+
+  /* Color — Neutral (zinc) */
+  --color-neutral-50: #FAFAFA;
+  --color-neutral-100: #F4F4F5;
+  --color-neutral-200: #E4E4E7;
+  --color-neutral-300: #D4D4D8;
+  --color-neutral-400: #A1A1AA;
+  --color-neutral-500: #71717A;
+  --color-neutral-600: #52525B;
+  --color-neutral-700: #3F3F46;
+  --color-neutral-800: #27272A;
+  --color-neutral-900: #18181B;
+  --color-neutral-950: #09090B;
+
+  /* Color — Surface / Text / Border */
+  --color-background: #FAFAFA;
+  --color-surface: #FFFFFF;
+  --color-border: #E4E4E7;
+  --color-border-strong: #D4D4D8;
+  --color-text: #18181B;
+  --color-text-muted: #71717A;
+  --color-text-subtle: #A1A1AA;
+  --color-text-inverse: #FAFAFA;
+
+  /* Color — Semantic State */
+  --color-state-request: #94A3B8;
+  --color-state-request-muted: #F1F5F9;
+  --color-state-proposed: #60A5FA;
+  --color-state-proposed-muted: #DBEAFE;
+  --color-state-confirmed: #3B82F6;
+  --color-state-confirmed-muted: #BFDBFE;
+  --color-state-in-progress: #10B981;
+  --color-state-in-progress-muted: #D1FAE5;
+  --color-state-completed: #6B7280;
+  --color-state-completed-muted: #E5E7EB;
+  --color-state-settled: #22C55E;
+  --color-state-settled-muted: #DCFCE7;
+  --color-state-pending: #F59E0B;
+  --color-state-pending-muted: #FEF3C7;
+  --color-state-alert: #EF4444;
+  --color-state-alert-muted: #FEE2E2;
+  --color-state-info: #06B6D4;
+  --color-state-info-muted: #CFFAFE;
+
+  /* Layout */
+  --layout-sidebar-width: 240px;
+  --layout-sidebar-width-collapsed: 64px;
+  --layout-topbar-height: 56px;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.06);
+
+  /* Motion */
+  --motion-duration-fast: 100ms;
+  --motion-duration-default: 150ms;
+  --motion-duration-slow: 200ms;
+  --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-easing-out: cubic-bezier(0, 0, 0.2, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --color-background: #09090B;
+    --color-surface: #18181B;
+    --color-border: #27272A;
+    --color-border-strong: #3F3F46;
+    --color-text: #FAFAFA;
+    --color-text-muted: #A1A1AA;
+    --color-text-subtle: #71717A;
+    --color-text-inverse: #18181B;
+    --color-secondary-muted: #1E293B;
+    --color-primary-muted: #1E3A8A;
   }
 }
 
+/* ============================================================
+   Tailwind v4 @theme — 토큰을 Tailwind 유틸리티로 노출
+   ============================================================ */
+
+@theme inline {
+  --font-sans: "Pretendard Variable", Pretendard, var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "system-ui", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --font-mono: var(--font-geist-mono), "JetBrains Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+
+  /* Brand */
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-foreground: var(--color-primary-foreground);
+  --color-primary-muted: var(--color-primary-muted);
+  --color-primary-muted-foreground: var(--color-primary-muted-foreground);
+  --color-secondary: var(--color-secondary);
+  --color-secondary-foreground: var(--color-secondary-foreground);
+  --color-secondary-muted: var(--color-secondary-muted);
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: var(--color-accent-foreground);
+
+  /* Surface */
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-text-subtle: var(--color-text-subtle);
+
+  /* State */
+  --color-state-request: var(--color-state-request);
+  --color-state-proposed: var(--color-state-proposed);
+  --color-state-confirmed: var(--color-state-confirmed);
+  --color-state-in-progress: var(--color-state-in-progress);
+  --color-state-completed: var(--color-state-completed);
+  --color-state-settled: var(--color-state-settled);
+  --color-state-pending: var(--color-state-pending);
+  --color-state-alert: var(--color-state-alert);
+  --color-state-info: var(--color-state-info);
+
+  /* Radius */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  /* Shadow */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+}
+
+/* ============================================================
+   Base layer
+   ============================================================ */
+
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-feature-settings: "ss06" on, "ss07" on; /* Pretendard 한글/숫자 가독 */
+  line-height: 1.5;
+}
+
+/* 한국어 단어 단위 줄바꿈 */
+:lang(ko) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 포커스 링 — 모든 인터랙션 요소 일관 */
+:where(button, a, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* 셀렉션 컬러 */
+::selection {
+  background-color: var(--color-primary-muted);
+  color: var(--color-primary-muted-foreground);
+}
+
+/* 스크롤바 (데스크톱) */
+@media (pointer: fine) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-neutral-300);
+    border-radius: var(--radius-full);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-neutral-400);
+  }
+}
+
+/* prefers-reduced-motion 대응 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 숫자 모노폰트 + tabular-nums (정산표 자릿수 정렬) */
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* shadcn/ui Radix 애니메이션용 keyframes */
+@keyframes algolink-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes algolink-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes algolink-slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes algolink-slide-out-right {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+@keyframes algolink-slide-in-bottom {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+[data-state="open"][data-radix-dialog-overlay],
+[data-state="open"][data-radix-dropdown-menu-content],
+[data-state="open"][data-radix-popover-content],
+[data-state="open"][data-radix-tooltip-content] {
+  animation: algolink-fade-in var(--motion-duration-default) var(--motion-easing-out);
+}
+[data-state="closed"][data-radix-dialog-overlay] {
+  animation: algolink-fade-out var(--motion-duration-fast) var(--motion-easing-out);
+}
+[data-state="open"][data-radix-dialog-content][data-side="right"] {
+  animation: algolink-slide-in-right var(--motion-duration-slow) var(--motion-easing-out);
+}
+[data-state="closed"][data-radix-dialog-content][data-side="right"] {
+  animation: algolink-slide-out-right var(--motion-duration-default) var(--motion-easing-out);
+}
+[data-state="open"][data-radix-dialog-content]:not([data-side]) {
+  animation: algolink-slide-in-bottom var(--motion-duration-slow) var(--motion-easing-out);
 }
