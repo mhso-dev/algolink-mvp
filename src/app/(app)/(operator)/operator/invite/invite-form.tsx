@@ -107,7 +107,11 @@ export function InviteForm({ currentRole }: InviteFormProps) {
           onValueChange={(v) => setRole(v as InviteInput["invited_role"])}
           disabled={isSubmitting}
         >
-          <SelectTrigger id="invite-role" aria-label="초대할 역할 선택">
+          <SelectTrigger
+            id="invite-role"
+            aria-label="초대할 역할 선택"
+            aria-describedby={!canInviteAdmin ? "invite-role-help" : undefined}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -119,7 +123,10 @@ export function InviteForm({ currentRole }: InviteFormProps) {
           </SelectContent>
         </Select>
         {!canInviteAdmin ? (
-          <p className="text-xs text-[var(--color-text-subtle)]">
+          <p
+            id="invite-role-help"
+            className="text-xs text-[var(--color-text-subtle)]"
+          >
             관리자 초대는 admin 권한이 필요합니다.
           </p>
         ) : null}

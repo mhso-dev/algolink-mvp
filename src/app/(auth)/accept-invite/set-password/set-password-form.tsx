@@ -76,7 +76,9 @@ export function SetPasswordForm() {
             autoComplete="new-password"
             disabled={isSubmitting}
             aria-invalid={Boolean(errors.password) || Boolean(serverError)}
-            aria-describedby={errorMessage ? "set-password-error" : undefined}
+            aria-describedby={
+              errorMessage ? "set-password-error" : "set-password-help"
+            }
             className="pr-9"
             {...register("password")}
           />
@@ -94,7 +96,10 @@ export function SetPasswordForm() {
             )}
           </button>
         </div>
-        <p className="text-xs text-[var(--color-text-subtle)]">
+        <p
+          id="set-password-help"
+          className="text-xs text-[var(--color-text-subtle)]"
+        >
           12자 이상이며 대소문자/숫자/특수문자 중 3가지 이상을 포함해야 합니다.
         </p>
       </div>
