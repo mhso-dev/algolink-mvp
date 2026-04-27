@@ -1,169 +1,106 @@
-import { cookies } from "next/headers";
+// @MX:NOTE: SPEC-DASHBOARD-001 — 운영자 메인 대시보드 (KPI + 칸반 + 알림 + 캘린더 링크).
 import Link from "next/link";
-import { Plus, LayoutDashboard, CalendarDays } from "lucide-react";
-import { createClient } from "@/utils/supabase/server";
+import { CalendarDays, LayoutDashboard, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card } from "@/components/ui/card";
-import { KpiCards } from "@/components/dashboard/kpi-cards";
-import {
-  KanbanBoard,
-  type KanbanProject,
-} from "@/components/dashboard/kanban-board";
+import { KpiGrid } from "@/components/dashboard/KpiGrid";
+import { StatusFilter } from "@/components/dashboard/StatusFilter";
+import { KanbanBoard } from "@/components/dashboard/KanbanBoard";
+import { NotificationPreview } from "@/components/dashboard/NotificationPreview";
+import { ErrorState } from "@/components/dashboard/ErrorState";
 import { requireUser } from "@/lib/auth";
-import type { ProjectStatus } from "@/lib/projects";
-import { statusToColumn } from "@/lib/projects";
+import {
+  getKpiSummary,
+  getProjectsByStatus,
+  getRecentNotifications,
+} from "@/lib/dashboard/queries";
+import {
+  DASHBOARD_COLUMNS,
+  isDashboardColumnLabel,
+  type DashboardColumnLabel,
+} from "@/lib/dashboard/types";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
-type ProjectRow = {
-  id: string;
-  title: string;
-  status: ProjectStatus;
-  scheduled_at: string | null;
-  education_start_at: string | null;
-  education_end_at: string | null;
-  business_amount_krw: number;
-  instructor_id: string | null;
-  client_id: string;
-};
+interface PageProps {
+  searchParams: Promise<{ status?: string }>;
+}
 
-type SettlementRow = { id: string; status: string };
+function parseStatusParam(raw: string | undefined): DashboardColumnLabel[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(isDashboardColumnLabel);
+}
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: PageProps) {
   const session = await requireUser();
-  const supabase = createClient(await cookies());
+  const sp = await searchParams;
+  const active = parseStatusParam(sp.status);
 
-  const [projectsRes, settlementsRes, instructorsRes, clientsRes] = await Promise.all([
-    supabase
-      .from("projects")
-      .select(
-        "id, title, status, scheduled_at, education_start_at, education_end_at, business_amount_krw, instructor_id, client_id",
-      )
-      .order("scheduled_at", { ascending: true, nullsFirst: false })
-      .returns<ProjectRow[]>(),
-    supabase.from("settlements").select("id, status").returns<SettlementRow[]>(),
-    supabase
-      .from("instructors_safe")
-      .select("id, name_kr")
-      .returns<{ id: string; name_kr: string | null }[]>(),
-    supabase
-      .from("clients")
-      .select("id, company_name")
-      .returns<{ id: string; company_name: string | null }[]>(),
+  const [kpiResult, columnsResult, previewResult] = await Promise.allSettled([
+    getKpiSummary(),
+    getProjectsByStatus(active),
+    getRecentNotifications(session.id, 5),
   ]);
 
-  const projects = projectsRes.data ?? [];
-  const settlements = settlementsRes.data ?? [];
-  const instructorMap = new Map((instructorsRes.data ?? []).map((i) => [i.id, i.name_kr]));
-  const clientMap = new Map((clientsRes.data ?? []).map((c) => [c.id, c.company_name]));
+  const kpi = kpiResult.status === "fulfilled" ? kpiResult.value : null;
+  const columns =
+    columnsResult.status === "fulfilled"
+      ? columnsResult.value
+      : new Map(DASHBOARD_COLUMNS.map((c) => [c, []]));
+  const preview =
+    previewResult.status === "fulfilled"
+      ? previewResult.value
+      : { unanswered: 0, conflict: 0, deadline: 0, updatedAt: null as string | null };
 
-  const kanbanProjects: KanbanProject[] = projects.map((p) => ({
-    id: p.id,
-    title: p.title,
-    status: p.status,
-    scheduledAt: p.scheduled_at,
-    educationStartAt: p.education_start_at,
-    educationEndAt: p.education_end_at,
-    businessAmountKrw: p.business_amount_krw,
-    instructorName: p.instructor_id ? instructorMap.get(p.instructor_id) ?? null : null,
-    clientName: clientMap.get(p.client_id) ?? null,
-    operatorName: null,
-  }));
-
-  const pendingSettlements = settlements.filter(
-    (s) => s.status === "pending" || s.status === "requested",
-  ).length;
-  const pendingAssignments = projects.filter(
-    (p) => statusToColumn(p.status) === "request",
-  ).length;
-  const alerts = 0;
-
-  const fetchError = projectsRes.error?.message ?? settlementsRes.error?.message;
+  const hasErrors =
+    kpiResult.status === "rejected" ||
+    columnsResult.status === "rejected" ||
+    previewResult.status === "rejected";
 
   return (
-    <div className="mx-auto max-w-[1440px] px-6 py-6 flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-6 py-6">
+      <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <LayoutDashboard className="h-6 w-6 text-[var(--color-primary)]" />
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+            <LayoutDashboard className="h-6 w-6 text-[var(--color-primary)]" aria-hidden />
             대시보드
           </h1>
-          <p className="text-sm text-[var(--color-text-muted)] mt-1">
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
             안녕하세요, {session.displayName}님. 오늘 처리할 업무를 한눈에 확인하세요.
           </p>
         </div>
         <Button asChild>
           <Link href="/projects/new">
-            <Plus /> 새 프로젝트
+            <Plus aria-hidden /> 새 프로젝트
           </Link>
         </Button>
-      </div>
+      </header>
 
-      <KpiCards
-        pendingSettlements={pendingSettlements}
-        pendingAssignments={pendingAssignments}
-        alerts={alerts}
-      />
+      <KpiGrid summary={kpi} />
 
-      {fetchError && (
-        <Card className="border-[var(--color-state-alert)] p-4">
-          <p className="text-sm text-[var(--color-state-alert)]">데이터 조회 오류: {fetchError}</p>
-        </Card>
+      {hasErrors && (
+        <ErrorState
+          title="일부 데이터를 불러오지 못했습니다."
+          message="네트워크 또는 서버 일시 오류일 수 있습니다. 잠시 후 다시 시도해주세요."
+        />
       )}
 
-      <Tabs defaultValue="board" className="flex flex-col">
-        <TabsList className="self-start">
-          <TabsTrigger value="board">
-            <LayoutDashboard className="h-3.5 w-3.5" /> 진행현황
-          </TabsTrigger>
-          <TabsTrigger value="timeline">
-            <CalendarDays className="h-3.5 w-3.5" /> 교육 일정
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="board" className="mt-4">
-          {projects.length === 0 ? (
-            <EmptyBoard />
-          ) : (
-            <div className="overflow-x-auto pb-4">
-              <KanbanBoard projects={kanbanProjects} />
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="timeline" className="mt-4">
-          <TimelinePlaceholder />
-        </TabsContent>
-      </Tabs>
+      <div className="grid gap-4 lg:grid-cols-[3fr_1fr]">
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <StatusFilter />
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dashboard/calendar">
+                <CalendarDays aria-hidden /> 강사 일정 보기
+              </Link>
+            </Button>
+          </div>
+          <KanbanBoard columns={columns} activeColumns={active} />
+        </section>
+        <NotificationPreview preview={preview} />
+      </div>
     </div>
-  );
-}
-
-function EmptyBoard() {
-  return (
-    <Card className="flex flex-col items-center justify-center py-16 text-center">
-      <h2 className="text-lg font-semibold mb-2">아직 등록된 프로젝트가 없어요</h2>
-      <p className="text-sm text-[var(--color-text-muted)] mb-6">
-        의뢰가 들어오면 새 프로젝트로 등록해 보세요. AI가 강사를 추천해드릴게요.
-      </p>
-      <Button asChild>
-        <Link href="/projects/new">
-          <Plus /> 새 프로젝트 등록
-        </Link>
-      </Button>
-    </Card>
-  );
-}
-
-function TimelinePlaceholder() {
-  return (
-    <Card className="p-8 text-center">
-      <CalendarDays className="h-10 w-10 mx-auto mb-3 text-[var(--color-text-subtle)]" />
-      <h3 className="font-semibold mb-1">교육 일정 타임라인</h3>
-      <p className="text-sm text-[var(--color-text-muted)]">
-        진행 중·예정 교육을 간트차트로 보여드릴게요. (다음 단계에서 구현)
-      </p>
-    </Card>
   );
 }
