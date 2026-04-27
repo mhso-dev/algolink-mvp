@@ -48,13 +48,16 @@ export default async function MySettlementsPage() {
     .returns<SettlementRow[]>();
 
   const settlements = data ?? [];
-  const pending = settlements.filter((s) => s.status === "pending" || s.status === "requested");
   const paid = settlements.filter((s) => s.status === "paid");
 
-  const pendingTotal = pending.reduce(
-    (sum, s) => sum + s.instructor_fee_krw - (s.withholding_tax_amount_krw ?? 0),
-    0,
-  );
+  // SPEC-ME-001 §2.6 REQ-ME-SET-004 — settlement-summary로 일관 계산.
+  // DB가 generated column으로 이미 계산해 둔 withholding_tax_amount_krw를 재사용 (단순 합산).
+  const pendingTotal = settlements
+    .filter((s) => s.status === "pending" || s.status === "requested")
+    .reduce(
+      (sum, s) => sum + s.instructor_fee_krw - (s.withholding_tax_amount_krw ?? 0),
+      0,
+    );
   const paidTotal = paid.reduce(
     (sum, s) => sum + s.instructor_fee_krw - (s.withholding_tax_amount_krw ?? 0),
     0,

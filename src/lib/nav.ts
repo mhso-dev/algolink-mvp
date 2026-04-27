@@ -63,6 +63,7 @@ const instructorNav: NavSection[] = [
       { href: "/me/resume", label: "이력서", icon: FileText, description: "양식 입력·PDF 다운로드" },
       { href: "/me/schedule", label: "일정", icon: CalendarDays, description: "강의·개인 일정" },
       { href: "/me/settlements", label: "내 정산", icon: Receipt, description: "지급 내역·세금 처리" },
+      { href: "/me/settings", label: "설정", icon: Settings, description: "지급 정보·암호화 저장" },
     ],
   },
 ];
