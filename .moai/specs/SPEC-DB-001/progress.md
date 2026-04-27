@@ -23,8 +23,8 @@
 | M9: db-verify.ts | ✅ DONE | `scripts/db-verify.ts` (15 시나리오) |
 | 트리거 (M4/M5 보강) | ✅ DONE | `000050_triggers.sql` (status_history × 2, leaf check, updated_at × 7, auth FK) |
 | Supabase config | ✅ DONE | `supabase/config.toml`, `supabase/seed/dev_setup.sql` |
-| Phase 2.5/2.8/2.9: Quality + MX | 🟡 in progress | tsc + eslint + next build 모두 통과 |
-| Phase 3: Git commits + push | ⏸️ pending | feature/SPEC-DB-001 → origin |
+| Phase 2.5/2.8/2.9: Quality + MX | ✅ DONE | tsc + eslint 모두 통과 (.next 캐시 정리 후 0 오류 확인) |
+| Phase 3: Git commits + push | ✅ DONE | 3 커밋 푸시 완료 (db57283/f017958/fb31c51), PR + main merge 진행 |
 
 ## TRUST 5 자체 평가
 
