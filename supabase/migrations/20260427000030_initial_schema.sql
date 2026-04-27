@@ -28,12 +28,9 @@ CREATE TABLE "files" (
 	"uploaded_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "pii_access_log" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"caller_id" uuid,
-	"target_instructor_id" uuid,
-	"accessed_at" timestamp with time zone DEFAULT now() NOT NULL
-);
+-- pii_access_log은 20260427000020_pgcrypto_functions.sql에서 CREATE TABLE IF NOT EXISTS로 먼저 생성됨.
+-- Drizzle 자동 생성된 중복 정의는 깨끗한 reset에서 SQLSTATE 42P07를 일으키므로 제거.
+-- (Drizzle schema src/db/schema/pii-log.ts는 그대로 유지하여 ORM 레이어 일관성 보존.)
 --> statement-breakpoint
 CREATE TABLE "instructors" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -374,9 +371,8 @@ ALTER TABLE "satisfaction_reviews" ADD CONSTRAINT "satisfaction_reviews_instruct
 ALTER TABLE "satisfaction_reviews" ADD CONSTRAINT "satisfaction_reviews_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "idx_files_owner" ON "files" USING btree ("owner_id");--> statement-breakpoint
 CREATE INDEX "idx_files_uploaded_at" ON "files" USING btree ("uploaded_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "idx_pii_access_log_caller" ON "pii_access_log" USING btree ("caller_id");--> statement-breakpoint
-CREATE INDEX "idx_pii_access_log_target" ON "pii_access_log" USING btree ("target_instructor_id");--> statement-breakpoint
-CREATE INDEX "idx_pii_access_log_accessed_at" ON "pii_access_log" USING btree ("accessed_at");--> statement-breakpoint
+-- pii_access_log 인덱스는 20260427000020_pgcrypto_functions.sql:21-23에서 CREATE INDEX IF NOT EXISTS로 이미 생성됨.
+--> statement-breakpoint
 CREATE INDEX "idx_instructors_user_id" ON "instructors" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_instructors_email" ON "instructors" USING btree ("email");--> statement-breakpoint
 CREATE INDEX "idx_instructors_deleted" ON "instructors" USING btree ("deleted_at");--> statement-breakpoint
