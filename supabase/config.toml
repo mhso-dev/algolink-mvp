@@ -49,6 +49,13 @@ enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
 
+# SPEC-AUTH-001 REQ-AUTH-ROLE-003 — Custom Access Token Hook.
+# 액세스 토큰 발급 시 public.users.role을 JWT claims.role 및 claims.app_metadata.role에 주입.
+# Cloud 활성화: Dashboard → Authentication → Hooks → Custom Access Token.
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/public/custom_access_token_hook"
+
 # 로컬 개발용 PII 키 — 운영에서는 절대 사용 금지.
 # 본 키는 SET LOCAL을 위해 supabase/seed.sql 또는 애플리케이션이 매 connection 시작 시 주입한다.
 [db.seed]

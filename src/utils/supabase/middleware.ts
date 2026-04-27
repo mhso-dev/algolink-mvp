@@ -7,7 +7,24 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-export const updateSession = async (request: NextRequest) => {
+export interface UpdateSessionResult {
+  response: NextResponse;
+  /** JWKS로 서명 검증된 access token claims. 미인증/오류 시 null. */
+  claims: Record<string, unknown> | null;
+}
+
+/**
+ * 모든 인증 필요 요청 진입 시 호출되는 세션 갱신 + claim 조회 헬퍼.
+ *
+ * 책임:
+ *  1. `supabase.auth.getClaims()` 호출 → access token 갱신 + JWKS 서명 검증
+ *     (SPEC-AUTH-001 §2.2 REQ-AUTH-SESSION-001/002).
+ *  2. 갱신된 쿠키를 request + response 양쪽에 attach (RSC 동일 요청 내 사용 가능).
+ *  3. 라우트 가드는 호출자(`src/proxy.ts`)에서 수행한다 — 본 함수는 가드를 결정하지 않는다.
+ */
+export const updateSession = async (
+  request: NextRequest,
+): Promise<UpdateSessionResult> => {
   let supabaseResponse = NextResponse.next({
     request: { headers: request.headers },
   });
@@ -29,25 +46,14 @@ export const updateSession = async (request: NextRequest) => {
     },
   });
 
-  // 세션 갱신 + 사용자 조회
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // @MX:ANCHOR: getClaims()는 JWKS 서명 검증을 수행하므로 getUser()/getSession()보다 신뢰도가 높다.
+  // @MX:REASON: SPEC-AUTH-001 §2.2 REQ-AUTH-SESSION-002 — RLS 보호의 1차 신뢰 경계.
+  const { data, error } = await supabase.auth.getClaims();
 
-  // @MX:NOTE: 미인증 사용자는 PUBLIC_PATHS 외 모든 경로에서 /login으로 리다이렉트
-  const { pathname } = request.nextUrl;
-  const isPublicPath =
-    pathname === "/login" ||
-    pathname.startsWith("/auth/") ||
-    pathname.startsWith("/_next/") ||
-    pathname === "/favicon.ico";
+  const claims =
+    !error && data?.claims
+      ? (data.claims as Record<string, unknown>)
+      : null;
 
-  if (!user && !isPublicPath) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  return supabaseResponse;
+  return { response: supabaseResponse, claims };
 };
