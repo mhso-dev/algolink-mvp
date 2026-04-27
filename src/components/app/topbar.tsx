@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { AppRole } from "@/lib/role";
 import { roleLabel } from "@/lib/role";
-import { logout } from "@/app/login/actions";
+import { signOut } from "@/app/(auth)/login/actions";
 
 interface TopBarProps {
   user: { email: string; displayName: string };
@@ -30,7 +30,7 @@ export function TopBar({ user, role, unreadNotifications = 0 }: TopBarProps) {
 
   const handleLogout = React.useCallback(() => {
     React.startTransition(async () => {
-      await logout();
+      await signOut();
       router.refresh();
     });
   }, [router]);
