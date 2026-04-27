@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "tsc --noEmit",
+    "test": "sh -c 'tsc --noEmit'",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:push": "drizzle-kit push",
