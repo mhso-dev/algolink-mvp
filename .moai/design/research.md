@@ -1,54 +1,81 @@
 # Design Research
 
-_TBD — Complete this file with competitive analysis and user insights before running `/moai design`._
+알고링크 AI Agentic 업무 지원 시스템의 디자인 의사결정에 영향을 준 외부 레퍼런스·내부 인사이트 정리.
 
 ---
 
 ## Research Scope
 
-_TBD — Define the scope of research: which markets, user segments, and design problems are being studied._
+- **시장**: 한국 B2B SaaS — 교육 컨설팅·인재 매칭·프로젝트 워크플로우 영역
+- **사용자 세그먼트**: 교육 PM(담당자), 외부 전문 강사, 운영 관리자
+- **디자인 문제**: 30~60분 걸리는 강사 섭외 워크플로우를 5~15분으로 단축하면서, 100명 강사·50개 고객사·수십 건 동시 진행 프로젝트를 한 사람이 통제할 수 있는 정보 밀도 + 명확성
 
 ## Competitor Analysis
 
-| Competitor | Strengths | Weaknesses | Design Patterns to Note |
-|------------|-----------|------------|------------------------|
-| _TBD_ | | | |
+| Competitor | Strengths | Weaknesses | Patterns to Note |
+|------------|-----------|------------|------------------|
+| **Notion (Database View)** | 칸반/테이블/캘린더 뷰 자유 전환, 행 클릭 → 세부 패널, 메모/댓글/임베딩 강력 | 일정 충돌·D-Day 알림 약함, 권한·정산 같은 워크플로우 자동화 없음 | 과정의뢰 → 교육종료 칸반, 행 사이드 패널, 마크다운 메모 |
+| **티그리스 (ai.tigrison.com)** | 한국 교육 도메인 직접 타겟, 깔끔한 라이트 UI, 사이드바 + 메인 클래식 레이아웃 | 데이터 시각화 약함, 모바일 대응 부족 | 사이드바 폭 240px, 좌측 컬러 강조 메뉴, 한국식 테이블 헤더(연한 블루) |
+| **Linear** | 키보드 우선, 빠른 응답, 상태 워크플로우 명확, 명령어 팔레트(⌘K) | 한국어 가독성 미고려, 폼 입력 약함 | Cmd+K 팔레트, 인라인 편집, 좌측 컬러 점으로 상태 표현 |
+| **Toss / 토스 인사이트** | 한국 금융 SaaS 표준 — 숫자·표 가독성·접근성 우수 | 일반 워크 도구로는 과한 톤 | Pretendard 폰트, 강한 위계, 1-탭 액션, 명확한 빈 상태 |
+| **Google Workspace (Sheets+Drive)** | 사용자가 이미 익숙, 협업 가능 | 권한·히스토리·검색 한계, 업무 자동화 없음 | 대체할 대상 — 시트의 "직접 셀 클릭 → 인라인 편집" 패턴은 유지 |
 
 ## User Insights
 
-_TBD — Summarize key user needs, pain points, and mental models discovered through research._
-
 ### Key Jobs-to-be-Done
 
-- _TBD_
+1. **담당자**: "의뢰가 들어왔을 때 적합한 강사 3명을 1분 안에 찾고, 1-클릭으로 배정 요청 보내기"
+2. **담당자**: "월말에 미정산 건을 한눈에 보고 일괄 정산 요청 보내기"
+3. **강사**: "다음 주 일정에 알고링크 강의가 추가됐는지 알림 받고 컨펌하기"
+4. **강사**: "PDF 이력서를 업로드하면 양식이 자동 채워지고, 마스킹 옵션으로 다운로드하기"
+5. **공통**: "변경/지연/충돌이 묻히지 않게 알림 받기"
 
 ### Pain Points
 
-- _TBD_
+- "노션 잘 알지만 알림·자동화 부족", "구글시트는 권한 사고 리스크"
+- "강사 추천이 결국 PM의 머릿속 즐겨찾기에서 나온다 — 신입 PM은 백지 상태"
+- "정산 처리 방식(인건비 3.3%·8.8% / 세금계산서 부가세별도·포함 / 페이백)이 강사마다 달라 매번 확인"
+- "이력서·증명서·계약서가 양식이 다 달라서 PDF/word/한글 모두 필요"
 
 ### Behavioral Patterns
 
-- _TBD_
+- **PM**: 아침에 출근하자마자 칸반 보고 그날 처리할 의뢰부터 본다 → 우측 KPI 위젯 3종(정산대기·배정대기·이슈알림)이 First-fold에 있어야 한다
+- **PM**: 강사 클릭 → 진행 이력(교육 횟수·정산 합계·만족도) 즉시 확인 → 사이드 패널이 화면 전환보다 빠름
+- **강사**: 알림 메일 클릭 → 컨펌 페이지 → 1-클릭 수락 → 끝. 회원가입·로그인 절차가 길면 응답률 떨어짐
+- **공통**: 메모는 카톡처럼 빠르게 쓰고 싶지만, 이력은 노션처럼 영구 저장되어야 한다
 
 ## Patterns to Adopt
 
-_TBD — List design patterns from competitors or adjacent domains that resonate with the target audience._
-
-- _TBD_
+1. **Notion 칸반 + 행 사이드 패널**: 메인 대시보드는 5컬럼 칸반(과정의뢰/강사제안/배정확정/교육중/교육종료) + 카드 클릭 시 우측 슬라이드 패널로 상세
+2. **상태 + 색상 점 표시**: Linear 스타일 — 상태마다 컬러 닷, 텍스트 라벨 병기 (색약 대응)
+3. **Cmd+K 명령 팔레트**: 강사 검색 / 프로젝트 점프 / 새 의뢰 등록 — 키보드 우선
+4. **빈 상태 + 행동 유도**: Toss 패턴 — 빈 화면일 때 다음 액션 버튼 명시
+5. **인라인 편집 (셀 클릭 = 직접 입력)**: 구글시트 익숙한 사용자 위해 테이블 셀 더블클릭 또는 클릭 시 즉시 편집
+6. **데이터 밀도 + Pretendard**: 한국 SaaS 표준. 표 행 44px, 본문 14px, 한글 line-height 1.5
+7. **사이드바 + 역할별 메뉴**: 담당자/강사/관리자별 다른 네비게이션
+8. **정보 우선순위 시각화**: 정산 임박/일정 충돌/만족도 낮음 → 색상 배지 + 카운트로 즉시 인지
 
 ## Anti-Patterns to Avoid
 
-_TBD — List patterns that were tested or observed and found to reduce clarity, trust, or conversion._
-
-- _TBD_
+1. **그라디언트 배경 + 일러스트**: 마케팅 SaaS 클리셰 — 워크 도구에 부적합 (피로 가중)
+2. **카드 안에 카드 안에 카드**: 정보 위계 무너짐 — 최대 2단계
+3. **모달 위에 모달**: 강사 검색 모달 안에서 다시 강사 등록 모달 → 슬라이드 패널 또는 인라인 인풋으로 대체
+4. **색상으로만 상태 구분**: 파랑/초록/주황만으로 "의뢰/진행/완료" → 색약 사용자에게 의미 없음. 텍스트 라벨 필수
+5. **장식적 애니메이션**: 200ms 넘는 트랜지션, 페이지 전환 시 페이드 — 매일 쓰는 도구는 즉각 반응
+6. **모든 액션이 "확인" 다이얼로그**: 신중함이 아니라 마찰 — 되돌릴 수 있는 액션은 토스트 + Undo
+7. **마스터-디테일 풀페이지 전환**: 강사 리스트 → 강사 상세 페이지 이동 → 뒤로가기 시 스크롤 위치 잃음. 사이드 패널로 해결
+8. **자동 저장 없는 긴 폼**: 이력서 9 섹션을 한 번에 작성하다가 날리면 강사 이탈
 
 ## References
 
-_TBD — Add links to articles, case studies, or research papers that informed the analysis._
-
-- _TBD_
+- 노션 요구사항 페이지: `https://www.notion.so/f00562d8a6ca82e3ac9101caf277df1a`
+- 화면 구성 시트: `https://docs.google.com/spreadsheets/d/1sfUbMktqo9FHfrYRWNYcQIyqFO0VsBDw9pRATBbOFzo`
+- UI 참고 사이트: `https://ai.tigrison.com` (티그리스)
+- lms_docs/ HTML 7개 화면 (메인화면, 강사관리, 이력서, 비용정산, 기본 데이터, 강사님 로그인 화면, 교육입력창)
+- Pretendard: `https://github.com/orioncactus/pretendard`
+- shadcn/ui 컴포넌트 라이브러리
 
 ---
 
-_Last updated: _TBD__
-_Populated by: human research or `/moai design` brand interview_
+_Last updated: 2026-04-27_
+_Populated by: /moai design 자동 채움 (Notion + lms_docs + product.md 종합)_

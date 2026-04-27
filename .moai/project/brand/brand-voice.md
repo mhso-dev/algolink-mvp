@@ -1,68 +1,81 @@
 # Brand Voice
 
-_TBD — Complete this file via the brand interview (/moai design) before running any design or copywriting tasks._
+알고링크(Algolink) 브랜드 보이스. AI Agentic 업무 지원 시스템의 모든 UI 카피·이메일·알림에 적용.
 
 ---
 
 ## Tone
 
-<!-- Describe the overall emotional register of your brand communication.
-Examples: "confident and direct", "warm and approachable", "technical and authoritative", "playful yet professional" -->
-
-tone: _TBD_
+tone: 전문적이면서 따뜻한 동료 (professional, warm, peer-like)
+  # 알고링크는 교육 컨설팅 회사 — 강사를 "외주 인력"이 아니라 "파트너 동료"로 대한다.
+  # 담당자에게는 "행정 부담을 덜어주는 어시스턴트"로 들려야 한다.
+  # AI Agentic 시스템이지만 차갑거나 거만하지 않다.
 
 ## Register Spectrum
 
-<!-- Where does your brand sit on each axis? Use a 1–5 scale or descriptive labels. -->
-
-formal_informal: _TBD_
-serious_playful: _TBD_
-technical_accessible: _TBD_
+formal_informal: 3 (반-격식체 — "~합니다" 기반, 시스템 메시지는 짧게)
+serious_playful: 2 (대체로 진지, 빈 상태/완료 토스트에서만 가벼운 위트)
+technical_accessible: 3 (도메인 용어는 쓰되 약어 풀어쓰기, 신규 강사도 이해 가능)
 
 ## Vocabulary Preferences
 
-<!-- List words or phrases that ARE and ARE NOT part of your brand voice. -->
+preferred_terms:
+  - "배정" (배치/매칭이 아니라 "배정")
+  - "강사님" (강사 호칭, 일반 리스트에서는 "강사"만 OK)
+  - "담당자" (PM/매니저 X)
+  - "교육 프로젝트" (강의/세션 X — 의뢰부터 정산까지 한 묶음 단위)
+  - "정산" (지급/페이먼트 X)
+  - "의뢰" (요청/리퀘스트 X)
+  - "추천" (제안 → 추천, AI가 골라준 결과)
+  - "확정" (컨펌 → 확정)
+  - "이력서" (프로필/포트폴리오 X)
 
-preferred_terms: []
-  # Examples:
-  # - "build" (not "leverage")
-  # - "simple" (not "seamless")
-  # - "team" (not "resources")
-
-avoided_terms: []
-  # Examples:
-  # - "innovative"
-  # - "cutting-edge"
-  # - "game-changing"
+avoided_terms:
+  - "혁신적" / "획기적" / "차세대"
+  - "원클릭" — 대신 "1-클릭" 또는 "한 번에"
+  - "리소스" (사람을 가리킬 때) — "강사" 또는 "담당자"
+  - "유저" — "사용자"
+  - "솔루션" — "기능" 또는 "도구"
+  - "leverage" / "synergy" 식 외래어 남용
 
 ## Audience Familiarity
 
-<!-- How much does your audience know about your domain? -->
+jargon_level: medium
+  # 강사: 강의/세금(3.3%/8.8%)/세금계산서 용어 익숙
+  # 담당자: 교육 행정/사업비/강사비/마진 용어 익숙
+  # 둘 다 SaaS UI 패턴(칸반·필터·검색)은 학습 가능하지만, 처음부터 명확해야 함.
 
-jargon_level: _TBD_
-  # Options: low (no jargon), medium (some domain terms), high (expert audience)
-
-assumed_knowledge: _TBD_
-  # Describe what the reader already knows when they land on your site.
+assumed_knowledge:
+  - 강사: 본인 이력서·일정·세금 처리 방식 알고 있음
+  - 담당자: 교육 사업 수주·강사 섭외 프로세스 익숙, 구글시트로 일하던 경험
+  - 공통: 카카오톡/이메일 기반 업무에서 옮겨오는 사용자 — 새 시스템에 부담 없게
 
 ## Example Phrases
 
-<!-- Provide 3–5 example phrases that capture your brand voice.
-These will be used as stylistic anchors during copy generation. -->
-
-examples: []
-  # - "We built this for teams who move fast and ship often."
-  # - "No fluff. Just the tool you need."
+examples:
+  - "강사님께 배정 요청을 보냈습니다. 컨펌이 오면 알려드릴게요."
+  - "오늘 처리할 일이 3건 있어요."
+  - "AI가 추천한 강사 3명을 보여드립니다. 1순위부터 검토해 보세요."
+  - "정산 대기 중인 건 8개 — 1-클릭으로 일괄 요청할 수 있어요."
+  - "이력서를 PDF로 올려주세요. 양식은 자동으로 채워드립니다."
 
 ## Anti-Examples
 
-<!-- Phrases that do NOT sound like your brand. -->
+anti_examples:
+  - "혁신적인 AI 기술로 당신의 업무를 변화시키세요."
+  - "차세대 교육 컨설팅 솔루션을 경험하세요."
+  - "원클릭으로 모든 것을 해결하는 마법 같은 플랫폼."
+  - "AI Agentic 워크플로우 시너지를 통해 효율을 극대화합니다."
 
-anti_examples: []
-  # - "Unlock your potential with our revolutionary platform."
-  # - "In today's fast-paced digital landscape..."
+## UI Copy Conventions
+
+- **빈 상태(Empty State)**: 다음 액션 명확히 안내 — "아직 등록된 강사가 없어요. [강사 등록하기]를 눌러 시작해 보세요."
+- **에러 메시지**: 원인 + 다음 행동 — "이메일 형식이 올바르지 않아요. 예: name@algolink.com"
+- **확인 다이얼로그**: 결과 명시 — "이 강사 배정을 취소하면 강사님께 취소 알림이 발송돼요. 계속할까요?"
+- **숫자 단위**: 한국식 — "12건", "₩2,918,400", "80시간", "3명"
+- **시간 표기**: "2025-12-04 09:00" (ISO 날짜 + 24시간)
 
 ---
 
-_Last updated: _TBD__
-_Populated by: brand interview via /moai design_
+_Last updated: 2026-04-27_
+_Populated by: /moai design 자동 채움 (Notion 요구사항 + product.md 기반)_

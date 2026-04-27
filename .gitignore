@@ -224,3 +224,9 @@ dist-ssr/
 next-env.d.ts
 .next/
 .gh-config/
+
+# 세션 리포트 (Claude 세션 로그 — 로컬 참고용)
+.moai/reports/session-*.md
+
+# 디자인 참고 자료 (외부 LMS 화면 캡쳐)
+lms_docs/

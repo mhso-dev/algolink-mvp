@@ -1,85 +1,142 @@
 # Target Audience
 
-_TBD — Complete this file via the brand interview (/moai design) before running any design or copywriting tasks._
+알고링크 AI Agentic 업무 지원 시스템의 사용자 페르소나 3종. UI 결정과 카피 톤은 이들의 일상·고통·언어에 맞춰진다.
 
 ---
 
-## Primary Persona
+## Primary Persona — 담당자 (PM/Operator)
 
-<!-- The main person your product or service is designed for. -->
+persona_name: "정담당 — 알고링크 PM"
+role_or_title: "교육 컨설팅 PM (Project Manager) — 연차 3~7년"
+age_range: "30~45"
 
-persona_name: _TBD_
-  # A memorable name for your primary user. Example: "Alex the Startup CTO"
+### Goals and Motivations
 
-role_or_title: _TBD_
-  # Job title or life role. Example: "Engineering Manager at a Series A startup"
+primary_goal: "의뢰가 들어오면 30분 안에 강사 매칭하고 컨펌받기 — 동시 진행 프로젝트 12~20건을 흘리지 않고 끝까지 챙기기"
 
-age_range: _TBD_
-  # Approximate age range. Example: "28–42"
+secondary_goals:
+  - "행정 시간 줄이고 고객사 응대 시간 늘리기"
+  - "월말 정산 야근 없애기"
+  - "신입 인수인계 쉽게 (메모/히스토리 자동 축적)"
 
-## Goals and Motivations
+### Pain Points
 
-<!-- What does this person want to accomplish? -->
+primary_pain: "이메일·전화·문자·구글시트가 제각각 — 한 강사 컨펌받는 데 30~60분이 걸리고, 진행 상황을 매번 다시 확인해야 함"
 
-primary_goal: _TBD_
-  # The main thing they are trying to achieve. Be specific.
-  # Example: "Ship product faster without sacrificing code quality"
+secondary_pains:
+  - "강사 100명 중 누가 이번 기술스택에 맞는지 일일이 이력서 뒤져야 함"
+  - "월말 정산 시 미정산 건 추리는 데 하루"
+  - "강사 미응답 / 일정 충돌이 알림 없이 묻힘"
+  - "구글시트는 협업 시 row가 깨지고 히스토리 추적 어려움"
 
-secondary_goals: []
-  # Additional motivations or aspirations.
-  # - "Build credibility with their engineering team"
-  # - "Reduce time spent on code review"
+### Decision Triggers
 
-## Pain Points
+triggers:
+  - "동시 프로젝트가 10건 넘어가면서 통제 안 되기 시작"
+  - "월말 정산 한 번 망쳐서 강사 클레임 받음"
+  - "구글시트 권한 사고로 데이터 날린 적 있음"
 
-<!-- What frustrates this person? What problems do they face today? -->
+### Objections
 
-primary_pain: _TBD_
-  # The most acute frustration your product addresses.
-  # Example: "Code reviews take too long and block deployment"
+objections:
+  - "또 새 도구 학습? 구글시트가 익숙한데"
+  - "AI 추천이 정확할까? 결국 내가 다시 검토해야 하지 않을까"
+  - "회사가 도입해 봤자 강사들이 안 쓰면 의미 없음"
 
-secondary_pains: []
-  # Other friction points.
-  # - "Too many tools that don't integrate well"
-  # - "Hard to maintain consistent code quality across teams"
+### Vocabulary
 
-## Decision Triggers
-
-<!-- What makes this person decide to try or buy something new? -->
-
-triggers: []
-  # Events or situations that prompt action.
-  # - "Team grows past 10 engineers and chaos sets in"
-  # - "Missed a deadline due to a preventable bug"
-
-## Objections
-
-<!-- What concerns might prevent this person from converting? -->
-
-objections: []
-  # Common hesitations or pushback.
-  # - "We already have our own process"
-  # - "I don't want to add another tool to the stack"
-
-## Vocabulary
-
-<!-- Words and phrases this audience uses naturally. -->
-
-their_words: []
-  # Terms from their world — use these in copy to sound native.
-  # - "ship it"
-  # - "pull request"
-  # - "CI/CD pipeline"
-
-## Secondary Persona (optional)
-
-<!-- If you have a secondary audience, define them here. -->
-
-secondary_persona_name: _TBD_
-secondary_persona_role: _TBD_
-secondary_persona_goal: _TBD_
+their_words:
+  - "의뢰", "배정", "컨펌", "정산", "인건비 처리", "사업비", "강사비", "마진"
+  - "기관", "고객사", "사업명", "과정명", "시수"
+  - "3.3% / 8.8%", "세금계산서", "원천세"
+  - "D-Day", "리마인드", "히스토리"
 
 ---
 
-_Last updated: _TBD__
-_Populated by: brand interview via /moai design_
+## Secondary Persona — 강사 (Instructor)
+
+persona_name: "강전문 — 외부 전문 강사"
+role_or_title: "프리랜서 강사 / 대학 겸임 / 기업 자문 — 알고링크 외에도 2~5개 기관과 협업"
+age_range: "35~60"
+
+### Goals and Motivations
+
+primary_goal: "내 일정·이력·정산을 한 군데에서 관리 — 알고링크 일정과 다른 일정이 부딪히지 않게"
+
+secondary_goals:
+  - "이력서를 한 번 잘 작성해 두면 자동 갱신되는 환경"
+  - "강의 만족도/실적이 자동 누적되어 다음 기관 어필 자료가 됨"
+  - "연말 정산 때 소득 자료 한 번에 받기"
+  - "증명서가 필요할 때 즉시 PDF 다운로드"
+
+### Pain Points
+
+primary_pain: "기관마다 양식 다른 이력서·계약서·증빙 매번 다시 작성. 정산 명세는 엑셀로 와서 본인이 합산해야 함"
+
+secondary_pains:
+  - "강의 제안이 카톡·이메일·전화로 산발적으로 옴 — 응답 놓치기 쉬움"
+  - "일정 잡혔다가 갑자기 변경되면 다른 일정에 도미노"
+  - "주민번호·계좌번호를 매번 평문 메일로 보내는 게 불안"
+  - "강의 만족도가 어떻게 나왔는지 알기 어려움"
+
+### Decision Triggers
+
+triggers:
+  - "한 달에 강의 제안 5건 이상 — 일정 충돌 한 번이라도 발생"
+  - "연말정산 때 알고링크 외 다른 기관 소득 합산해야 할 때"
+  - "증명서가 급하게 필요한데 담당자 연락 안 됨"
+
+### Objections
+
+objections:
+  - "또 비밀번호 외워야 함?"
+  - "내 이력서 데이터를 시스템에 저장하면 보안 괜찮을까"
+  - "쓰는 강사가 적으면 결국 카톡으로 다시 연락 올 텐데"
+
+### Vocabulary
+
+their_words:
+  - "강의", "교육과정", "강의장", "교안", "출강"
+  - "강사료", "원천징수", "통장사본", "사업자등록증"
+  - "기술스택", "프론트엔드/백엔드/AI/생성형AI"
+  - "출강 가능 여부", "휴강", "보강"
+
+---
+
+## Tertiary Persona — 관리자 (Admin)
+
+persona_name: "관관리 — 알고링크 운영 책임자"
+role_or_title: "팀장 / 본부장 — 시스템 권한·매출 통계 책임"
+age_range: "40~55"
+
+### Goals
+
+primary_goal: "전 직원의 업무 가시성 확보 + 매출/매입 흐름 한눈에"
+
+secondary_goals:
+  - "회원 권한 관리(강사·담당자 비활성화·승급)"
+  - "월별 매입매출 집계로 의사결정"
+
+### Pain Points
+
+primary_pain: "담당자별로 진행 상황·매출이 흩어져 있어 보고 받을 때마다 자료 취합"
+
+### Vocabulary
+
+their_words: "권한", "감사 로그", "월 매출", "원가", "마진율", "프로젝트 현황"
+
+---
+
+## Cross-Persona Constraints
+
+shared_constraints:
+  - "모바일 100% 대응은 MVP 후순위 — 데스크톱·태블릿 우선"
+  - "한국어 단일, Asia/Seoul 타임존 고정"
+  - "일과 시간(09:00~19:00) 동시 사용 — 응답 속도 200ms 미만 체감 필요"
+  - "장시간 사용(하루 4시간+) — 피로 적은 컬러·여백"
+  - "개인정보(주민번호·계좌)는 마스킹 디폴트, 명시적 펼치기"
+
+---
+
+_Last updated: 2026-04-27_
+_Populated by: /moai design 자동 채움 (Notion 요구사항 + product.md 페르소나 기반)_
