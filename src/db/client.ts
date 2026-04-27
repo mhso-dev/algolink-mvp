@@ -24,13 +24,17 @@ const queryClient = postgres(databaseUrl, {
 export const db = drizzle(queryClient, { schema });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// 신규 publishable key (sb_publishable_*) — 레거시 anon JWT 대체.
+// Supabase 2026 Q1 retro: legacy anon/service_role JWT 는 2026 후반 제거 예정.
+const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 /**
- * 클라이언트 사이드 Supabase 인스턴스 (anon key).
+ * 클라이언트 사이드 Supabase 인스턴스 (publishable key).
  * 서버 사이드에서는 별도 SSR 헬퍼 (@supabase/ssr) 사용 권장.
  */
 export const supabase: SupabaseClient | null =
-  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+  supabaseUrl && supabasePublishableKey
+    ? createClient(supabaseUrl, supabasePublishableKey)
+    : null;
 
 export { schema };

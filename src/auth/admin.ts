@@ -13,20 +13,22 @@ import type { Database } from "@/db/supabase-types";
  */
 export function createServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // 신규 secret key (sb_secret_*) — 레거시 service_role JWT 대체.
+  // Supabase 2026 Q1 retro: legacy service_role 키는 2026 후반 제거 예정.
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
 
   if (!url) {
     throw new Error(
       "[auth.admin] NEXT_PUBLIC_SUPABASE_URL 환경변수가 설정되지 않았습니다.",
     );
   }
-  if (!serviceRoleKey) {
+  if (!secretKey) {
     throw new Error(
-      "[auth.admin] SUPABASE_SERVICE_ROLE_KEY 환경변수가 설정되지 않았습니다.",
+      "[auth.admin] SUPABASE_SECRET_KEY 환경변수가 설정되지 않았습니다.",
     );
   }
 
-  return createClient<Database>(url, serviceRoleKey, {
+  return createClient<Database>(url, secretKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
