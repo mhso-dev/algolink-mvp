@@ -1,7 +1,7 @@
 ---
 id: SPEC-AUTH-001
 version: 1.0.0
-status: planned
+status: completed
 created: 2026-04-27
 updated: 2026-04-27
 author: 철
@@ -530,6 +530,39 @@ UI 없음. `pnpm tsx scripts/auth/bootstrap-admin.ts --email ... --password ...`
   - https://supabase.com/docs/guides/auth/password-security
   - https://supabase.com/docs/guides/auth/rate-limits
   - https://supabase.com/docs/reference/javascript/auth-admin-inviteuserbyemail
+
+---
+
+## 9. Implementation Notes (Sync 2026-04-27)
+
+본 SPEC은 Plan-Run-Sync 사이클을 거쳐 정적 영역 100% 구현 완료(상태 `completed`). 라이브 검증(acceptance.md 시나리오 1-7, EC-1..12, axe DevTools, Lighthouse)은 SPEC 외 운영 검증으로 위임.
+
+### 구현 산출물 (커밋 6종)
+
+| Milestone | 커밋 | 핵심 산출물 |
+|-----------|------|-------------|
+| M1 | `a3b9a33` | 의존성 + .env.example + setup 가이드 |
+| M2/M3/M4 | `7d6bb8b` | `src/auth/` 도메인 8 모듈 + `src/utils/supabase/middleware.ts` getClaims + 마이그레이션 3종 (`20260427000080_auth_custom_access_token_hook.sql`, `_user_invitations.sql`, `_auth_events.sql`) |
+| M5 | `d60e4c6` | `(auth)` route group + login/logout + zod validation (`src/lib/validation/auth.ts`) |
+| M7/M8/M11 | `9c17947` | 역할별 nested route group `(instructor)/(operator)/(admin)` + `<AppShell userRole>` 통합 + `scripts/auth/bootstrap-admin.ts` |
+| M6/M9 | `93a0c57` | 초대 발급/수락 + 비밀번호 재설정 + `/api/auth/callback` OTP dispatcher |
+| M10/M12/M13 | `1121aa2` | `auth_events` 8 type 활성 사용 + `a11y-audit.md` + `docs/auth-architecture.md` + `docs/auth-bootstrap.md` |
+
+### Plan 대비 발생한 보완
+
+- **Module structure (hybrid)**: `src/utils/supabase/`(SDK 어댑터)와 `src/auth/`(도메인 레이어) 분리 채택. SPEC §4.2의 단일 `src/middleware.ts` 표기는 Next.js 16 canonical entry name `src/proxy.ts`로 해석 (sync에서 spec.md는 그대로 유지하고 본 노트에서 명시).
+- **`SessionUser` 평탄화**: 외부 API(`requireUser`) 유지, 내부 모양만 `{id, email, role, displayName}`로 단순화 — 호출처 0건 변경.
+- **`auth_events` event_type 9종 중 8종 활성**: `password_changed`는 REQ-AUTH-PASSWORD-006 정의된 in-session 변경으로 SPEC-ME-001에 위임.
+- **추가 도메인 모듈**: `errors.ts`(8종 한국어 에러 매핑), `next-param.ts`(open redirect 가드), `events.ts`(audit logger), `admin.ts`(server-only Service Role), `client.ts`/`server.ts`(어댑터 래퍼) — 원안의 4 파일을 8 파일로 확장.
+
+### 잔여 작업 (SPEC 범위 외)
+
+1. `src/db/supabase-types.ts` 재생성 → `user_invitations`/`auth_events` 자동 타입 → `as never`/`as any` 캐스트 제거 (`@MX:NOTE`로 표시됨)
+2. acceptance.md 시나리오 1-7 + EC-1..12 라이브 검증 세션
+3. axe DevTools / Lighthouse 측정 (5 페이지)
+4. 첫 admin bootstrap 실제 실행 (`pnpm auth:bootstrap-admin`)
+
+정적 DoD 체크리스트는 `progress.md` 참조.
 
 ---
 

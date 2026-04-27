@@ -65,11 +65,20 @@ algolink/
 │   │   ├── parsers/              # 응답 → 도메인 객체
 │   │   └── fallback.ts           # 에러 시 기본 동작
 │   │
-│   ├── auth/                     # Supabase Auth
-│   │   ├── server.ts             # 서버 세션
-│   │   ├── client.ts             # 클라이언트
-│   │   ├── guards.ts             # 역할 가드
-│   │   └── roles.ts              # role enum
+│   ├── auth/                     # Supabase Auth 도메인 레이어 (SPEC-AUTH-001)
+│   │   ├── server.ts             # 서버 세션 (getCurrentUser)
+│   │   ├── client.ts             # 클라이언트 어댑터
+│   │   ├── admin.ts              # Service Role (server-only)
+│   │   ├── guards.ts             # requireRole / requireUser
+│   │   ├── roles.ts              # role enum + path prefixes
+│   │   ├── errors.ts             # 8종 한국어 에러 매핑
+│   │   ├── events.ts             # auth_events audit logger
+│   │   └── next-param.ts         # next= open redirect 가드
+│   │
+│   ├── utils/supabase/           # @supabase/ssr SDK 어댑터
+│   │   ├── server.ts             # createServerClient (cookies)
+│   │   ├── client.ts             # createBrowserClient
+│   │   └── middleware.ts         # getClaims() 기반 세션 갱신
 │   │
 │   ├── components/               # 공유 UI 컴포넌트
 │   │   ├── ui/                   # shadcn 자동 생성
