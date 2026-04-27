@@ -4,8 +4,11 @@
 
 export type UserRole = "instructor" | "operator" | "admin";
 
+// 강사 홈은 src/app/(app)/(instructor)/me/page.tsx (InstructorDashboardPage) 가
+// 실제로 대시보드 컨텐츠를 렌더하므로 /me 로 정렬한다.
+// 이전 값 "/me/dashboard" 는 라우트가 존재하지 않아 404 + 다른 역할의 layout 가드 우회를 유발했다.
 export const ROLE_HOME: Record<UserRole, string> = {
-  instructor: "/me/dashboard",
+  instructor: "/me",
   operator: "/dashboard",
   admin: "/dashboard",
 };

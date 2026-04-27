@@ -22,7 +22,7 @@ test("isValidRole: 그 외 값은 false", () => {
 });
 
 test("roleHomePath: 역할별 home 경로", () => {
-  assert.equal(roleHomePath("instructor"), "/me/dashboard");
+  assert.equal(roleHomePath("instructor"), "/me");
   assert.equal(roleHomePath("operator"), "/dashboard");
   assert.equal(roleHomePath("admin"), "/dashboard");
 });
