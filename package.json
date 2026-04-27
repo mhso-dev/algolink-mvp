@@ -16,6 +16,7 @@
     "db:push": "drizzle-kit push",
     "db:verify": "tsx scripts/db-verify.ts",
     "db:seed-users": "tsx scripts/seed-users.ts",
+    "auth:bootstrap-admin": "tsx scripts/auth/bootstrap-admin.ts",
     "supabase:reset": "supabase db reset",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop"

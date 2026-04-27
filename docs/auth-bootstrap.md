@@ -65,9 +65,13 @@ supabase db push                   # 변경분만 적용
 pnpm auth:bootstrap-admin --email admin@algolink.test --password 'StrongPass!2026' --name '관리자'
 ```
 
-- 이미 admin이 존재하면 skip + exit 0 (멱등)
-- 동일 이메일이 instructor/operator로 등록된 경우 `--force-promote` 추가 시 role을 admin으로 UPDATE
-- `SUPABASE_SERVICE_ROLE_KEY` 미설정 시 명확한 에러 + exit 1
+- 이미 admin이 존재하면 skip + exit 0 (멱등). 기존 admin 이메일은 마스킹된 형태(`a***@domain`)로 출력
+- 동일 이메일이 admin이면 skip + exit 0
+- 동일 이메일이 instructor/operator로 등록된 경우 `--force-promote` 추가 시 role을 admin으로 UPDATE (비밀번호는 변경하지 않음)
+- `--force-promote` 없이 충돌 시 안내 메시지 + exit 1
+- `--name` 미지정 시 이메일 local-part가 `public.users.name_kr` 로 저장됨
+- `SUPABASE_SERVICE_ROLE_KEY` 또는 `NEXT_PUBLIC_SUPABASE_URL` 미설정 시 명확한 에러 + exit 1
+- `--help` 로 인자 없이 사용법만 출력 가능 (DB 연결 불필요)
 
 ---
 
