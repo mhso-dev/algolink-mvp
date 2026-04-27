@@ -230,3 +230,7 @@ next-env.d.ts
 
 # 디자인 참고 자료 (외부 LMS 화면 캡쳐)
 lms_docs/
+
+# Supabase CLI 로컬 런타임 메타데이터
+supabase/.branches/
+supabase/.temp/
