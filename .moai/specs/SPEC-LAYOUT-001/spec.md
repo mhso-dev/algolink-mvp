@@ -1,7 +1,7 @@
 ---
 id: SPEC-LAYOUT-001
 version: 1.0.0
-status: draft
+status: implemented
 created: 2026-04-27
 updated: 2026-04-27
 author: 철
@@ -13,7 +13,9 @@ issue_number: 3
 
 ## HISTORY
 
-- **2026-04-27 (v1.0.0)**: 초기 작성. Algolink MVP의 frontend 기반 레이어로서 (1) `(app)` route group 공통 셸(사이드바 + 톱바 + 메인), (2) DB `user_role` enum(instructor/operator/admin) 기반 nav 분기, (3) shadcn/ui 11종 프리미티브, (4) Tailwind 4 `@theme` 디자인 토큰(컬러 21·타이포 8·spacing 12·radius 5·shadow 3), (5) system-preference 기반 다크 모드, (6) WCAG 2.1 AA 접근성 베이스라인을 명세한다. SPEC-DB-001 완료 후속, SPEC-AUTH-001(가드)·SPEC-PROJECT-001(콘텐츠) 등 모든 페이지 SPEC의 선행 의존성. stash@{0}에 baseline 코드(앱 셸 4파일 + UI 프리미티브 11파일 + globals.css + tokens.json)가 대기 중이며, /moai run 단계에서 pop 후 본 SPEC 인수기준에 맞춰 정제될 예정.
+- **2026-04-27 (v1.0.0)**: 초기 작성. Algolink MVP의 frontend 기반 레이어로서 (1) `(app)` route group 공통 셸(사이드바 + 톱바 + 메인), (2) DB `user_role` enum(instructor/operator/admin) 기반 nav 분기, (3) shadcn/ui 11종 프리미티브, (4) Tailwind 4 `@theme` 디자인 토큰(컬러 21·타이포 8·spacing 12·radius 5·shadow 3), (5) system-preference 기반 다크 모드, (6) WCAG 2.1 AA 접근성 베이스라인을 명세한다. SPEC-DB-001 완료 후속, SPEC-AUTH-001(가드)·SPEC-PROJECT-001(콘텐츠) 등 모든 페이지 SPEC의 선행 의존성.
+
+- **2026-04-27 (v1.0.0 → status: implemented)**: as-built 통합. 사전 구축된 baseline 코드(앱 셸 4파일 + UI 프리미티브 11파일 + globals.css + tokens.json + 페이지 스캐폴딩 + helpers)를 정식 구현으로 채택. 3 커밋(`a1739a3` deps, `7f72064` design docs, `3ba71dd` baseline)으로 분할 통합. 검증: tsc/eslint 0 errors. 페이지 컨텐츠는 후속 SPEC에서 정제. 본 SPEC은 frontend 기반 레이어(셸+토큰+프리미티브)에 대한 책임만 부담.
 
 ---
 
