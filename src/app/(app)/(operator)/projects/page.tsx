@@ -136,7 +136,11 @@ export default async function ProjectsListPage() {
                   <TableCell className="text-sm">
                     {clientMap.get(p.client_id) ?? "—"}
                   </TableCell>
-                  <TableCell className="font-medium text-sm">{p.title}</TableCell>
+                  <TableCell className="font-medium text-sm">
+                    <Link href={`/projects/${p.id}`} className="hover:underline">
+                      {p.title}
+                    </Link>
+                  </TableCell>
                   <TableCell className="text-sm">
                     {p.instructor_id ? instructorMap.get(p.instructor_id) ?? "—" : "미배정"}
                   </TableCell>

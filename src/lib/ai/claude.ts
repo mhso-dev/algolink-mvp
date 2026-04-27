@@ -2,7 +2,7 @@
 // 의존성 미설치 시(mocking 또는 키 없음) null 반환하여 룰 기반 폴백으로 자동 강등.
 
 import type { ReasonGenerator } from "@/lib/recommend/engine";
-import type { CandidateScore, ProjectInput } from "@/lib/recommend/types";
+import type { CandidateScore } from "@/lib/recommend/types";
 
 const DEFAULT_MODEL = "claude-sonnet-4-6";
 const RECOMMEND_TIMEOUT_MS = 8000;
@@ -81,7 +81,6 @@ export function buildClaudeReasonGenerator(): ReasonGenerator | null {
               },
             ],
           },
-          // @ts-expect-error — SDK 별 옵션 시그니처
           { signal: controller.signal },
         )) as AnthropicResponse;
 
@@ -151,11 +150,14 @@ type AnthropicSdkModule = {
 
 async function loadAnthropicSdk(): Promise<AnthropicSdkModule | null> {
   try {
+    // 동적 import — 미설치 시 catch. 변수 우회로 webpack 정적 분석 회피.
+    const moduleName = "@anthropic-ai/sdk";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mod = (await import(
-      /* webpackIgnore: true */ "@anthropic-ai/sdk"
-    )) as AnthropicSdkModule;
-    return mod;
+    const mod = (await import(/* webpackIgnore: true */ moduleName as any)) as
+      | AnthropicSdkModule
+      | { default?: AnthropicSdkModule["default"] };
+    if (!mod || !("default" in mod) || !mod.default) return null;
+    return mod as AnthropicSdkModule;
   } catch {
     return null;
   }

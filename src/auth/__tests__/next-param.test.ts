@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { safeNextPath } from "../next-param";
 
 test("null/empty/undefined → role home (fallback)", () => {
-  assert.equal(safeNextPath(null, "instructor"), "/me/dashboard");
+  assert.equal(safeNextPath(null, "instructor"), "/me");
   assert.equal(safeNextPath(undefined, "operator"), "/dashboard");
   assert.equal(safeNextPath("", "admin"), "/dashboard");
 });
@@ -35,8 +35,8 @@ test("절대 외부 URL 거부 (https://evil.com)", () => {
 });
 
 test("instructor가 /dashboard로 가려고 하면 거부 (자기 home으로 fallback)", () => {
-  assert.equal(safeNextPath("/dashboard", "instructor"), "/me/dashboard");
-  assert.equal(safeNextPath("/admin/users", "instructor"), "/me/dashboard");
+  assert.equal(safeNextPath("/dashboard", "instructor"), "/me");
+  assert.equal(safeNextPath("/admin/users", "instructor"), "/me");
 });
 
 test("auth 페이지로의 redirect 거부", () => {
@@ -46,7 +46,7 @@ test("auth 페이지로의 redirect 거부", () => {
     safeNextPath("/accept-invite/set-password", "operator"),
     "/dashboard",
   );
-  assert.equal(safeNextPath("/reset-password", "instructor"), "/me/dashboard");
+  assert.equal(safeNextPath("/reset-password", "instructor"), "/me");
 });
 
 test("instructor의 유효한 경로 통과", () => {

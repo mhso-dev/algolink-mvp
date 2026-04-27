@@ -213,7 +213,7 @@ async function main() {
   });
 
   // ===== Section 8: Notifications enum =====
-  await check("AC-DB001-NOTIF-01: notification_type enum 5개 검증", async () => {
+  await check("AC-DB001-NOTIF-01: notification_type enum 검증 (SPEC-DB-001 5종 + SPEC-PROJECT-001 assignment_request)", async () => {
     const rows = await sql<{ enumlabel: string }[]>`
       SELECT enumlabel FROM pg_enum e
       JOIN pg_type t ON e.enumtypid = t.oid
@@ -221,9 +221,10 @@ async function main() {
       ORDER BY enumlabel
     `;
     const names = rows.map((r) => r.enumlabel).sort();
+    // SPEC-PROJECT-001 마이그레이션 91 가 assignment_request 를 ADD VALUE IF NOT EXISTS 로 추가.
     const expected = [
-      "assignment_overdue", "dday_unprocessed", "low_satisfaction_assignment",
-      "schedule_conflict", "settlement_requested",
+      "assignment_overdue", "assignment_request", "dday_unprocessed",
+      "low_satisfaction_assignment", "schedule_conflict", "settlement_requested",
     ];
     assert(JSON.stringify(names) === JSON.stringify(expected),
       `notification_type ${JSON.stringify(names)} ≠ ${JSON.stringify(expected)}`);
