@@ -223,3 +223,4 @@ dist-ssr/
 !.yarn/versions
 next-env.d.ts
 .next/
+.gh-config/
