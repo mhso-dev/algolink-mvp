@@ -10,6 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { requireUser } from "@/lib/auth";
 import { formatKRW } from "@/lib/utils";
 import { SETTLEMENT_STATUS_LABEL, settlementStatusBadgeVariant } from "@/lib/projects";
+import {
+  summarizeSettlements,
+  type SettlementInput,
+} from "@/lib/instructor/settlement-summary";
 
 export const dynamic = "force-dynamic";
 
@@ -35,12 +39,31 @@ export default async function InstructorDashboardPage() {
 
   const upcoming = upcomingRes.data ?? [];
   const settlements = settlementsRes.data ?? [];
-  const pendingTotal = settlements
-    .filter((s) => s.status === "pending" || s.status === "requested")
-    .reduce((sum, s) => sum + s.instructor_fee_krw - (s.withholding_tax_amount_krw ?? 0), 0);
+
+  // SPEC-ME-001 §2.6 REQ-ME-SET-004 — settlement-summary 단일 진실 공급원 사용.
+  const summaryRows: SettlementInput[] = settlements.map((s) => ({
+    status: s.status as SettlementInput["status"],
+    settlementFlow: s.settlement_flow as SettlementInput["settlementFlow"],
+    instructorFeeKrw: s.instructor_fee_krw,
+    // settlement_flow에 맞춰 0 / 3.30 / 8.80을 추론 (DB withholding_tax_amount_krw는 generated이므로 합계 검증용).
+    withholdingTaxRate:
+      s.settlement_flow === "corporate"
+        ? 0
+        : s.withholding_tax_amount_krw && s.instructor_fee_krw
+          ? Number(((s.withholding_tax_amount_krw / s.instructor_fee_krw) * 100).toFixed(2)) === 3.3
+            ? 3.3
+            : 8.8
+          : 3.3,
+  }));
+  const summary = summarizeSettlements(summaryRows);
+  // BigInt → Number (대시보드 표시용; 9천조 미만 안전).
+  const pendingTotal = Number(summary.unsettledNetKrw);
   const yearTotal = settlements
     .filter((s) => s.status === "paid")
-    .reduce((sum, s) => sum + s.instructor_fee_krw - (s.withholding_tax_amount_krw ?? 0), 0);
+    .reduce(
+      (sum, s) => sum + s.instructor_fee_krw - (s.withholding_tax_amount_krw ?? 0),
+      0,
+    );
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-6 flex flex-col gap-6">
