@@ -22,6 +22,11 @@
 --
 -- REQ: SPEC-AUTH-001 REQ-AUTH-ROLE-002..006
 
+-- @MX:ANCHOR: custom_access_token_hook — JWT 발급 시마다 호출되는 RLS 1차 신뢰 경계.
+-- @MX:REASON: Supabase Auth가 access_token을 발급할 때 매번 호출. claims에 무엇을 넣느냐가 모든 RLS 정책의 신뢰 기반.
+-- @MX:WARN: jsonb_set으로 claims.role(top-level)을 덮어쓰지 말 것.
+-- @MX:REASON: top-level role은 PostgREST 전용 (authenticated/anon/service_role). 여기에 비즈니스 role을 넣으면 SET ROLE 폭발하여 dashboard/instructors/projects 모두 0건으로 회귀. 비즈니스 role은 claims.app_metadata.role에만 주입한다.
+-- @MX:SPEC: SPEC-AUTH-001 §5.1
 CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
