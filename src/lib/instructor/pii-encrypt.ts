@@ -1,54 +1,75 @@
-// SPEC-ME-001 §2.7 REQ-ME-PAYOUT-003/004 — pgcrypto 기반 PII 암호화/복호화 wrapper.
-// @MX:WARN: 평문 PII는 본 모듈 외부로 절대 누출되어선 안 됨.
+// SPEC-ME-001 §2.7 REQ-ME-PAYOUT-003/004/005/008 — pgcrypto 기반 PII 암호화/복호화 wrapper.
+// @MX:WARN: 평문 PII 는 본 모듈 외부로 절대 누출되어선 안 됨.
 // @MX:REASON: 개인정보보호법 위반 — 평문 저장/로깅 시 회사 책임.
-// @MX:NOTE: SPEC-DB-001의 pgcrypto helper RPC 부재 시 service role + pgp_sym_encrypt 우회 (REQ-ME-PAYOUT-008).
+// @MX:ANCHOR: 강사 본인 지급 정보 R/W 진입점. 암호화는 RPC encrypt_payout_field, 복호화는 decrypt_payout_field.
+// @MX:REASON: fan_in 기대 >= 3 (form action, masked-display loader, settlement export).
+//
+// 본 모듈은 SupabaseClient 를 외부에서 주입받으므로 next/cookies 의존이 없다.
+// 따라서 'server-only' 마커는 생략하고, 실제 호출은 server action / page loader 에서만 이루어진다.
 
-import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+const KEY_LABEL_DEFAULT = "default" as const;
+
 /**
- * PII 평문 → bytea 암호문 변환 (Server Action 전용).
+ * 평문 → bytea(Uint8Array) 암호화 (RPC `app.encrypt_payout_field`).
  *
- * 우선순위:
- *  1. SPEC-DB-001이 노출한 RPC `app.encrypt_pii(text)` (authenticated GRANT).
- *  2. 부재 시 service role client에서 raw SQL `pgp_sym_encrypt(plaintext, key)` 실행.
- *
- * 본 MVP는 RPC 부재 가정으로 service role 우회를 기본 경로로 사용한다.
- * 실제 운영에서는 Supabase의 `Vault` 시크릿 또는 환경변수 기반 키 주입이 필요하다.
+ * - 빈 문자열/undefined 는 null 로 취급, RPC 호출 없이 null 반환.
+ * - pgcrypto 미설치 / RPC 미배포 시 한국어 에러 메시지를 throw.
  */
-export async function encryptPii(
-  supabaseAdmin: SupabaseClient,
-  plaintext: string,
-): Promise<Uint8Array> {
-  // 우선 RPC 시도 — 실패하면 raw SQL fallback.
-  const { data, error } = await supabaseAdmin.rpc("encrypt_pii", { plaintext });
-  if (!error && data) {
-    return toUint8Array(data);
+export async function encryptPayoutField(
+  supabase: SupabaseClient,
+  plaintext: string | null | undefined,
+): Promise<Uint8Array | null> {
+  if (plaintext == null || plaintext.length === 0) {
+    return null;
   }
-  // Fallback: pgp_sym_encrypt 직접 호출.
-  // @MX:WARN: 키는 process.env.PGCRYPTO_KEY로 주입. 누설 시 모든 PII 평문 복원 가능.
-  const key = process.env.PGCRYPTO_KEY;
-  if (!key) {
-    throw new Error("PGCRYPTO_KEY 환경 변수가 설정되어 있지 않습니다.");
+
+  const { data, error } = await supabase.rpc("encrypt_payout_field", {
+    plaintext,
+    key_label: KEY_LABEL_DEFAULT,
+  });
+
+  if (error) {
+    throw new Error(translateRpcError(error.message, "암호화"));
   }
-  // service role으로 단일 row select via SQL.
-  // postgres-js 직접 사용은 본 모듈 외부에 위임 (queries layer).
-  // 본 모듈은 placeholder — 실제 구현은 SPEC-DB-002에서 RPC가 정착될 때 단순화.
-  throw new Error(
-    "encrypt_pii RPC가 SPEC-DB-001에 노출되지 않았습니다. SPEC-DB-002로 위임이 필요합니다.",
-  );
+  if (data == null) {
+    return null;
+  }
+  return toUint8Array(data);
 }
 
-/** bytea → 평문 — 본 모듈 외부로 평문이 빠져나가지 않도록 즉시 마스킹할 것. */
-export async function decryptPii(
-  supabaseAdmin: SupabaseClient,
-  ciphertext: Uint8Array,
-): Promise<string> {
-  const { data, error } = await supabaseAdmin.rpc("decrypt_pii", {
-    ciphertext: toBase64(ciphertext),
+/**
+ * bytea(Uint8Array) → 평문 복호화 (RPC `app.decrypt_payout_field`).
+ *
+ * - 본인 row 만 허용. owner_instructor_id 가 caller(auth.uid()) 와 다르면 RPC 가 거부.
+ * - 평문은 즉시 마스킹 후 반환할 것 — DOM/로그/캐시에 평문 노출 금지.
+ */
+export async function decryptPayoutField(
+  supabase: SupabaseClient,
+  ciphertext: Uint8Array | string | null | undefined,
+  ownerInstructorId: string,
+): Promise<string | null> {
+  if (ciphertext == null) {
+    return null;
+  }
+
+  const ciphertextParam = normalizeCiphertextParam(ciphertext);
+  if (ciphertextParam == null) {
+    return null;
+  }
+
+  const { data, error } = await supabase.rpc("decrypt_payout_field", {
+    ciphertext: ciphertextParam,
+    owner_instructor_id: ownerInstructorId,
+    key_label: KEY_LABEL_DEFAULT,
   });
+
   if (error) {
-    throw new Error(`PII 복호화 실패: ${error.message}`);
+    throw new Error(translateRpcError(error.message, "복호화"));
+  }
+  if (data == null) {
+    return null;
   }
   if (typeof data !== "string") {
     throw new Error("PII 복호화 결과 형식 오류");
@@ -56,10 +77,12 @@ export async function decryptPii(
   return data;
 }
 
+// ---------- 변환 helpers ----------
+
+/** Supabase 가 bytea 결과를 hex(`\x...`) 또는 base64 문자열로 반환하는 두 케이스 모두 처리. */
 function toUint8Array(value: unknown): Uint8Array {
   if (value instanceof Uint8Array) return value;
   if (typeof value === "string") {
-    // Supabase는 bytea를 hex 문자열 (`\x...`) 또는 base64로 반환할 수 있다.
     if (value.startsWith("\\x")) {
       const hex = value.slice(2);
       const out = new Uint8Array(hex.length / 2);
@@ -70,9 +93,46 @@ function toUint8Array(value: unknown): Uint8Array {
     }
     return Uint8Array.from(Buffer.from(value, "base64"));
   }
-  throw new Error("encrypt_pii RPC 응답 형식 오류");
+  throw new Error("encrypt_payout_field RPC 응답 형식 오류");
 }
 
-function toBase64(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString("base64");
+/** RPC 입력에 들어갈 ciphertext 정규화 (항상 `\x` hex 표기). */
+function normalizeCiphertextParam(value: Uint8Array | string): string | null {
+  if (typeof value === "string") {
+    if (value.length === 0) return null;
+    if (value.startsWith("\\x")) return value;
+    const buf = Buffer.from(value, "base64");
+    if (buf.length === 0) return null;
+    return `\\x${buf.toString("hex")}`;
+  }
+  if (value.byteLength === 0) return null;
+  return `\\x${Buffer.from(value).toString("hex")}`;
 }
+
+/** RPC 에러 메시지를 한국어 사용자 메시지로 변환. */
+function translateRpcError(message: string, op: "암호화" | "복호화"): string {
+  const m = message.toLowerCase();
+  if (m.includes("function") && m.includes("does not exist")) {
+    return `PII ${op} RPC가 DB에 배포되어 있지 않습니다. supabase migration을 적용해주세요.`;
+  }
+  if (m.includes("pgcrypto") || m.includes("pgp_sym_encrypt") || m.includes("pgp_sym_decrypt")) {
+    return `pgcrypto 확장이 설치되어 있지 않습니다. CREATE EXTENSION pgcrypto 를 먼저 적용하세요.`;
+  }
+  if (m.includes("permission denied")) {
+    return `PII ${op} 권한이 없습니다. 본인 row만 ${op}할 수 있습니다.`;
+  }
+  if (m.includes("authentication required")) {
+    return `세션이 만료되었습니다. 다시 로그인해주세요.`;
+  }
+  if (m.includes("pii_encryption_key")) {
+    return `서버 암호화 키가 설정되어 있지 않습니다 (app.pii_encryption_key 누락).`;
+  }
+  return `PII ${op} 실패: ${message}`;
+}
+
+// ---------- backward-compat aliases ----------
+
+/** @deprecated encryptPayoutField 사용. */
+export const encryptPii = encryptPayoutField;
+/** @deprecated decryptPayoutField 사용 — owner_instructor_id 인자 추가됨. */
+export const decryptPii = decryptPayoutField;

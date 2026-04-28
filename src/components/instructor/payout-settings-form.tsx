@@ -1,7 +1,8 @@
 "use client";
 
-// SPEC-ME-001 §2.7 REQ-ME-PAYOUT — 지급 정보 폼 (mock 제출).
-// 실제 Server Action은 SPEC-DB-002 RPC 정착 후 연결.
+// SPEC-ME-001 §2.7 REQ-ME-PAYOUT-001~009 — 지급 정보 폼.
+// @MX:WARN: 평문 PII 는 form state 에 잠시 머무른 뒤 저장 직후 reset() 으로 폐기한다.
+// @MX:REASON: localStorage / React DevTools 노출 차단 (REQ-ME-PAYOUT-004).
 import * as React from "react";
 import { Save, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,16 +16,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { payoutInputSchema } from "@/lib/validation/instructor";
+import type { MaskedPayout } from "@/lib/instructor/payout-queries";
+import {
+  savePayoutInfoAction,
+  type PayoutActionResult,
+} from "@/app/(app)/(instructor)/me/settings/payout/actions";
 
-export function PayoutSettingsForm() {
+interface Props {
+  initial: MaskedPayout;
+}
+
+export function PayoutSettingsForm({ initial }: Props) {
+  const formRef = React.useRef<HTMLFormElement>(null);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [submitting, setSubmitting] = React.useState(false);
-  const [done, setDone] = React.useState(false);
+  const [resultMsg, setResultMsg] = React.useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErrors({});
-    setDone(false);
+    setResultMsg(null);
+
     const fd = new FormData(e.currentTarget);
     const input = {
       residentNumber: String(fd.get("residentNumber") ?? ""),
@@ -34,6 +46,16 @@ export function PayoutSettingsForm() {
       businessNumber: String(fd.get("businessNumber") ?? ""),
       withholdingTaxRate: String(fd.get("withholdingTaxRate") ?? "3.30"),
     };
+
+    if (
+      input.residentNumber.includes("*") ||
+      input.bankAccount.includes("*") ||
+      input.businessNumber.includes("*")
+    ) {
+      setErrors({ _form: "마스킹된 기존 값은 그대로 저장할 수 없습니다. 새 값을 다시 입력해주세요." });
+      return;
+    }
+
     const r = payoutInputSchema.safeParse(input);
     if (!r.success) {
       const next: Record<string, string> = {};
@@ -44,28 +66,46 @@ export function PayoutSettingsForm() {
       setErrors(next);
       return;
     }
+
     setSubmitting(true);
-    // @MX:TODO: Server Action 연결 (SPEC-DB-002 RPC 정착 후).
-    setTimeout(() => {
+    let result: PayoutActionResult;
+    try {
+      result = await savePayoutInfoAction(fd);
+    } catch (err) {
       setSubmitting(false);
-      setDone(true);
-      // 폼 평문 즉시 폐기.
-      (e.target as HTMLFormElement).reset();
-    }, 600);
+      setResultMsg({ kind: "err", text: (err as Error).message || "저장 실패" });
+      return;
+    }
+    setSubmitting(false);
+
+    if (!result.ok) {
+      if (result.fieldErrors) setErrors(result.fieldErrors);
+      setResultMsg({ kind: "err", text: result.message ?? "저장에 실패했습니다." });
+      return;
+    }
+
+    formRef.current?.reset();
+    setResultMsg({ kind: "ok", text: result.message ?? "저장되었습니다." });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
       <Field
         label="주민등록번호"
         name="residentNumber"
-        placeholder="000000-0000000"
+        placeholder={initial.hasResidentNumber ? initial.residentNumberMasked : "000000-0000000"}
+        helper={
+          initial.hasResidentNumber
+            ? `현재 등록: ${initial.residentNumberMasked} — 변경하려면 13자리를 새로 입력하세요.`
+            : undefined
+        }
         error={errors["residentNumber"]}
         required
       />
       <Field
         label="거래은행"
         name="bankName"
+        defaultValue={initial.bankName}
         placeholder="국민은행"
         error={errors["bankName"]}
         required
@@ -73,13 +113,19 @@ export function PayoutSettingsForm() {
       <Field
         label="계좌번호"
         name="bankAccount"
-        placeholder="000-000000-00-000"
+        placeholder={initial.hasBankAccount ? initial.bankAccountMasked : "000-000000-00-000"}
+        helper={
+          initial.hasBankAccount
+            ? `현재 등록: ${initial.bankAccountMasked} — 변경하려면 전체 번호를 새로 입력하세요.`
+            : undefined
+        }
         error={errors["bankAccount"]}
         required
       />
       <Field
         label="예금주"
         name="accountHolder"
+        defaultValue={initial.accountHolder}
         placeholder="홍길동"
         error={errors["accountHolder"]}
         required
@@ -87,7 +133,10 @@ export function PayoutSettingsForm() {
       <Field
         label="사업자등록번호 (선택)"
         name="businessNumber"
-        placeholder="000-00-00000"
+        placeholder={initial.hasBusinessNumber ? initial.businessNumberMasked : "000-00-00000"}
+        helper={
+          initial.hasBusinessNumber ? `현재 등록: ${initial.businessNumberMasked}` : undefined
+        }
         error={errors["businessNumber"]}
       />
 
@@ -95,7 +144,7 @@ export function PayoutSettingsForm() {
         <Label htmlFor="withholdingTaxRate" required>
           원천징수율
         </Label>
-        <Select name="withholdingTaxRate" defaultValue="3.30">
+        <Select name="withholdingTaxRate" defaultValue={initial.withholdingTaxRate}>
           <SelectTrigger id="withholdingTaxRate">
             <SelectValue />
           </SelectTrigger>
@@ -117,20 +166,33 @@ export function PayoutSettingsForm() {
         <div className="rounded-md border-2 border-dashed border-[var(--color-border-strong)] p-4 text-center">
           <Upload className="h-5 w-5 mx-auto mb-1 text-[var(--color-text-subtle)]" />
           <p className="text-xs text-[var(--color-text-muted)]">
-            PDF / JPG / PNG · 최대 5MB · Storage `payout-documents` 버킷에 본인만 read/write 가능
+            PDF / JPG / PNG · 최대 5MB · Storage `payout-documents` 버킷 (SPEC-DB-002 후속)
           </p>
         </div>
       </div>
 
-      {done && (
-        <p role="status" className="text-sm text-[var(--color-state-info)]">
-          저장되었습니다. (mock — 실제 암호화 저장은 SPEC-DB-002 RPC 정착 후)
+      {errors["_form"] && (
+        <p role="alert" className="text-sm text-[var(--color-state-alert)]">
+          {errors["_form"]}
+        </p>
+      )}
+
+      {resultMsg && (
+        <p
+          role={resultMsg.kind === "ok" ? "status" : "alert"}
+          className={
+            resultMsg.kind === "ok"
+              ? "text-sm text-[var(--color-state-info)]"
+              : "text-sm text-[var(--color-state-alert)]"
+          }
+        >
+          {resultMsg.text}
         </p>
       )}
 
       <div className="flex gap-2 mt-2">
         <Button type="submit" disabled={submitting}>
-          <Save /> 저장
+          <Save /> {submitting ? "저장 중..." : "저장"}
         </Button>
       </div>
     </form>
@@ -141,17 +203,22 @@ function Field({
   label,
   name,
   placeholder,
+  defaultValue,
+  helper,
   error,
   required,
 }: {
   label: string;
   name: string;
   placeholder?: string;
+  defaultValue?: string;
+  helper?: string;
   error?: string;
   required?: boolean;
 }) {
   const id = `field-${name}`;
   const errId = `${id}-error`;
+  const helpId = `${id}-help`;
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id} required={required}>
@@ -161,9 +228,15 @@ function Field({
         id={id}
         name={name}
         placeholder={placeholder}
+        defaultValue={defaultValue}
         aria-invalid={error ? "true" : undefined}
-        aria-describedby={error ? errId : undefined}
+        aria-describedby={error ? errId : helper ? helpId : undefined}
       />
+      {helper && !error && (
+        <p id={helpId} className="text-xs text-[var(--color-text-muted)]">
+          {helper}
+        </p>
+      )}
       {error && (
         <p id={errId} role="alert" className="text-xs text-[var(--color-state-alert)]">
           {error}
