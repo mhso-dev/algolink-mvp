@@ -39,7 +39,13 @@ export async function emitNotification(
     }
   }
 
-  const { data: row, error } = await supabase
+  // RLS 주의: INSERT ... RETURNING (supabase-js .select().single()) 은 RETURNING
+  // 단계에서 SELECT 정책을 추가로 요구한다. operator 는 notifications_operator_insert 로
+  // INSERT 만 허용되고, recipient_id != auth.uid() 인 행에 대한 SELECT 권한이 없으므로
+  // RETURNING 이 RLS 위반(42501)으로 실패한다.
+  // 회피: 본 함수는 notification id 를 반환할 책임이 없으므로 `.select()` 호출을 제거한다.
+  // (notificationId 는 호출처(mail-stub)에서 실제 사용처 없음 — 로그만 사용)
+  const { error } = await supabase
     .from("notifications")
     .insert({
       recipient_id: data.recipientId,
@@ -47,9 +53,7 @@ export async function emitNotification(
       title: data.title,
       body: data.body ?? null,
       link_url: data.linkUrl ?? null,
-    })
-    .select("id")
-    .single();
+    });
 
   if (error) {
     console.error("[notify.emit] insert failed", {
@@ -70,5 +74,7 @@ export async function emitNotification(
   const ctx = data.logContext ?? `recipient_id=${data.recipientId}`;
   console.log(`${NOTIF_LOG_PREFIX} ${data.type} → ${ctx}`);
 
-  return { ok: true, id: (row as { id: string }).id };
+  // id 는 RETURNING 없이 반환할 수 없으므로 빈 문자열 placeholder.
+  // 호출처는 ok 만 검사하며 id 는 사용하지 않는다 (관련 호출처: src/lib/payouts/mail-stub.ts).
+  return { ok: true, id: "" };
 }
