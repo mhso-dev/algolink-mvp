@@ -1,5 +1,7 @@
 // @MX:ANCHOR: SPEC-PROJECT-001 §5.3 REQ-PROJECT-RECOMMEND-001/003/004 — Top-3 + 사유 생성 + 폴백.
 // @MX:REASON: 추천 결과의 단일 entry point. AI 실패 시에도 폴백으로 결과를 보장한다.
+// @MX:NOTE: SPEC-RECOMMEND-001 — runRecommendationAction 이 reasonGen=null 전달 → 항상 fallback 분기.
+// @MX:SPEC: SPEC-RECOMMEND-001
 
 import { rankTopN } from "./score";
 import type {

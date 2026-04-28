@@ -208,6 +208,9 @@ test("rankTopN: 4명 → Top-3, skillMatch=0 후보 제외", () => {
 });
 
 test("rankTopN: 동점 시 instructorId 사전순 stable sort", () => {
+  // SPEC-RECOMMEND-001 REQ-RECOMMEND-003 — tier-3 (instructorId asc) 검증.
+  // 두 후보 모두 schedule=[] → availability=1 (tier-1 동률),
+  // 동일 skills+reviews → finalScore 동률 (tier-2 동률) → tier-3 instructorId asc 가 결정.
   const baseSkills = [
     { skillId: SK_PY, proficiency: "expert" as const },
     { skillId: SK_DJ, proficiency: "advanced" as const },
@@ -231,6 +234,137 @@ test("rankTopN: 동점 시 instructorId 사전순 stable sort", () => {
   const top = rankTopN(projectA, cands, 3);
   assert.equal(top[0].instructorId, "ins-A");
   assert.equal(top[1].instructorId, "ins-Z");
+});
+
+// ---------------------------------------------------------------------------
+// SPEC-RECOMMEND-001 — 3-tier 안정 정렬 (REQ-RECOMMEND-001/002/003)
+// 신규 비교자: availability desc → finalScore desc → instructorId asc
+// ---------------------------------------------------------------------------
+
+test("rankTopN: tier-1 (availability) 우선 정렬", () => {
+  // SPEC-RECOMMEND-001 REQ-RECOMMEND-001 — tier-1 availability 가 최상위 키.
+  // ins-A: 스킬/만족도 우수하나 일정 충돌 (availability=0, finalScore=0.7)
+  // ins-B: 스킬/만족도 보통이나 일정 OK (availability=1, finalScore=0.6)
+  // 기존 정책(단일 키 finalScore desc): ins-A 1순위.
+  // 신규 정책(tier-1 availability desc 우선): ins-B 1순위.
+  const cands: CandidateInput[] = [
+    {
+      instructorId: "ins-A",
+      displayName: "A",
+      skills: [
+        { skillId: SK_PY, proficiency: "expert" }, // 1.0
+        { skillId: SK_DJ, proficiency: "expert" }, // 1.0
+      ],
+      // (1.0 + 1.0) / 2 = 1.0 skillMatch
+      schedules: [
+        {
+          kind: "unavailable",
+          startsAt: new Date("2026-05-12"),
+          endsAt: new Date("2026-05-13"),
+        },
+      ],
+      // unavailable overlaps project → availability=0
+      reviews: { meanScore: 5, count: 3 }, // satisfaction = (5-1)/4 = 1.0
+    },
+    // finalScore = 0.5*1.0 + 0.3*0 + 0.2*1.0 = 0.7
+    {
+      instructorId: "ins-B",
+      displayName: "B",
+      skills: [
+        { skillId: SK_PY, proficiency: "beginner" }, // 0.4
+        { skillId: SK_DJ, proficiency: "beginner" }, // 0.4
+      ],
+      // (0.4 + 0.4) / 2 = 0.4 skillMatch
+      schedules: [],
+      // availability = 1
+      reviews: { meanScore: 3, count: 2 }, // satisfaction = (3-1)/4 = 0.5
+    },
+    // finalScore = 0.5*0.4 + 0.3*1 + 0.2*0.5 = 0.2 + 0.3 + 0.1 = 0.6
+  ];
+  const top = rankTopN(projectA, cands, 3);
+  assert.equal(top.length, 2);
+  // tier-1 으로 availability=1 인 ins-B 가 1순위.
+  assert.equal(top[0].instructorId, "ins-B");
+  assert.equal(top[0].availability, 1);
+  // ins-A 는 availability=0 후순위.
+  assert.equal(top[1].instructorId, "ins-A");
+  assert.equal(top[1].availability, 0);
+  // ins-A 의 finalScore 가 ins-B 보다 큼에도 후순위인 것이 핵심.
+  assert.ok(top[1].finalScore > top[0].finalScore);
+});
+
+test("rankTopN: tier-2 (finalScore) — availability 동일 시", () => {
+  // SPEC-RECOMMEND-001 REQ-RECOMMEND-001 — tier-1 동률 시 tier-2 finalScore 적용.
+  // 두 후보 모두 schedule=[] → availability=1 (tier-1 동률).
+  // ins-A: finalScore 0.955, ins-C: finalScore 0.5.
+  // 입력 순서를 점수 낮은 후보 먼저 두어 정렬이 실제로 동작하는지 확인.
+  const cands: CandidateInput[] = [
+    {
+      instructorId: "ins-C",
+      displayName: "C",
+      skills: [{ skillId: SK_PY, proficiency: "beginner" }],
+      // skillMatch = 0.4 / 2 = 0.2
+      schedules: [],
+      reviews: { meanScore: 3, count: 2 },
+      // satisfaction = 0.5 → finalScore = 0.5*0.2 + 0.3*1 + 0.2*0.5 = 0.5
+    },
+    {
+      instructorId: "ins-A",
+      displayName: "A",
+      skills: [
+        { skillId: SK_PY, proficiency: "expert" },
+        { skillId: SK_DJ, proficiency: "advanced" },
+      ],
+      // skillMatch = (1.0 + 0.9) / 2 = 0.95
+      schedules: [],
+      reviews: { meanScore: 4.6, count: 8 },
+      // satisfaction = 0.9 → finalScore = 0.5*0.95 + 0.3*1 + 0.2*0.9 = 0.955
+    },
+  ];
+  const top = rankTopN(projectA, cands, 3);
+  assert.equal(top[0].instructorId, "ins-A");
+  assert.equal(top[1].instructorId, "ins-C");
+  assert.ok(top[0].finalScore > top[1].finalScore);
+});
+
+test("rankTopN: 3-tier 통합 시나리오 — 3명 동일 (availability, finalScore)", () => {
+  // SPEC-RECOMMEND-001 REQ-RECOMMEND-003 — 3명 후보가 (availability, finalScore) 모두 동률일 때
+  // tier-3 instructorId asc 로 결정. 입력 순서를 무작위로 두어 실제 정렬을 검증.
+  const baseSkills = [
+    { skillId: SK_PY, proficiency: "expert" as const },
+    { skillId: SK_DJ, proficiency: "advanced" as const },
+  ];
+  const cands: CandidateInput[] = [
+    {
+      instructorId: "ins-C",
+      displayName: "C",
+      skills: baseSkills,
+      schedules: [],
+      reviews: { meanScore: 4.6, count: 8 },
+    },
+    {
+      instructorId: "ins-A",
+      displayName: "A",
+      skills: baseSkills,
+      schedules: [],
+      reviews: { meanScore: 4.6, count: 8 },
+    },
+    {
+      instructorId: "ins-B",
+      displayName: "B",
+      skills: baseSkills,
+      schedules: [],
+      reviews: { meanScore: 4.6, count: 8 },
+    },
+  ];
+  const top = rankTopN(projectA, cands, 3);
+  assert.deepEqual(
+    top.map((t) => t.instructorId),
+    ["ins-A", "ins-B", "ins-C"],
+  );
+  // 모든 후보 (availability, finalScore) 동률.
+  assert.ok(top.every((t) => t.availability === 1));
+  assert.ok(top.every((t) => Math.abs(t.finalScore - top[0].finalScore) < 1e-9));
 });
 
 test("rankTopN: 후보가 N 미만일 때 가능한 만큼 반환", () => {

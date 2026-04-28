@@ -87,7 +87,7 @@
   - 프로젝트 등록/편집 전체 폼 ✅ (create-form, edit-form 분리)
   - 상태 워크플로우 ✅ (status-machine.ts)
   - 리스트 검색·필터(사업/담당자/기관) ✅ (페이지네이션 포함)
-  - **AI 강사 추천** ✅ (recommend/engine.ts, score.ts)
+  - **강사 추천** ✅ (recommend/engine.ts, score.ts) — SPEC-RECOMMEND-001로 일정 미충돌 우선 Tier sort 적용 + AI 사유 비활성 (2026-04-28)
   - 1-클릭 배정 요청 메일 발송(스텁) ✅
   - **KPI 모듈** ✅ (kpi.ts + 통합 시나리오 1~7, 2026-04-28)
   - q-파라미터 ILIKE 완전 구현 ⏳, Playwright E2E ⏳

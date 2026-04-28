@@ -1,6 +1,7 @@
 "use client";
 
 // SPEC-PROJECT-001 §2.6/§2.7 — 추천 결과 표시 + 1-클릭 배정 버튼.
+// SPEC-RECOMMEND-001 §3 REQ-RECOMMEND-006 — AI 어휘 제거 + model/source 배지 미노출.
 
 import * as React from "react";
 import { Sparkles, CheckCircle2, AlertTriangle } from "lucide-react";
@@ -46,7 +47,6 @@ export function RecommendationPanel(props: Props) {
 
   const [candidates, setCandidates] = React.useState(initialCandidates);
   const [recId, setRecId] = React.useState<string | null>(initialRecId);
-  const [model, setModel] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [assigning, setAssigning] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState<string | null>(null);
@@ -63,7 +63,6 @@ export function RecommendationPanel(props: Props) {
       } else {
         setCandidates(res.candidates ?? []);
         setRecId(res.recommendationId ?? null);
-        setModel(res.model ?? null);
         if ((res.candidates ?? []).length === 0) {
           setMessage("기술스택을 만족하는 후보가 0명입니다.");
         } else if ((res.candidates ?? []).length < 3) {
@@ -101,12 +100,7 @@ export function RecommendationPanel(props: Props) {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-sm flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[var(--color-primary)]" />
-          AI 강사 추천
-          {model && (
-            <Badge variant="secondary" className="ml-2 text-[10px]">
-              {model}
-            </Badge>
-          )}
+          강사 추천
         </CardTitle>
         {!hasInstructor && (
           <Button onClick={onRecommend} disabled={loading} size="sm">
@@ -124,7 +118,7 @@ export function RecommendationPanel(props: Props) {
             aria-live="polite"
             className="rounded-md border border-dashed border-[var(--color-border)] p-6 text-center text-sm"
           >
-            AI가 추천을 생성하고 있습니다…
+            추천을 생성하고 있습니다…
           </div>
         )}
 
@@ -166,12 +160,6 @@ export function RecommendationPanel(props: Props) {
                             <CheckCircle2 className="h-3 w-3 mr-0.5" /> 배정됨
                           </Badge>
                         )}
-                        <Badge
-                          variant={c.source === "claude" ? "info" : "secondary"}
-                          className="text-[10px]"
-                        >
-                          {c.source === "claude" ? "AI 사유" : "룰 기반"}
-                        </Badge>
                       </div>
                       <p className="text-sm mt-1.5">{c.reason}</p>
                       <div className="flex flex-wrap gap-2 mt-2 text-xs text-[var(--color-text-muted)]">

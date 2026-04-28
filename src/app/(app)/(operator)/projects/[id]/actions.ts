@@ -15,7 +15,6 @@ import {
   type ProjectInput,
   type RecommendationCandidate,
 } from "@/lib/recommend";
-import { buildClaudeReasonGenerator } from "@/lib/ai/claude";
 import { validateTransition } from "@/lib/projects/status-machine";
 import { PROJECT_ERRORS } from "@/lib/projects/errors";
 import type { ProjectStatus } from "@/lib/projects";
@@ -75,6 +74,9 @@ async function ensureOperator() {
   return { ok: true, error: null, user } as const;
 }
 
+// @MX:NOTE: SPEC-RECOMMEND-001 §3 REQ-RECOMMEND-004/005 — Claude 사유 생성기 호출 비활성.
+// @MX:REASON: AI 사유 비용/지연 vs KPI 가치 미검증 단계. 룰 기반 폴백을 단일 노출 경로로 사용.
+// @MX:SPEC: SPEC-RECOMMEND-001
 /** Top-3 추천 실행 + ai_instructor_recommendations INSERT. */
 export async function runRecommendationAction(
   projectId: string,
@@ -205,11 +207,11 @@ export async function runRecommendationAction(
     requiredSkillIds,
   };
 
-  const reasonGen = buildClaudeReasonGenerator();
+  // SPEC-RECOMMEND-001 REQ-RECOMMEND-004 — reasonGen=null 직접 전달 (AI 사유 비활성).
   const result = await generateRecommendations(
     projectInput,
     candidates,
-    reasonGen,
+    null,
     3,
   );
 

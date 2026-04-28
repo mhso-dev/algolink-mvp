@@ -136,3 +136,68 @@ test("generateRecommendations: 후보 0명일 때 빈 결과 반환", async () =
   assert.equal(result.candidates.length, 0);
   assert.equal(result.projectId, "proj-1");
 });
+
+// ---------------------------------------------------------------------------
+// SPEC-RECOMMEND-001 — engine 측면 회귀 가드 (REQ-RECOMMEND-004 / 001)
+// ---------------------------------------------------------------------------
+
+test("generateRecommendations: reasonGen=null 시 model=null + 모든 source='fallback'", async () => {
+  // SPEC-RECOMMEND-001 REQ-RECOMMEND-004 — runRecommendationAction 이 항상 null 을 전달.
+  // 명시적 null 케이스에서 result.model === null + 모든 source === "fallback" 보장.
+  const result = await generateRecommendations(project, candidates, null, 3);
+  assert.equal(result.model, null);
+  assert.ok(result.candidates.length > 0);
+  assert.ok(
+    result.candidates.every((c) => c.source === "fallback"),
+    `모든 후보 source 가 'fallback' 이어야 한다. 실제: ${result.candidates.map((c) => c.source).join(",")}`,
+  );
+});
+
+test("generateRecommendations: tier sort 결과가 candidates 배열 순서로 유지", async () => {
+  // SPEC-RECOMMEND-001 REQ-RECOMMEND-001 — engine 레벨에서도 score.ts tier sort 가
+  // 결과 배열 순서로 보존되어야 한다. 입력 순서 [avail=0/score=0.7, avail=1/score=0.6]
+  // → 출력 순서 [avail=1/score=0.6, avail=0/score=0.7] (tier-1 우선).
+  const SK_PY_LOCAL = "skill-python";
+  const SK_DJ_LOCAL = "skill-django";
+  const localCandidates: CandidateInput[] = [
+    {
+      instructorId: "ins-A",
+      displayName: "A",
+      skills: [
+        { skillId: SK_PY_LOCAL, proficiency: "expert" },
+        { skillId: SK_DJ_LOCAL, proficiency: "expert" },
+      ],
+      // skillMatch = 1.0
+      schedules: [
+        {
+          kind: "unavailable",
+          startsAt: new Date("2026-05-12"),
+          endsAt: new Date("2026-05-13"),
+        },
+      ],
+      // availability = 0 (오버랩)
+      reviews: { meanScore: 5, count: 3 }, // satisfaction = 1.0
+      // finalScore = 0.5*1.0 + 0.3*0 + 0.2*1.0 = 0.7
+    },
+    {
+      instructorId: "ins-B",
+      displayName: "B",
+      skills: [
+        { skillId: SK_PY_LOCAL, proficiency: "beginner" },
+        { skillId: SK_DJ_LOCAL, proficiency: "beginner" },
+      ],
+      // skillMatch = 0.4
+      schedules: [],
+      // availability = 1
+      reviews: { meanScore: 3, count: 2 }, // satisfaction = 0.5
+      // finalScore = 0.5*0.4 + 0.3*1 + 0.2*0.5 = 0.6
+    },
+  ];
+  const result = await generateRecommendations(project, localCandidates, null, 3);
+  assert.equal(result.candidates.length, 2);
+  // tier-1 우선 → availability=1 인 ins-B 가 candidates[0].
+  assert.equal(result.candidates[0].instructorId, "ins-B");
+  assert.equal(result.candidates[0].availability, 1);
+  assert.equal(result.candidates[1].instructorId, "ins-A");
+  assert.equal(result.candidates[1].availability, 0);
+});

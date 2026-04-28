@@ -112,9 +112,17 @@ export function scoreCandidate(
   };
 }
 
+// @MX:ANCHOR: SPEC-RECOMMEND-001 §3 REQ-RECOMMEND-001/002/003 — 3-tier 안정 정렬.
+// @MX:REASON: KPI(1순위 채택률 ≥ 60%) 분자가 top3_jsonb[0]에 의존하므로 정렬 결정성 필수.
+// @MX:SPEC: SPEC-RECOMMEND-001
+// @MX:SPEC: SPEC-PROJECT-001 (가중치 FROZEN — REQ-RECOMMEND-007 보존)
 /**
- * 후보 리스트 → 점수 내림차순 Top-N (안정 정렬: 동점 시 instructorId 사전순).
- * skillMatch === 0 후보는 제외 (REQ-PROJECT-RECOMMEND-007).
+ * 후보 리스트 → Top-N (3-tier 안정 정렬, skillMatch=0 후보 제외).
+ * 정렬 키 (SPEC-RECOMMEND-001 REQ-RECOMMEND-001):
+ *   tier-1: availability desc (1 우선, 0 후순위)
+ *   tier-2: finalScore desc  (가중합 점수 큰 순)
+ *   tier-3: instructorId asc (결정성 tiebreak — REQ-RECOMMEND-003)
+ * skillMatch === 0 후보는 제외 (REQ-RECOMMEND-002).
  */
 export function rankTopN(
   project: ProjectInput,
@@ -126,7 +134,11 @@ export function rankTopN(
     .filter((s) => s.skillMatch > 0);
 
   scored.sort((a, b) => {
+    // tier-1: availability desc (1 before 0)
+    if (b.availability !== a.availability) return b.availability - a.availability;
+    // tier-2: finalScore desc
     if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore;
+    // tier-3: instructorId asc (deterministic tiebreak)
     return a.instructorId.localeCompare(b.instructorId);
   });
 

@@ -1,4 +1,5 @@
 // SPEC-PROJECT-001 — 한국어 에러 메시지 단일 출처 (REQ-PROJECT-ERROR).
+// SPEC-RECOMMEND-001 — RECOMMENDATION_DISCLAIMER 문구에서 "AI" 어휘 제거 (REQ-RECOMMEND-006).
 // 인라인 한국어 문자열 사용 금지. 모든 사용자 메시지는 본 모듈 경유.
 
 export const PROJECT_ERRORS = {
@@ -14,6 +15,6 @@ export const PROJECT_ERRORS = {
   RECOMMEND_NO_CANDIDATE_TEMPLATE: (n: number) =>
     `기술스택을 만족하는 후보가 ${n}명입니다.`,
   RECOMMENDATION_DISCLAIMER:
-    "AI 추천은 참고용이며 최종 배정은 담당자가 결정합니다.",
+    "강사 추천은 참고용이며 최종 배정은 담당자가 결정합니다.",
   CREATE_FAILED_GENERIC: "프로젝트 등록에 실패했습니다.",
 } as const;
