@@ -234,3 +234,11 @@ lms_docs/
 # Supabase CLI 로컬 런타임 메타데이터
 supabase/.branches/
 supabase/.temp/
+
+# ===========================================
+# Playwright E2E
+# ===========================================
+playwright-report/
+test-results/
+tests/e2e/.auth/
+playwright/.cache/

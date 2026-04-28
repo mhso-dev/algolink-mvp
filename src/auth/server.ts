@@ -33,13 +33,18 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   const email = typeof claims.email === "string" ? claims.email : "";
 
-  const topLevelRole = claims.role;
+  // 우선순위: app_metadata.role(비즈니스 role) → top-level claims.role 폴백.
+  // claims.role(top-level)은 PostgREST의 DB role 결정 필드(authenticated/anon/service_role)
+  // 영역이라 'instructor'/'operator'/'admin'을 거기에 넣으면 PostgREST가
+  // 'role does not exist'로 폭발한다. SPEC-AUTH-001 §5.1 — app_metadata.role을
+  // 1차 신뢰 경계로 사용한다.
   const appMeta =
     typeof claims.app_metadata === "object" && claims.app_metadata !== null
       ? (claims.app_metadata as Record<string, unknown>)
       : null;
   const metaRole = appMeta?.role;
-  const candidate = topLevelRole ?? metaRole;
+  const topLevelRole = claims.role;
+  const candidate = isValidRole(metaRole) ? metaRole : topLevelRole;
 
   if (!isValidRole(candidate)) return null;
 
