@@ -1,14 +1,18 @@
 import { test, expect } from "@playwright/test";
 import { PERSONAS } from "./helpers/personas";
+import { SEED_USERS } from "./helpers/seed-users";
 
 /**
  * SPEC-AUTH-001 — 인증/인가 회귀 테스트.
+ * SPEC-E2E-001 stage 1 REQ-E2E-002 보강: 3 역할 성공 로그인 + 보호 라우트 미인증 차단.
  *
  * 검증 범위:
  *  1. 미인증 보호 라우트 → /login?next= redirect
- *  2. 잘못된 자격 증명 → 통일 에러 메시지 + URL 유지
- *  3. 역할 기반 라우팅(instructor가 /dashboard 접근 시 /me, operator가 /me 접근 시 /dashboard)
- *  4. 로그아웃 → /login 복귀
+ *  2. 쿠키 제거 후 보호 페이지 접근 → /login 으로 복귀
+ *  3. 잘못된 자격 증명 → 통일 에러 메시지 + URL 유지
+ *  4. 3 역할(admin/operator/instructor) 성공 로그인 → 역할별 home 도착
+ *  5. 역할 기반 라우팅(instructor가 /dashboard 접근 시 /me, operator가 /me 접근 시 /dashboard)
+ *  6. 로그아웃 → /login 복귀
  */
 
 const PROTECTED_PATHS = [
@@ -34,6 +38,13 @@ test.describe("@anon Anonymous redirects", () => {
     });
   }
 
+  test("session 쿠키 제거 후 /projects 접근 → /login redirect", async ({ page, context }) => {
+    // 미인증 상태 보장: anon project 는 storageState 없음이지만 명시적으로 한 번 더 비운다.
+    await context.clearCookies();
+    await page.goto("/projects", { waitUntil: "domcontentloaded" });
+    expect(new URL(page.url()).pathname).toBe("/login");
+  });
+
   test("invalid credentials → unified error message", async ({ page }) => {
     await page.goto("/login", { waitUntil: "networkidle" });
     const submit = page.getByRole("button", { name: /^로그인$/ });
@@ -49,6 +60,34 @@ test.describe("@anon Anonymous redirects", () => {
     // URL은 그대로 /login.
     expect(new URL(page.url()).pathname).toBe("/login");
   });
+});
+
+test.describe("@anon Successful login per role lands at home", () => {
+  // 3 역할의 자격 증명을 받아 /login 폼을 직접 제출 → 역할 home 도착을 확인.
+  // setup 프로젝트와 별도로, REQ-E2E-002(a) "성공 로그인 → 역할별 랜딩" 을 명시적으로 회귀 검증.
+  for (const role of ["admin", "operator", "instructor"] as const) {
+    test(`${role} login → ${PERSONAS[role].homePath}`, async ({ page, context }) => {
+      test.setTimeout(90_000);
+      await context.clearCookies();
+      await page.goto("/login", { waitUntil: "networkidle" });
+      await page.locator("#login-email").fill(SEED_USERS[role].email);
+      await page.locator("#login-password").fill(SEED_USERS[role].password);
+      const submit = page.getByRole("button", { name: /^로그인$/ });
+      await Promise.all([
+        page.waitForURL(
+          (url) =>
+            url.pathname === PERSONAS[role].homePath ||
+            url.pathname.startsWith(PERSONAS[role].homePath + "/"),
+          { timeout: 60_000 },
+        ),
+        submit.click(),
+      ]);
+      const finalPath = new URL(page.url()).pathname;
+      expect(finalPath).not.toMatch(/\/login/);
+      // operator/admin → /dashboard, instructor → /me 로 시작.
+      expect(finalPath.startsWith(PERSONAS[role].homePath)).toBe(true);
+    });
+  }
 });
 
 test.describe("@instructor Role-based routing — instructor", () => {
