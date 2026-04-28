@@ -11,6 +11,7 @@ import { logAuthEvent } from "@/auth/events";
 import { roleHomePath, isValidRole, type UserRole } from "@/auth/roles";
 import { mapAuthError } from "@/auth/errors";
 import { setPasswordSchema } from "@/lib/validation/auth";
+import { linkInstructorUser } from "@/lib/instructor/link-user";
 
 export async function acceptInvite(
   formData: FormData,
@@ -100,16 +101,49 @@ export async function acceptInvite(
     })
     .eq("id", inv.id);
 
-  // 5. 감사 로그.
+  // 5. instructors.user_id 자동 매핑 — SPEC-INSTRUCTOR-001 §5.5 REQ-INSTRUCTOR-CREATE-007.
+  //    role === "instructor" 일 때만 email 매칭으로 UPDATE. 멱등 (user_id IS NULL 조건).
+  //    실패는 로깅만 — 비밀번호는 이미 설정됐고, 운영자가 수동 매핑 가능.
+  const linkResult = await linkInstructorUser(
+    { email, authUserId, role },
+    {
+      updateInstructorUserIdByEmail: async (em, uid) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data, error } = await (admin as any)
+          .from("instructors")
+          .update({ user_id: uid })
+          .eq("email", em)
+          .is("user_id", null)
+          .is("deleted_at", null)
+          .select("id");
+        if (error) {
+          return { matched: 0, error: error.message ?? "update_failed" };
+        }
+        return { matched: Array.isArray(data) ? data.length : 0, error: null };
+      },
+    },
+  );
+  if (!linkResult.ok) {
+    console.error("[accept-invite] instructors.user_id 매핑 실패", {
+      email,
+      authUserId,
+      error: linkResult.error,
+    });
+  }
+
+  // 6. 감사 로그.
   await logAuthEvent("invitation_accepted", {
     userId: authUserId,
     email,
-    metadata: { role },
+    metadata: {
+      role,
+      ...(linkResult.ok ? { instructor_link_matched: linkResult.matched } : {}),
+    },
   });
 
-  // 6. 세션 갱신 — 새로 추가된 role claim이 즉시 반영되도록 강제 refresh.
+  // 7. 세션 갱신 — 새로 추가된 role claim이 즉시 반영되도록 강제 refresh.
   await supabase.auth.refreshSession();
 
-  // 7. 역할 home으로 이동 (try/catch 바깥에서 redirect — Next.js 규약).
+  // 8. 역할 home으로 이동 (try/catch 바깥에서 redirect — Next.js 규약).
   redirect(roleHomePath(role));
 }
