@@ -11,16 +11,23 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 interface SidebarProps {
   sections: NavSection[];
   collapsed?: boolean;
+  /**
+   * SPEC-MOBILE-001 §M2: Sheet drawer 내부 등 viewport 분기와 무관하게
+   * 항상 표시해야 할 때 true. 기본 false → AppShell 직접 사용 시
+   * `hidden lg:flex`로 모바일에서 자동 미렌더된다.
+   */
+  forceVisible?: boolean;
 }
 
-export function Sidebar({ sections, collapsed = false }: SidebarProps) {
+export function Sidebar({ sections, collapsed = false, forceVisible = false }: SidebarProps) {
   const pathname = usePathname();
 
   return (
     <TooltipProvider delayDuration={150}>
       <aside
         className={cn(
-          "flex flex-col bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)] transition-[width] duration-150",
+          "flex-col bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)] transition-[width] duration-150",
+          forceVisible ? "flex" : "hidden lg:flex",
           collapsed ? "w-[var(--layout-sidebar-width-collapsed)]" : "w-[var(--layout-sidebar-width)]",
         )}
         style={{

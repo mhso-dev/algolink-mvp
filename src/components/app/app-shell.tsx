@@ -31,6 +31,7 @@ export function AppShell({
         <TopBar
           user={user}
           role={role}
+          sections={sections}
           unreadNotifications={unreadNotifications}
           notificationSlot={notificationSlot}
         />

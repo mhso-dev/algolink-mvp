@@ -17,16 +17,20 @@ import {
 import type { AppRole } from "@/lib/role";
 import { roleLabel } from "@/lib/role";
 import { signOut } from "@/app/(auth)/login/actions";
+import type { NavSection } from "@/lib/nav";
+import { MobileNav } from "./mobile-nav";
 
 interface TopBarProps {
   user: { email: string; displayName: string };
   role: AppRole;
+  /** SPEC-MOBILE-001 §M2: lg 미만 viewport에서 MobileNav drawer로 재사용할 nav sections. */
+  sections: NavSection[];
   unreadNotifications?: number;
   /** SPEC-NOTIFY-001 §M5: server-rendered NotificationBell 슬롯. */
   notificationSlot?: React.ReactNode;
 }
 
-export function TopBar({ user, role, unreadNotifications = 0, notificationSlot }: TopBarProps) {
+export function TopBar({ user, role, sections, unreadNotifications = 0, notificationSlot }: TopBarProps) {
   const initial = user.displayName.trim().slice(0, 1) || "?";
   const router = useRouter();
 
@@ -39,9 +43,12 @@ export function TopBar({ user, role, unreadNotifications = 0, notificationSlot }
 
   return (
     <header
-      className="flex items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4"
-      style={{ height: "var(--layout-topbar-height)" }}
+      className="flex items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 sm:px-4 pt-safe"
+      style={{ minHeight: "var(--layout-topbar-height)" }}
     >
+      {/* SPEC-MOBILE-001 §M2: lg 미만 viewport 햄버거 트리거 (lg 이상은 lg:hidden으로 미렌더). */}
+      <MobileNav sections={sections} />
+
       {/* 검색 */}
       <div className="relative flex-1 max-w-md">
         <Search
