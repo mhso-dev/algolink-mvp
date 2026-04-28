@@ -93,11 +93,12 @@ test.describe("@operator Instructors list", () => {
 test.describe("@operator AI matching from project detail", () => {
   test("프로젝트 상세 → AI 추천 실행 → 후보 또는 룰 기반 폴백 가시", async ({ page }) => {
     // SPEC-E2E-001 REQ-E2E-004: 프로젝트 상세에서 AI 매칭 트리거 → top-3 후보 또는 폴백 메시지.
+    // 강사 미배정 프로젝트만 추천 패널이 노출되므로 status=assignment_review 로 필터링.
     test.setTimeout(90_000);
-    await page.goto("/projects");
+    await page.goto("/projects?status=assignment_review&sort=created_at&order=desc");
     const firstRow = page.locator("table tbody tr a").first();
     if ((await firstRow.count()) === 0) {
-      test.skip(true, "시드 프로젝트 부재 — AI 매칭 테스트 스킵");
+      test.skip(true, "강사 미배정(assignment_review) 시드 프로젝트 부재 — AI 매칭 테스트 스킵");
     }
     await firstRow.click();
     await expect(page).toHaveURL(/\/projects\/[^/]+/);

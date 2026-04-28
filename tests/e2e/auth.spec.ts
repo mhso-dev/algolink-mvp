@@ -117,26 +117,16 @@ test.describe("@operator Role-based routing — operator", () => {
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/dashboard/);
 
-    // 토픕바 프로필 메뉴 → 로그아웃. 셀렉터는 보수적으로 "로그아웃" 텍스트 기반.
-    // 메뉴가 dropdown 안에 있으면 트리거 버튼을 먼저 연다.
-    const logoutByName = page.getByRole("menuitem", { name: /로그아웃/ });
-    const logoutButton = page.getByRole("button", { name: /로그아웃/ });
+    // 토픕바 프로필 메뉴 트리거 — Topbar 컴포넌트의 DropdownMenuTrigger 는
+    // aria-label="프로필 메뉴 열기" 를 사용한다 (src/components/app/topbar.tsx).
+    const menuTrigger = page.getByRole("button", { name: "프로필 메뉴 열기" });
+    await expect(menuTrigger).toBeVisible();
+    await menuTrigger.click();
 
-    if (await logoutByName.count()) {
-      await logoutByName.first().click();
-    } else if (await logoutButton.count()) {
-      await logoutButton.first().click();
-    } else {
-      // 메뉴가 닫혀 있을 가능성 — 사용자 아바타/메뉴 트리거를 연다.
-      const avatarTrigger =
-        page.getByRole("button", { name: PERSONAS.operator.email }).first();
-      if (await avatarTrigger.count()) {
-        await avatarTrigger.click();
-        await page.getByRole("menuitem", { name: /로그아웃/ }).first().click();
-      } else {
-        test.skip(true, "로그아웃 트리거를 찾지 못함 — Topbar UI 확인 필요");
-      }
-    }
+    // 드롭다운 열린 후 "로그아웃" menuitem 클릭. shadcn DropdownMenuItem 은 menuitem role.
+    const logoutItem = page.getByRole("menuitem", { name: /로그아웃/ });
+    await expect(logoutItem).toBeVisible();
+    await logoutItem.click();
 
     await page.waitForURL(/\/login/, { timeout: 15_000 });
     expect(new URL(page.url()).pathname).toBe("/login");

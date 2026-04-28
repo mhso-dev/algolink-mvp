@@ -104,66 +104,69 @@ test.describe("@operator Projects list", () => {
     await expect(page.getByRole("main")).toBeVisible();
   });
 
-  test("신규 프로젝트 등록 → 상세 진입 → (가능하면) 1-클릭 배정", async ({ page }) => {
-    // SPEC-E2E-001 stage 1 REQ-E2E-005: 등록 → 검색 → 상세 → 배정 골든 패스.
-    // 시드 client/skill 이 1 개 이상 필요 (SPEC-DB-001 시드 보장).
+  test("강사 미배정 프로젝트 진입 → AI 추천 실행 → 1-클릭 배정 요청", async ({ page }) => {
+    // SPEC-E2E-001 REQ-E2E-005: 미배정 프로젝트에서 추천 → top-3 후보 → 배정 요청 골든패스.
+    // 결정성을 위해 status=assignment_review (instructor_id NULL) 시드를 사용한다.
+    // 신규 프로젝트 등록 회귀는 별도 테스트 "신규 프로젝트 등록 happy path" 가 담당.
     test.setTimeout(120_000);
 
+    await page.goto("/projects?status=assignment_review&sort=created_at&order=desc");
+    const firstRowLink = page.locator("table tbody tr a").first();
+    if ((await firstRowLink.count()) === 0) {
+      throw new Error(
+        "강사 미배정(assignment_review) 시드 프로젝트 부재 — phase2 시드 마이그레이션 미적용 가능",
+      );
+    }
+    await firstRowLink.click();
+    await expect(page).toHaveURL(/\/projects\/[^/]+/);
+    await expect(page.getByRole("main")).toBeVisible();
+
+    // 추천 실행.
+    const recBtn = page.getByRole("button", { name: /추천 (실행|다시 실행)/ });
+    await expect(recBtn).toBeVisible();
+    await recBtn.first().click();
+
+    // 후보 리스트 또는 에러 메시지 — AI key 미설정 환경에서도 룰 기반 폴백이 노출되어야 한다.
+    const candidates = page.getByRole("list", { name: "강사 추천 후보" });
+    const errorAlert = page.getByRole("alert");
+    await expect(candidates.or(errorAlert).first()).toBeVisible({ timeout: 60_000 });
+
+    // 후보가 떴다면 1-클릭 배정 시도.
+    if (await candidates.isVisible().catch(() => false)) {
+      const assignBtn = page.getByRole("button", { name: /^배정 요청$/ }).first();
+      if ((await assignBtn.count()) > 0) {
+        await assignBtn.click();
+        // 배정 완료 후 "배정됨" 배지 또는 강사 배정 메시지가 노출.
+        await expect(
+          page.getByText(/배정됨|배정 완료|이미 강사가 배정|배정 요청됨/).first(),
+        ).toBeVisible({ timeout: 30_000 });
+      }
+    }
+  });
+
+  test("신규 프로젝트 등록 happy path — title + 첫 client 로 redirect", async ({ page }) => {
+    // SPEC-E2E-001 REQ-E2E-005 (a): 등록 폼 제출 → /projects/{id} 로 redirect 되고 main 가시.
+    test.setTimeout(60_000);
     const stamp = Date.now();
     const title = `E2E회귀_${stamp}`;
 
     await page.goto("/projects/new");
-    await expect(page).toHaveURL(/\/projects\/new/);
-
     await page.locator("#title").fill(title);
 
-    // shadcn Select: trigger 클릭 → option 1 개 클릭. 첫 번째 client/skill 만 사용.
+    // shadcn(Radix) Select: trigger 클릭 → listbox 가 보일 때까지 대기 → option 클릭.
     const clientTrigger = page.locator("#clientId");
-    if (await clientTrigger.count()) {
-      await clientTrigger.click();
-      const firstClientOption = page.getByRole("option").first();
-      if (await firstClientOption.count()) {
-        await firstClientOption.click();
-      }
-    }
+    await expect(clientTrigger).toBeVisible();
+    await clientTrigger.click();
+    const optionList = page.getByRole("listbox");
+    await expect(optionList).toBeVisible({ timeout: 5_000 });
+    const firstClientOption = page.getByRole("option").first();
+    await expect(firstClientOption).toBeVisible();
+    await firstClientOption.click();
+    await expect(optionList).toBeHidden({ timeout: 5_000 });
 
-    // 등록.
-    await page.getByRole("button", { name: /등록|저장|생성/ }).first().click();
-
-    // 성공 시 /projects 목록 또는 /projects/{id} 상세로 이동.
-    await page
-      .waitForURL(/\/projects(\/[^/]+)?(\?|$)/, { timeout: 30_000 })
-      .catch(() => null);
-
-    // 리스트로 돌아와 q 검색으로 새 프로젝트 발견.
-    await page.goto(`/projects?q=${encodeURIComponent(title)}`);
-    const newRow = page.locator("table tbody tr", { hasText: title });
-    if ((await newRow.count()) === 0) {
-      test.skip(true, "신규 프로젝트가 리스트에 반영되지 않음 — 시드 client/skill 부재 가능");
-    }
-    await newRow.first().locator("a").first().click();
-    await expect(page).toHaveURL(/\/projects\/[^/]+/);
+    await page.getByRole("button", { name: /^등록$/ }).first().click();
+    await page.waitForURL(/\/projects\/[0-9a-f-]+(\?|$)/, { timeout: 30_000 });
     await expect(page.getByRole("main")).toBeVisible();
-
-    // 추천 실행 → 후보 → 1-클릭 배정. 시드/AI 가용성에 따라 skip 허용.
-    const recBtn = page.getByRole("button", { name: /추천 (실행|다시 실행)/ });
-    if ((await recBtn.count()) === 0) {
-      test.skip(true, "추천 버튼 부재 — 강사 이미 배정");
-    }
-    await recBtn.first().click();
-    const candidates = page.getByRole("list", { name: "강사 추천 후보" });
-    if (!(await candidates.isVisible({ timeout: 60_000 }).catch(() => false))) {
-      test.skip(true, "AI 추천 결과 미가용");
-    }
-    const assignBtn = page.getByRole("button", { name: /^배정 요청$/ }).first();
-    if ((await assignBtn.count()) === 0) {
-      test.skip(true, "배정 가능한 후보 없음");
-    }
-    await assignBtn.click();
-    // 배정 완료 시 "배정됨" 배지 또는 폼 disable 확인.
-    await expect(
-      page.getByText(/배정됨|이미 강사가 배정/).first(),
-    ).toBeVisible({ timeout: 30_000 });
   });
 });
 

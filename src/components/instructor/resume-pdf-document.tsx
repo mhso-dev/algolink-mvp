@@ -52,7 +52,9 @@ const styles = StyleSheet.create({
   rowSub: { fontSize: 10, color: "#333333" },
   rowPeriod: { fontSize: 9, color: "#666666", marginTop: 1 },
   rowDesc: { fontSize: 10, color: "#222222", marginTop: 2 },
-  empty: { fontSize: 10, color: "#888888", fontStyle: "italic" },
+  // NotoSansKR italic 변형이 미설치 — fontStyle italic 사용 시 react-pdf 가
+  // "Could not resolve font" 로 throw. 색상으로만 강조하고 italic 은 제거.
+  empty: { fontSize: 10, color: "#888888" },
   footer: { position: "absolute", bottom: 16, left: 0, right: 0, textAlign: "center", fontSize: 8, color: "#888888" },
   maskBadge: { marginTop: 4, fontSize: 9, color: "#a14b00" },
 });

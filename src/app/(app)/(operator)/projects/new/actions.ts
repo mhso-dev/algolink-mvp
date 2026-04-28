@@ -27,18 +27,25 @@ export async function createProjectAction(
   }
 
   const requiredSkillIdsRaw = formData.getAll("requiredSkillIds[]");
+  // 빈 문자열은 zod preprocess + optional 조합에서 inner z.date 검증을 통과하지 못한다 —
+  // optional 은 undefined 만 허용하므로 빈 문자열을 undefined 로 정규화한다.
+  const blankToUndef = (v: FormDataEntryValue | null): string | undefined => {
+    if (typeof v !== "string") return undefined;
+    const trimmed = v.trim();
+    return trimmed.length === 0 ? undefined : trimmed;
+  };
   const parsed = createProjectSchema.safeParse({
     title: formData.get("title"),
     clientId: formData.get("clientId"),
-    projectType: formData.get("projectType") ?? "education",
-    startAt: formData.get("startAt"),
-    endAt: formData.get("endAt"),
+    projectType: blankToUndef(formData.get("projectType")) ?? "education",
+    startAt: blankToUndef(formData.get("startAt")),
+    endAt: blankToUndef(formData.get("endAt")),
     requiredSkillIds: requiredSkillIdsRaw
       .map((v) => (typeof v === "string" ? v : ""))
       .filter(Boolean),
     businessAmountKrw: formData.get("businessAmountKrw"),
     instructorFeeKrw: formData.get("instructorFeeKrw"),
-    notes: formData.get("notes") ?? undefined,
+    notes: blankToUndef(formData.get("notes")),
   });
 
   if (!parsed.success) {
