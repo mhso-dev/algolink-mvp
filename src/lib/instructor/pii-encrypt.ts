@@ -18,7 +18,8 @@ const KEY_LABEL_DEFAULT = "default" as const;
  * - pgcrypto 미설치 / RPC 미배포 시 한국어 에러 메시지를 throw.
  */
 export async function encryptPayoutField(
-  supabase: SupabaseClient,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any, any, any>,
   plaintext: string | null | undefined,
 ): Promise<Uint8Array | null> {
   if (plaintext == null || plaintext.length === 0) {
@@ -46,7 +47,8 @@ export async function encryptPayoutField(
  * - 평문은 즉시 마스킹 후 반환할 것 — DOM/로그/캐시에 평문 노출 금지.
  */
 export async function decryptPayoutField(
-  supabase: SupabaseClient,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any, any, any>,
   ciphertext: Uint8Array | string | null | undefined,
   ownerInstructorId: string,
 ): Promise<string | null> {
