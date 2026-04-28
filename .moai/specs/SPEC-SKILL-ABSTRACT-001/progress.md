@@ -36,12 +36,12 @@
   - T-17 (projects/[id]/actions.ts skillsByInstructor binary): completed
   - T-18 일부 (추가 MX 태그 부착 — createProject, updateProject, createInstructor 등): completed
   - 잔여 T-18: 최종 회귀 검증 + ai_instructor_recommendations forward-only 검증은 다음 단계 manager-quality
-- Phase 2.5 (TRUST 5 Validation): pending → manager-quality
-- Phase 2.7 (Re-planning Gate): pending
-- Phase 2.75 (Pre-Review Quality Gate): pending
-- Phase 2.8a (Active Quality Evaluation): pending → evaluator-active
-- Phase 2.8b (TRUST 5 Static Verification): pending
-- Phase 2.9 (MX Tag Update): pending
+- Phase 2.5 (TRUST 5 Validation): completed → manager-quality 자율 검증 PASS (T/R/U/S/T 5 dim 통과)
+- Phase 2.7 (Re-planning Gate): N/A (재기획 트리거 부재)
+- Phase 2.75 (Pre-Review Quality Gate): completed → 회귀 grep 0 hit + claude.ts diff empty
+- Phase 2.8a (Active Quality Evaluation): pending → evaluator-active (별도 spawn 진행 중)
+- Phase 2.8b (TRUST 5 Static Verification): completed → typecheck 0 / lint 0 new (1 pre-existing) / test:unit 523/529 (6 pre-existing 비-SPEC) / build PASS / db:verify 24/24
+- Phase 2.9 (MX Tag Update): completed → @MX:SPEC SPEC-SKILL-ABSTRACT-001 = 21 file / 27 hit (≥ 8 expected). @MX:ANCHOR computeSkillMatch/rankTopN/SkillsPicker/skill-taxonomy/skill-queries 등 부착. @MX:WARN N/A (TS 프로젝트). @MX:TODO 0 잔여 (모두 GREEN 통과)
 - Phase 3 (Git Operations): pending → manager-git
 - Phase 4 (Completion + Sync handoff): pending
 
@@ -94,6 +94,44 @@
 - `pnpm db:verify`: 24/24 PASS ✓
 - recommendation-panel-text.test 7/7 PASS ✓
 - projects/__tests__/integration.test 10/10 PASS ✓
+
+### Phase 2.5/2.9 manager-quality 검증 (2026-04-29)
+
+#### TRUST 5 평가 결과
+- **Tested PASS**: score 22/22 + engine 9/9 + recommendation-panel-text 7/7 + action-integration 3/3 + me-resume validation 29/29 + instructor validation 13/13 + projects integration 10/10 + project validation 11/13 (1 SPEC max(9) 추가 PASS, 1 pre-existing FAIL `end == start` strict-less-than 버그) ✓
+- **Readable PASS**: 신규 코드 가독성 양호. JSDoc 명확 (computeSkillMatch, rankTopN, SkillsPicker controlled API). `code_comments: ko` 정책 준수 ✓
+- **Unified PASS**: SkillsPicker controlled API 5개 사용처 동일 패턴 (categories/selected/onChange + readOnly optional). Drizzle ORM 일관 사용. zod schema 통합 ✓
+- **Secured PASS**: RLS 정책 변경 없음 (skill_categories 4 policies / instructor_skills 4 policies / ai_instructor_recommendations 3 policies 모두 보존). zod input validation 적용 (uuidLike + max(9)). Drizzle parameterized query (raw/execute 0 hit). ON CONFLICT/CASCADE 안전 ✓
+- **Trackable PASS**: @MX:SPEC SPEC-SKILL-ABSTRACT-001 = 21 file / 27 hit. conventional commit (feat(skill): ... 형식 사용). REQ-SKILL-* → 변경 코드 추적 가능 ✓
+
+#### MX 태그 검증 결과
+- @MX:SPEC: SPEC-SKILL-ABSTRACT-001 = 21 files (≥ 8 expected) ✓
+- @MX:ANCHOR 부착 anchor 함수: computeSkillMatch (score.ts:1), rankTopN (score.ts:114), SkillsPicker (skills-picker.tsx:3), getAllSkillCategories (skill-queries.ts:18), skillCategories table (skill-taxonomy.ts:1), createProject (projects/new/actions.ts:22), updateProject (projects/[id]/edit/actions.ts:30), createInstructor (instructors/new/actions.ts:20), me-resume single chip toggle (resume/actions.ts:375)
+- @MX:WARN: N/A (TypeScript 프로젝트, goroutine/async lifecycle risk 없음)
+- @MX:NOTE 적절성: types.ts SPEC 추적 + recommendation-panel.tsx fallback 정책 보존 + me-skills-picker-section client wrapper 분리 이유 명시 ✓
+- @MX:TODO 잔여: 0 (모두 GREEN 통과) ✓
+
+#### T-18 잔여 회귀 검증
+- claude.ts diff (`git diff main -- src/lib/ai/claude.ts`): empty ✓
+- recommendation-panel-text test 7/7 PASS (source/model='fallback' 정책 보존) ✓
+- grep 회귀: PROFICIENCY_WEIGHT = 0 hit, skill_tier|skillTier = 0 hit, tier-(small|medium|large) 패턴 = 0 hit, proficiency 잔여 코드 = 0 (모두 SPEC 추적 주석/MX 노트만 검출) ✓
+- ai_instructor_recommendations: row count 14 유지 (forward-only 보존, model='fallback' 유일) ✓
+- main 대비 test 비교: main 528/522/6, feature 529/523/6 → 신규 1개 (max(9))만 추가 + 6 pre-existing 동일 (회귀 0건) ✓
+- DB 실 적용 검증: instructor_skills 0 row + project_required_skills 0 row (TRUNCATE 적용) + skill_categories 9 row + tier/parent_id/proficiency 컬럼 부재 + proficiency/skill_tier enum 부재 + leaf-only 트리거 부재 ✓
+
+#### Acceptance Criteria 최종 평가
+- AC-1 PASS: db:verify 24/24
+- AC-2 PASS: skill_categories 9 row, UUID/이름/sort_order 정합, tier/parent_id 부재
+- AC-3 PASS-with-note: instructor_skills 컬럼 (instructor_id, skill_id, created_at), proficiency 부재. PK 명시 대신 UNIQUE CONSTRAINT(uq_instructor_skills) — main 패턴 보존, REQ-SKILL-INSTRUCTOR-MAP-001 의도(중복 보유 불가) 충족
+- AC-4 UI-READY: SkillsPicker 9 chip + me-skills-picker-section 통합. production 수동 검증 대기
+- AC-5 LOGIC-READY: binary 점수 (score.test 22/22 + integration.test 10/10) + UI 통합. production 수동 검증 대기
+- AC-6 PASS: source/model='fallback' 정책 보존 (recommendation-panel-text + DB model='fallback' 확인)
+- AC-7 PASS: typecheck 0 / lint 0 new / test:unit no regression / build PASS / grep 회귀 0
+- AC-8 DEFER: 로컬 reset 환경에서는 14 row 보존 확인. cloud는 manager-git + production push 후 검증
+- AC-9 PASS: claude.ts diff empty
+
+#### 결론 (manager-quality 검증)
+**전체 PASS**. 다음 단계 (manager-git → main PR → production push → 브라우저 수동 시나리오) 진행 가능.
 
 ## Risks (from plan.md §5)
 
