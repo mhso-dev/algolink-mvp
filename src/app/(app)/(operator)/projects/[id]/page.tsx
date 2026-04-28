@@ -22,6 +22,11 @@ import {
 import { PROJECT_ERRORS } from "@/lib/projects/errors";
 import { RecommendationPanel } from "@/components/projects/recommendation-panel";
 import { StatusTransitionPanel } from "@/components/projects/status-transition-panel";
+import {
+  AssignmentHistoryList,
+  type RecommendationHistoryEntry,
+  type StatusHistoryEntry,
+} from "@/components/projects/assignment-history-list";
 
 export const dynamic = "force-dynamic";
 
@@ -82,34 +87,144 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const [{ data: client }, { data: instructor }, { data: latestRec }] =
-    await Promise.all([
-      supabase
-        .from("clients")
-        .select("id, company_name")
-        .eq("id", project.client_id)
-        .maybeSingle<{ id: string; company_name: string | null }>(),
-      project.instructor_id
-        ? supabase
-            .from("instructors_safe")
-            .select("id, name_kr")
-            .eq("id", project.instructor_id)
-            .maybeSingle<{ id: string; name_kr: string | null }>()
-        : Promise.resolve({ data: null }),
-      supabase
-        .from("ai_instructor_recommendations")
-        .select("id, top3_jsonb, model, created_at, adopted_instructor_id")
-        .eq("project_id", id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle<{
+  const [
+    { data: client },
+    { data: instructor },
+    { data: allRecs },
+    { data: statusRows },
+  ] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("id, company_name")
+      .eq("id", project.client_id)
+      .maybeSingle<{ id: string; company_name: string | null }>(),
+    project.instructor_id
+      ? supabase
+          .from("instructors_safe")
+          .select("id, name_kr")
+          .eq("id", project.instructor_id)
+          .maybeSingle<{ id: string; name_kr: string | null }>()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("ai_instructor_recommendations")
+      .select("id, top3_jsonb, model, created_at, adopted_instructor_id")
+      .eq("project_id", id)
+      .order("created_at", { ascending: false })
+      .returns<
+        {
           id: string;
           top3_jsonb: unknown;
           model: string;
           created_at: string;
           adopted_instructor_id: string | null;
-        }>(),
-    ]);
+        }[]
+      >(),
+    supabase
+      .from("project_status_history")
+      .select("id, from_status, to_status, changed_by, changed_at")
+      .eq("project_id", id)
+      .order("changed_at", { ascending: false })
+      .limit(50)
+      .returns<
+        {
+          id: string;
+          from_status: ProjectStatus | null;
+          to_status: ProjectStatus;
+          changed_by: string | null;
+          changed_at: string;
+        }[]
+      >(),
+  ]);
+
+  const recommendations = allRecs ?? [];
+  const latestRec = recommendations[0] ?? null;
+
+  // 이력 candidate 들의 instructor_id 모음 → 이름 한 번에 조회
+  const candidateInstructorIds = new Set<string>();
+  for (const rec of recommendations) {
+    if (Array.isArray(rec.top3_jsonb)) {
+      for (const c of rec.top3_jsonb as { instructorId?: string }[]) {
+        if (c.instructorId) candidateInstructorIds.add(c.instructorId);
+      }
+    }
+    if (rec.adopted_instructor_id) {
+      candidateInstructorIds.add(rec.adopted_instructor_id);
+    }
+  }
+  const changedByIds = Array.from(
+    new Set(
+      (statusRows ?? [])
+        .map((r) => r.changed_by)
+        .filter((v): v is string => Boolean(v)),
+    ),
+  );
+
+  const [{ data: instructorNamesRaw }, { data: userNamesRaw }] = await Promise.all([
+    candidateInstructorIds.size > 0
+      ? supabase
+          .from("instructors_safe")
+          .select("id, name_kr")
+          .in("id", Array.from(candidateInstructorIds))
+          .returns<{ id: string; name_kr: string | null }[]>()
+      : Promise.resolve({ data: [] as { id: string; name_kr: string | null }[] }),
+    changedByIds.length > 0
+      ? supabase
+          .from("users")
+          .select("id, display_name")
+          .in("id", changedByIds)
+          .returns<{ id: string; display_name: string | null }[]>()
+      : Promise.resolve({ data: [] as { id: string; display_name: string | null }[] }),
+  ]);
+
+  const instructorNameMap = new Map(
+    (instructorNamesRaw ?? []).map((i) => [i.id, i.name_kr ?? "(이름 미공개)"]),
+  );
+  const userNameMap = new Map(
+    (userNamesRaw ?? []).map((u) => [u.id, u.display_name ?? null]),
+  );
+
+  // 추천 이력 변환
+  const recommendationHistory: RecommendationHistoryEntry[] = recommendations.map(
+    (rec) => {
+      const candidates = Array.isArray(rec.top3_jsonb)
+        ? (rec.top3_jsonb as Array<{
+            instructorId: string;
+            displayName?: string;
+            finalScore: number;
+          }>)
+        : [];
+      return {
+        id: rec.id,
+        createdAt: rec.created_at,
+        model: rec.model,
+        candidateCount: candidates.length,
+        adoptedInstructorId: rec.adopted_instructor_id,
+        adoptedDisplayName: rec.adopted_instructor_id
+          ? instructorNameMap.get(rec.adopted_instructor_id) ?? null
+          : null,
+        topCandidates: candidates.map((c, idx) => ({
+          instructorId: c.instructorId,
+          displayName:
+            c.displayName ??
+            instructorNameMap.get(c.instructorId) ??
+            c.instructorId.slice(0, 8),
+          finalScore: c.finalScore,
+          rank: idx + 1,
+        })),
+      };
+    },
+  );
+
+  // 상태 변경 이력 변환
+  const statusHistory: StatusHistoryEntry[] = (statusRows ?? []).map((r) => ({
+    id: r.id,
+    changedAt: r.changed_at,
+    fromStatus: r.from_status,
+    toStatus: r.to_status,
+    fromLabel: r.from_status ? STATUS_LABELS[r.from_status] : null,
+    toLabel: STATUS_LABELS[r.to_status],
+    changedByName: r.changed_by ? userNameMap.get(r.changed_by) ?? null : null,
+  }));
 
   const currentStep = userStepFromEnum(project.status);
   const initialCandidates = Array.isArray(latestRec?.top3_jsonb)
@@ -243,6 +358,12 @@ export default async function ProjectDetailPage({ params }: PageProps) {
         projectId={project.id}
         currentStatus={project.status}
         hasInstructor={Boolean(project.instructor_id)}
+      />
+
+      {/* 배정 / 상태 이력 (REQ-PROJECT-DETAIL-006 / RECOMMEND-006) */}
+      <AssignmentHistoryList
+        recommendations={recommendationHistory}
+        statusHistory={statusHistory}
       />
     </div>
   );

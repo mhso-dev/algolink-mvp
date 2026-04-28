@@ -1,0 +1,147 @@
+// SPEC-PROJECT-001 §2.2/§2.4 — 프로젝트 등록/수정 zod 스키마 검증.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  createProjectSchema,
+  updateProjectSchema,
+} from "../project";
+
+const VALID_UUID = "11111111-1111-4111-8111-111111111111";
+
+test("createProjectSchema: 정상 입력", () => {
+  const r = createProjectSchema.safeParse({
+    title: "AI 워크샵",
+    clientId: VALID_UUID,
+    projectType: "education",
+    startAt: "2026-05-01T09:00",
+    endAt: "2026-05-01T18:00",
+    requiredSkillIds: [VALID_UUID],
+    businessAmountKrw: 1000000,
+    instructorFeeKrw: 800000,
+    notes: "메모",
+  });
+  assert.equal(r.success, true);
+});
+
+test("createProjectSchema: title 빈 문자열 거부", () => {
+  const r = createProjectSchema.safeParse({
+    title: "",
+    clientId: VALID_UUID,
+    requiredSkillIds: [],
+    businessAmountKrw: 0,
+    instructorFeeKrw: 0,
+  });
+  assert.equal(r.success, false);
+  if (!r.success) {
+    const titleErr = r.error.issues.find((i) => i.path.includes("title"));
+    assert.ok(titleErr, "title 에러 존재");
+  }
+});
+
+test("createProjectSchema: end <= start 거부", () => {
+  const r = createProjectSchema.safeParse({
+    title: "x",
+    clientId: VALID_UUID,
+    startAt: "2026-05-01T18:00",
+    endAt: "2026-05-01T09:00",
+    requiredSkillIds: [],
+    businessAmountKrw: 0,
+    instructorFeeKrw: 0,
+  });
+  assert.equal(r.success, false);
+});
+
+test("createProjectSchema: end == start 거부", () => {
+  const r = createProjectSchema.safeParse({
+    title: "x",
+    clientId: VALID_UUID,
+    startAt: "2026-05-01T09:00",
+    endAt: "2026-05-01T09:00",
+    requiredSkillIds: [],
+    businessAmountKrw: 0,
+    instructorFeeKrw: 0,
+  });
+  assert.equal(r.success, false);
+});
+
+test("createProjectSchema: clientId 비-UUID 거부", () => {
+  const r = createProjectSchema.safeParse({
+    title: "x",
+    clientId: "not-uuid",
+    requiredSkillIds: [],
+    businessAmountKrw: 0,
+    instructorFeeKrw: 0,
+  });
+  assert.equal(r.success, false);
+});
+
+test("createProjectSchema: businessAmountKrw 음수 거부", () => {
+  const r = createProjectSchema.safeParse({
+    title: "x",
+    clientId: VALID_UUID,
+    requiredSkillIds: [],
+    businessAmountKrw: -100,
+    instructorFeeKrw: 0,
+  });
+  assert.equal(r.success, false);
+});
+
+test("createProjectSchema: 빈 문자열 금액 → 0 으로 coerce", () => {
+  const r = createProjectSchema.safeParse({
+    title: "x",
+    clientId: VALID_UUID,
+    requiredSkillIds: [],
+    businessAmountKrw: "",
+    instructorFeeKrw: "",
+  });
+  assert.equal(r.success, true);
+  if (r.success) {
+    assert.equal(r.data.businessAmountKrw, 0);
+    assert.equal(r.data.instructorFeeKrw, 0);
+  }
+});
+
+test("updateProjectSchema: expectedUpdatedAt 필수", () => {
+  const r = updateProjectSchema.safeParse({
+    title: "x",
+    clientId: VALID_UUID,
+    requiredSkillIds: [],
+    businessAmountKrw: 0,
+    instructorFeeKrw: 0,
+    // expectedUpdatedAt 누락
+  });
+  assert.equal(r.success, false);
+  if (!r.success) {
+    const tokenErr = r.error.issues.find((i) =>
+      i.path.includes("expectedUpdatedAt"),
+    );
+    assert.ok(tokenErr, "expectedUpdatedAt 누락 에러 존재");
+  }
+});
+
+test("updateProjectSchema: expectedUpdatedAt 빈 문자열 거부", () => {
+  const r = updateProjectSchema.safeParse({
+    title: "x",
+    clientId: VALID_UUID,
+    requiredSkillIds: [],
+    businessAmountKrw: 0,
+    instructorFeeKrw: 0,
+    expectedUpdatedAt: "",
+  });
+  assert.equal(r.success, false);
+});
+
+test("updateProjectSchema: 정상 — 동시성 토큰 포함", () => {
+  const r = updateProjectSchema.safeParse({
+    title: "x",
+    clientId: VALID_UUID,
+    requiredSkillIds: [],
+    businessAmountKrw: 0,
+    instructorFeeKrw: 0,
+    expectedUpdatedAt: "2026-04-28T10:00:00.000Z",
+  });
+  assert.equal(r.success, true);
+  if (r.success) {
+    assert.equal(r.data.expectedUpdatedAt, "2026-04-28T10:00:00.000Z");
+  }
+});

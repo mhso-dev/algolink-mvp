@@ -1,6 +1,4 @@
-// SPEC-PROJECT-001 §2.4 — 프로젝트 수정 페이지 (MVP placeholder).
-// 본 SPEC 범위에서는 수정 흐름의 zod 스키마 + 동시성 보호 토큰만 노출.
-// 풀 기능 수정 UI 는 후속 SPEC.
+// SPEC-PROJECT-001 §2.4 — 프로젝트 수정 페이지 (풀폼 + 동시성 토큰).
 
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -8,9 +6,10 @@ import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
+import { getCurrentUser } from "@/auth/server";
 import { STATUS_LABELS, type ProjectStatus } from "@/lib/projects";
+import { ProjectEditForm } from "@/components/projects/project-edit-form";
 
 export const dynamic = "force-dynamic";
 
@@ -22,29 +21,85 @@ interface ProjectRow {
   id: string;
   title: string;
   status: ProjectStatus;
+  client_id: string;
+  project_type: "education" | "material_development";
+  education_start_at: string | null;
+  education_end_at: string | null;
   notes: string | null;
   business_amount_krw: number;
   instructor_fee_krw: number;
   updated_at: string;
 }
 
+interface SkillRow {
+  id: string;
+  name: string;
+  tier: "large" | "medium" | "small";
+}
+
 export default async function EditProjectPage({ params }: PageProps) {
   await requireUser();
+  const user = await getCurrentUser();
   const { id } = await params;
   const supabase = createClient(await cookies());
 
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, title, status, notes, business_amount_krw, instructor_fee_krw, updated_at")
-    .eq("id", id)
-    .maybeSingle<ProjectRow>();
+  const [{ data: project }, { data: clientsRaw }, { data: skillsRaw }, { data: reqSkillsRaw }] =
+    await Promise.all([
+      supabase
+        .from("projects")
+        .select(
+          "id, title, status, client_id, project_type, education_start_at, education_end_at, notes, business_amount_krw, instructor_fee_krw, updated_at",
+        )
+        .eq("id", id)
+        .maybeSingle<ProjectRow>(),
+      supabase
+        .from("clients")
+        .select("id, company_name")
+        .returns<{ id: string; company_name: string | null }[]>(),
+      supabase
+        .from("skill_categories")
+        .select("id, name, tier")
+        .returns<SkillRow[]>(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any)
+        .from("project_required_skills")
+        .select("skill_id")
+        .eq("project_id", id),
+    ]);
 
   if (!project) notFound();
 
-  const lockedDueToTaskDone = project.status === "task_done";
+  const lockedDueToTaskDone =
+    project.status === "task_done" && user?.role !== "admin";
+
+  const clients = (clientsRaw ?? []).map((c) => ({
+    id: c.id,
+    name: c.company_name ?? "(이름 없음)",
+  }));
+  const skills = (skillsRaw ?? [])
+    .filter((s) => s.tier === "small")
+    .map((s) => ({ id: s.id, label: s.name }));
+  const requiredSkillIds = ((reqSkillsRaw ?? []) as { skill_id: string }[]).map(
+    (r) => r.skill_id,
+  );
+
+  const initial = {
+    id: project.id,
+    title: project.title,
+    clientId: project.client_id,
+    projectType: project.project_type,
+    startAt: project.education_start_at,
+    endAt: project.education_end_at,
+    businessAmountKrw: project.business_amount_krw,
+    instructorFeeKrw: project.instructor_fee_krw,
+    notes: project.notes,
+    updatedAt: project.updated_at,
+    status: project.status,
+    requiredSkillIds,
+  };
 
   return (
-    <div className="mx-auto max-w-[800px] px-6 py-6 flex flex-col gap-4">
+    <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-4">
       <header className="flex items-center gap-3">
         <Button asChild variant="ghost" size="icon">
           <Link href={`/projects/${id}`} aria-label="상세로 돌아가기">
@@ -59,33 +114,21 @@ export default async function EditProjectPage({ params }: PageProps) {
         </div>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">기본 정보</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm space-y-2">
-          <p>
-            <strong>제목:</strong> {project.title}
-          </p>
-          <p>
-            <strong>비고:</strong> {project.notes ?? "—"}
-          </p>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            동시성 토큰 (expected_updated_at): {project.updated_at}
-          </p>
-          {lockedDueToTaskDone && (
-            <p
-              role="alert"
-              className="text-sm text-[var(--color-state-alert)] mt-2"
-            >
-              과업 종료 상태에서는 수정이 잠겨 있습니다. (관리자 되돌리기 필요)
-            </p>
-          )}
-          <p className="text-xs text-[var(--color-text-muted)] mt-3">
-            상세 수정 UI 는 후속 SPEC 에서 제공됩니다. 현재는 상세 페이지의 상태 전환과 추천/배정만 사용 가능합니다.
-          </p>
-        </CardContent>
-      </Card>
+      {lockedDueToTaskDone && (
+        <p
+          role="alert"
+          className="text-sm text-[var(--color-state-alert)] bg-[var(--color-state-alert-muted)] rounded-md p-3"
+        >
+          정산 완료된 프로젝트는 관리자만 수정할 수 있습니다. 모든 필드가 잠겼습니다.
+        </p>
+      )}
+
+      <ProjectEditForm
+        project={initial}
+        clients={clients}
+        skills={skills}
+        locked={lockedDueToTaskDone}
+      />
     </div>
   );
 }
