@@ -19,6 +19,8 @@
  *   2: 환경 설정 오류 (DB 연결 실패 등).
  */
 import "dotenv/config";
+import { readdirSync } from "node:fs";
+import path from "node:path";
 import postgres from "postgres";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -242,6 +244,52 @@ async function main() {
       rejected = true;
     }
     assert(rejected, "score=6이 CHECK로 거부되지 않음");
+  });
+
+  // ===== SPEC-DB-002: 마이그레이션 적용 누락 감지 =====
+  await check("AC-DB002-MIG-PENDING: 모든 마이그레이션 적용됨", async () => {
+    // REQ-DB002-002: schema_migrations 테이블이 없으면 skip (cloud / non-supabase 환경).
+    const [{ exists }] = await sql<{ exists: boolean }[]>`
+      SELECT to_regclass('supabase_migrations.schema_migrations') IS NOT NULL AS exists
+    `;
+    if (!exists) {
+      // Skip 신호 — supabase_migrations 추적 테이블 부재.
+      return;
+    }
+
+    // 파일 timestamp 수집 (yyyymmddhhmmss prefix 만).
+    const migrationsDir = path.resolve("supabase/migrations");
+    const fileTimestamps = readdirSync(migrationsDir)
+      .filter((f) => /^\d{14}_.*\.sql$/.test(f))
+      .map((f) => f.slice(0, 14));
+
+    const appliedRows = await sql<{ version: string }[]>`
+      SELECT version FROM supabase_migrations.schema_migrations
+    `;
+    const applied = new Set(appliedRows.map((r) => String(r.version)));
+
+    const pending = fileTimestamps.filter((t) => !applied.has(t));
+    if (pending.length > 0) {
+      throw new Error(
+        `${pending.length}건 누락 — 적용 필요: ${pending.join(", ")} (npx supabase db reset 또는 docker exec psql 로 적용)`,
+      );
+    }
+  });
+
+  // ===== Section 12-bis: SPEC-SEED-002 보강 시드 =====
+  await check("AC-SEED002-PENDING-COUNT: pending settlements ≥ 3", async () => {
+    const [{ count }] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM settlements WHERE status = 'pending'
+    `;
+    assert(count >= 3, `pending settlements ${count} < 3 — 20260428000020_e2e_seed_phase2.sql 미적용?`);
+  });
+
+  await check("AC-SEED002-OPERATOR2: operator2 시드 존재", async () => {
+    const [{ count }] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM users
+      WHERE email = 'operator2@algolink.local' AND role = 'operator'
+    `;
+    assert(count === 1, `operator2 행 ${count} ≠ 1 — 20260428000020_e2e_seed_phase2.sql 미적용?`);
   });
 
   // ===== Section 12: Seed =====
