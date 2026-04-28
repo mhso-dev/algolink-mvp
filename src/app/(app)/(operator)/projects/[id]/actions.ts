@@ -263,7 +263,9 @@ export async function assignInstructorAction(input: {
     .maybeSingle<ProjectRow & { title: string }>();
   if (!project) return { ok: false, message: PROJECT_ERRORS.PROJECT_NOT_FOUND };
 
-  // 추천 결과 검증 (force 가 아니면 Top-3 에 반드시 포함)
+  // 추천 결과 검증 (force 가 아니면 Top-3 에 반드시 포함) + KPI 로깅용 rank 산출.
+  // SPEC-PROJECT-001 §1.4 / EC-13 — top3_jsonb->0 (rank 1) 매칭이 KPI 분자.
+  let acceptedRank: number | null = null;
   if (!input.force) {
     const { data: rec } = await supabase
       .from("ai_instructor_recommendations")
@@ -276,10 +278,11 @@ export async function assignInstructorAction(input: {
     const top3 = Array.isArray(rec?.top3_jsonb)
       ? (rec!.top3_jsonb as { instructorId?: string }[])
       : [];
-    const ok = top3.some((c) => c.instructorId === input.instructorId);
-    if (!ok) {
+    const idx = top3.findIndex((c) => c.instructorId === input.instructorId);
+    if (idx < 0) {
       return { ok: false, message: PROJECT_ERRORS.ASSIGN_NOT_IN_TOP3 };
     }
+    acceptedRank = idx + 1; // 1-based rank for KPI 로깅 (1순위/2순위/3순위).
   }
 
   // instructor → user_id 매핑 (notification recipient 결정)
@@ -354,8 +357,9 @@ export async function assignInstructorAction(input: {
     }
   }
 
+  // KPI 로그 — 채택 rank 포함 (1순위 채택률 측정용 raw signal).
   console.log(
-    `[notif] assignment_request → instructor_id=${input.instructorId} project_id=${input.projectId}`,
+    `[notif] assignment_request → instructor_id=${input.instructorId} project_id=${input.projectId} rank=${acceptedRank ?? "force"}`,
   );
 
   revalidatePath(`/projects/${input.projectId}`);
