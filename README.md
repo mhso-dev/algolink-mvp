@@ -69,6 +69,7 @@ pnpm e2e             # Playwright E2E (Phase 1 SPEC 시나리오)
 | SPEC-INSTRUCTOR-001 | 강사 등록/이력서/매칭 | 완료 |
 | SPEC-PROJECT-001 | 프로젝트 CRUD + KPI rank | 완료 |
 | SPEC-ME-001 | 마이페이지 (지급 정보 pgcrypto 암호화) | 완료 |
+| SPEC-PROJECT-SEARCH-001 | 프로젝트 리스트 다중 컬럼 검색 (title + clients.company_name + notes) | 완료 |
 
 ## 코드 컨텍스트 (@MX 태그)
 

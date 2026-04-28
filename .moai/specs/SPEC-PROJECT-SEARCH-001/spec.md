@@ -1,7 +1,7 @@
 ---
 id: SPEC-PROJECT-SEARCH-001
-version: 0.1.0
-status: draft
+version: 1.0.0
+status: completed
 created: 2026-04-28
 updated: 2026-04-28
 author: 철
@@ -174,7 +174,46 @@ projects (
 
 ---
 
-Version: 0.1.0
-Status: draft
+---
+
+## Implementation Notes
+
+### 변경 파일
+
+- **`src/lib/projects/list-queries.ts`** (+57 / -4): `buildSearchClause` 헬퍼 신규 export, `fetchProjectList` 내 `q` 처리 블록 교체, `clients.company_name` 2-stage 조회 통합.
+- **`src/lib/projects/__tests__/list-queries.test.ts`** (+220 / 신규): `buildSearchClause` 단위 테스트 6케이스 + `fetchProjectList` mock 테스트 9케이스 = 총 15 테스트 케이스.
+
+### 채택 전략: 2-stage 크로스 테이블 검색
+
+SPEC 초안(REQ-PS-006)에서 제안한 PostgREST `.or()` 단일 호출로 own-table + embedded resource 컬럼을 OR 결합하는 방식(옵션 B) 대신, **2-stage 방식**을 채택했다.
+
+구체적으로:
+1. **1차 조회**: `clients` 테이블에서 `company_name ilike %q%` 조건으로 매칭 클라이언트 `id` 집합을 조회.
+2. **2차 조회**: `projects` 테이블에서 `title.ilike.%q%,notes.ilike.%q%,client_id.in.(id1,id2,...)` OR 결합으로 최종 결과 조회.
+
+**채택 이유**: PostgREST의 cross-table `.or()` 표현식(`clients.name.ilike.%q%`을 own-table 컬럼과 한 `.or()` 호출로 묶는 방식)은 Supabase JS 버전에 따라 HTTP 400을 반환하는 취약성이 있다. 2-stage 방식은 각 쿼리가 단일 테이블 범위 내에 머물러 PostgREST 호환성이 보장되며, 동일한 OR-of-3 의미를 안전하게 달성한다.
+
+### 컬럼 확정
+
+- `clients.company_name` — SPEC 초안에서 `clients.name` 으로 기술했으나, 실제 DB 스키마(`supabase/migrations/`) 확인 결과 `company_name` 이 정확한 컬럼명임을 확인하고 구현 및 테스트에 반영.
+- `projects.notes` — SPEC 초안의 `description` 가정은 폴백 조건 적용 없이 `notes` 로 확정 (§2.4 검증 결과 그대로).
+
+### 테스트 커버리지
+
+총 15 케이스:
+
+- `buildSearchClause` 헬퍼 (6 케이스): null/undefined/공백 → null, 일반 문자열 래핑, 공백 트리밍, LIKE 메타문자 escape (`%`, `_`, `\`), 100자 초과 절단, 100자 정확히 유지.
+- `fetchProjectList` mock (9 케이스): q 없음 → clients 조회 없음, q 공백 → 미적용, q 있음 → company_name ilike + 3-컬럼 OR, clients 0 매칭 → client_id.in 생략, 메타문자 escape, 150자 절단, q+status AND 결합, q 없음+status, 페이지네이션 range 검증.
+
+### MX 태그 현황
+
+- `@MX:ANCHOR` — `buildSearchClause` 함수 직전: 사용자 입력 LIKE 패턴 신뢰 경계, fan_in ≥ 3 예상 (list page + 향후 picker).
+- `@MX:NOTE` × 2 — 파일 상단: `ProjectListQuery → Supabase select chain` 개요, 2-stage 전략 근거.
+- `@MX:REASON` — `@MX:ANCHOR` 하위: LIKE 메타문자 escape 필요성 + 100자 캡 근거 명시.
+
+---
+
+Version: 1.0.0
+Status: completed
 Last Updated: 2026-04-28
 REQ coverage: REQ-PS-001, REQ-PS-002, REQ-PS-003, REQ-PS-004, REQ-PS-005, REQ-PS-006, REQ-PS-NFR-001, REQ-PS-NFR-002, REQ-PS-NFR-003, REQ-PS-NFR-004
