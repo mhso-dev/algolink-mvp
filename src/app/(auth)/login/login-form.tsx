@@ -49,11 +49,18 @@ export function LoginForm({ next }: LoginFormProps) {
   const [serverError, setServerError] = React.useState<string | null>(null);
   const [isDevHost, setIsDevHost] = React.useState(false);
 
-  // 클라이언트 마운트 시 hostname 확인 — localhost/127.0.0.1 에서만 dev 패널 노출.
+  // 클라이언트 마운트 시 hostname 확인 — localhost/127.0.0.1/.local + Vercel preview/prod
+  // (*.vercel.app) 에서 dev 패널 노출. MVP 단계에서 데모/QA 편의를 위해 staging/prod alias 도 허용.
+  // 운영 도메인 연결 시 endsWith(".vercel.app") 분기를 제거할 것.
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const host = window.location.hostname;
-    setIsDevHost(host === "localhost" || host === "127.0.0.1" || host.endsWith(".local"));
+    setIsDevHost(
+      host === "localhost" ||
+        host === "127.0.0.1" ||
+        host.endsWith(".local") ||
+        host.endsWith(".vercel.app"),
+    );
   }, []);
 
   const onSubmit = handleSubmit(async (values) => {
