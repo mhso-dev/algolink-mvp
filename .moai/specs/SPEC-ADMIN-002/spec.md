@@ -1,7 +1,7 @@
 ---
 id: SPEC-ADMIN-002
-version: 0.1.0
-status: draft
+version: 1.0.0
+status: completed
 created: 2026-04-28
 updated: 2026-04-28
 author: 철
@@ -15,6 +15,7 @@ related: [SPEC-AUTH-001, SPEC-ADMIN-001, SPEC-E2E-002, SPEC-SEED-002]
 ## HISTORY
 
 - 2026-04-28 (v0.1.0): 초안 작성. SPEC-ADMIN-001(F-301 회원/권한 관리)에서 도입된 `setUserActive` Server Action이 `public.users.is_active`만 토글하고 `auth.users` 세션은 살아 있는 회귀를 차단한다. SSR 가드(`requireUser`)와 로그인 Server Action을 보강하여 (a) 비활성 사용자의 다음 SSR 요청부터 즉시 세션 무효화 + `/login?error=deactivated` redirect, (b) 비활성 자격증명의 신규 로그인 즉시 거부, (c) `/login` 페이지 안내 배너 노출을 명세한다. SPEC-E2E-002 phase2-admin.spec.ts의 비활성화 회귀 테스트 통과를 목표로 한다. LESSON-003(인증/가드 회귀 즉시 테스트) 직접 대응 SPEC.
+- 2026-04-28 (v1.0.0): 구현 완료. commit a8f9784 — `feat(admin): SPEC-ADMIN-002 — 비활성 사용자 즉시 차단 (deactivated user block)`. draft → completed.
 
 ---
 
@@ -210,3 +211,36 @@ related: [SPEC-AUTH-001, SPEC-ADMIN-001, SPEC-E2E-002, SPEC-SEED-002]
 - e2e: `tests/e2e/phase2-admin.spec.ts` 비활성화 시나리오 PASS
 - 통합: SPEC-AUTH-001 e2e 0회귀
 - 수동: admin 토글 → 다른 브라우저 세션의 navigation에서 즉시 `/login?error=deactivated` 도달
+
+---
+
+## Implementation Notes
+
+본 SPEC은 spec-first lifecycle (Level 1) 으로 종결되었다. 구현은 plan.md 의 모듈 구성에 1:1 대응한다.
+
+### 인도된 산출물 (commit a8f9784)
+
+| 산출물 | 위치 | 비고 |
+|---|---|---|
+| 매 요청 `is_active` 검증 | `src/auth/server.ts` `getCurrentUser` | JWT 검증 후 `public.users.is_active` 추가 SELECT, false 시 null 반환 → 다음 SSR 사이클부터 즉시 차단 (REQ-ADMIN002-001/003) |
+| 비활성 식별 헬퍼 | `src/auth/server.ts` `isSessionDeactivated()` | 세션은 살아있으나 비활성화된 케이스 판별 — `/login?error=deactivated` 분기 결정 |
+| SSR 가드 분기 | `src/auth/guards.ts` `requireUser` | `getCurrentUser` null 시 `isSessionDeactivated()` 결과로 `/login?next=...` vs `/login?error=deactivated` 구분 |
+| 로그인 시점 차단 | `src/app/(auth)/login/actions.ts` | 인증 성공 직후 `is_active` 검증, false 면 `signOut()` + deactivated 에러 반환 (REQ-ADMIN002-002) |
+| 안내 배너 | `src/app/(auth)/login/login-form.tsx` + `page.tsx` | `?error=deactivated` 쿼리 → "관리자에 의해 비활성화된 계정입니다" 배너 |
+| 보조: zod uuid 완화 | `src/lib/admin/users/validation.ts` | operator2 placeholder UUID (`...bbb2`) 호환 — strict UUID v4 검증 거부 회피 |
+
+### 검증 결과
+
+- E2E 회귀: `tests/e2e/phase2-admin.spec.ts` 의 "보조 operator 비활성화 → 새 컨텍스트 로그인 거부 → 원복" 시나리오 PASS (commit 89fd64b)
+- SPEC-AUTH-001 회귀: `auth.spec.ts` (anon redirects, 로그인 per role, RBAC) 21건 0회귀
+- 수동: admin 토글 후 별도 컨텍스트에서 즉시 `/login?error=deactivated` 노출 확인
+
+### 의도적 trade-off
+
+- **DB round-trip 비용**: 매 SSR 요청마다 `users.is_active` 추가 SELECT 발생. JWT-only 검증 대비 latency 증가. 비활성화 즉시성(REQ-ADMIN002-003)을 우선시한 의도적 선택. 캐시 도입 시 비활성화 적용 지연이 발생하므로 캐시 미사용.
+- **Self-lockout**: SPEC-ADMIN-001 §B-8 의 admin 본인 비활성화 차단 (UI 측 가드)을 그대로 신뢰. 본 SPEC 은 백엔드 enforcement 만 책임.
+
+### 후속 (out-of-scope)
+
+- 캐시 + invalidation 도입 (latency 최적화) — 별도 SPEC 필요 시 SPEC-ADMIN-003 으로 분기.
+- 로그아웃된 활성 토큰 추적 (revocation list) — Supabase Auth 자체 기능 의존.

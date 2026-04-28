@@ -1,7 +1,7 @@
 ---
 id: SPEC-DB-002
-version: 0.1.0
-status: draft
+version: 1.0.0
+status: completed
 created: 2026-04-28
 updated: 2026-04-28
 author: 철
@@ -15,6 +15,7 @@ related: [SPEC-DB-001, SPEC-SEED-002]
 ## HISTORY
 
 - 2026-04-28 (v0.1.0): 최초 초안 작성. Phase 2 종결 작업 중 `users.is_active` 컬럼 누락(20260428120000_admin_user_active.sql 미적용)이 `pnpm db:verify` 18/18 PASS 를 통과하고 `/admin/users` 접근 시점에 PG 42703 으로 폭발한 사건이 트리거.
+- 2026-04-28 (v1.0.0): 구현 완료. commit 8ed8b63 — `feat(db): SPEC-DB-002 — db:verify pending migration 가드 + history trigger fix`. draft → completed.
 
 ## 1. 배경 (Background)
 
@@ -83,3 +84,28 @@ related: [SPEC-DB-001, SPEC-SEED-002]
 
 - expert-backend: db-verify.ts 보강 시 Supabase 클라이언트 / pg 풀 재사용 패턴 검토 권고.
 - expert-devops: 후속 SPEC (pnpm dev/e2e hook 통합) 시점에 자문 권고.
+
+---
+
+## Implementation Notes
+
+본 SPEC은 spec-first lifecycle (Level 1) 으로 종결되었다.
+
+### 인도된 산출물 (commit 8ed8b63)
+
+| 산출물 | 위치 | 비고 |
+|---|---|---|
+| Pending migration 가드 | `scripts/db-verify.ts` `AC-DB002-MIG-PENDING` | `supabase/migrations/` 파일 timestamp (정규식 `^\d{14}_.*\.sql$`) vs `supabase_migrations.schema_migrations.version` 차집합. cloud / non-supabase 환경은 `to_regclass` 검사로 silent skip. (REQ-DB002-001/002) |
+| SEED-002 보강 AC | `scripts/db-verify.ts` `AC-SEED002-PENDING-COUNT`, `AC-SEED002-OPERATOR2` | SPEC-SEED-002 의 acceptance criteria 자동화. 본 SPEC 과 동일 파일이라 함께 commit. |
+| Settlement history trigger 수정 | `supabase/migrations/20260428000030_fix_settlement_history_trigger.sql` | 본 SPEC 작업 중 발견된 trigger 회귀 수정. 별도 SPEC 분리 없이 동시 commit. |
+
+### 검증 결과
+
+- `pnpm db:verify` → 21/21 PASS (이전 18/21 → +3: `AC-DB002-MIG-PENDING`, `AC-SEED002-*`)
+- 의도적 누락 시뮬레이션 (`20260428000030_*.sql` 임시 미적용) → `AC-DB002-MIG-PENDING` FAIL 로 즉시 검출 (REQ-DB002-001 만족)
+- supabase_migrations 테이블 부재 환경 (CI external DB) → 자동 skip 동작 확인 (REQ-DB002-002 만족)
+
+### 후속 (out-of-scope)
+
+- pnpm dev/e2e pre-hook 통합 (자동 차단 게이트로 격상) — 별도 SPEC 으로 분리 권고.
+- 마이그레이션 적용 자동화 (`db:verify --apply`) — 본 SPEC 은 read-only 검증만 책임.

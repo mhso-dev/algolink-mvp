@@ -1,7 +1,7 @@
 ---
 id: SPEC-SEED-002
-version: 0.1.0
-status: draft
+version: 1.0.0
+status: completed
 created: 2026-04-28
 updated: 2026-04-28
 author: 철
@@ -15,6 +15,7 @@ related: [SPEC-DB-001, SPEC-E2E-002, SPEC-ADMIN-001]
 ## HISTORY
 
 - 2026-04-28 (v0.1.0): 초기 draft 작성. Phase 2 회귀 보고서(.moai/reports/phase2-e2e-closure-2026-04-28.md)에서 식별된 3건의 SKIP(`tests/e2e/phase2-{payout,notify,admin}.spec.ts`)을 PASS로 전환하기 위한 add-only 시드 보강 SPEC.
+- 2026-04-28 (v1.0.0): 구현 완료. commit d2577b7 — `feat(seed): SPEC-SEED-002 — Phase 2 e2e 시드 보강 (operator2 + pending settlements)`. draft → completed.
 
 ---
 
@@ -116,3 +117,44 @@ The seed reinforcement **shall not** modify the credentials, identifiers, role, 
 | `auth.identities`의 `provider_id` UNIQUE 제약 충돌 | 시드 실패 | `ON CONFLICT (provider, provider_id) DO NOTHING` 적용 |
 | operator2 UUID가 다른 테스트의 mock UUID와 충돌 | 테스트 비결정성 | `bbb2` suffix는 현 코드베이스에서 미사용임을 grep으로 확인 후 픽스 |
 | pending 정산 추가가 매출 집계 합계 단언을 깨뜨림 | admin 회귀 실패 | acceptance.md AC-SEED002-PENDING-COUNT는 `>= 3`로 하한만 단언, admin 합계 단언은 SPEC-ADMIN-001 측에서 본 SPEC 도입 후 재baselining |
+
+---
+
+## Implementation Notes
+
+본 SPEC은 spec-first lifecycle (Level 1) 으로 종결되었다. 구현은 plan.md 의 M1-M5 모듈
+에 1:1 대응되며 의도적 divergence 는 다음 1건만 발생했다.
+
+### 인도된 산출물 (commit d2577b7)
+
+| 산출물 | 위치 | 비고 |
+|---|---|---|
+| add-only 시드 마이그레이션 | `supabase/migrations/20260428000020_e2e_seed_phase2.sql` | plan 의 `_010_` 대신 `_020_` prefix 사용 — 070 시드 이후 적용 순서는 유지(파일명 정렬상 `20260427000070 < 20260428000020`). 결정성·idempotent 보장. |
+| operator2 dev 자격증명 | auth.users + auth.identities + public.users (UUID `00000000-0000-0000-0000-00000000bbb2`) | bcrypt 해시 (`crypt('DevOperator2!2026', gen_salt('bf'))`). 070 의 어떤 행도 수정하지 않음 (REQ-SEED002-004 충족). |
+| pending settlements 보강 | settlements `_003`, `_004` (instructor_001 user_id=cccc 연결) | mail-stub 의 `resolveInstructorUserId` 가 정상 dispatch 되도록 user_id 가 연결된 instructor 에 한정. |
+| 멱등 시드 스크립트 | `scripts/seed-users.ts` | `SEED_USERS` 배열에 operator2 엔트리. ON CONFLICT DO NOTHING + listUsers 멱등 매칭. |
+| e2e 헬퍼 export | `tests/e2e/helpers/seed-users.ts` | `SEED_USERS.operator2 = pick(env.SEED_OPERATOR2_EMAIL, env.SEED_OPERATOR2_PASSWORD, fallback)` (REQ-SEED002-005). |
+| env 안내 | `.env.example` | `SEED_OPERATOR2_EMAIL` / `SEED_OPERATOR2_PASSWORD` 두 라인 + 운영 환경 사용 금지 안내. |
+| db:verify AC | `scripts/db-verify.ts` | `AC-SEED002-PENDING-COUNT` (≥ 3), `AC-SEED002-OPERATOR2` (1건). 자동 회귀 가드. |
+
+### 검증 결과
+
+- `pnpm db:verify` → 21/21 PASS (AC-SEED002-* 포함)
+- `pnpm db:seed-users` 멱등 재실행 → 4 계정 모두 "이미 존재" 분기 (REQ-SEED002-003 충족)
+- 후속 SPEC-E2E-002 의 phase2-{payout,notify,admin} 시나리오 → 본 시드 위에서 PASS 전환 (commit 89fd64b)
+- operator 주 페르소나 (`operator@algolink.local`) 행 변동 없음 (`SELECT * WHERE id='...bbbb'` 비교) — REQ-SEED002-004 충족
+
+### 의도적 divergence
+
+- **마이그레이션 파일명**: plan 은 `20260428000010_e2e_seed_phase2.sql` 명시. 실제는
+  `20260428000020_e2e_seed_phase2.sql`. 사유: 같은 날짜에 SPEC-ADMIN-002 의 `_admin_user_active.sql`
+  마이그레이션이 먼저 작성될 가능성을 고려해 `000020` 으로 후행 배치. 의미·동작·정렬 영향 없음.
+
+### 후속 (out-of-scope, 다른 SPEC 영역)
+
+- SPEC-DB-002: `db:verify` 에 pending migrations 가드 추가 (별도 commit 8ed8b63)
+- SPEC-ADMIN-002: 비활성 사용자 즉시 차단 (별도 commit a8f9784)
+- SPEC-E2E-002: phase2 spec 4종 + 신규 RBAC/검증/self-lockout 14종 (별도 commit 89fd64b)
+
+본 SPEC 의 모든 acceptance criteria 는 위 산출물에 의해 충족되며, spec-first 정책에 따라
+status 를 `completed` 로 종결한다. 추가 evolution 시 SPEC-SEED-003 으로 분기.
