@@ -131,6 +131,35 @@ test("updateProjectSchema: expectedUpdatedAt 빈 문자열 거부", () => {
   assert.equal(r.success, false);
 });
 
+// SPEC-SKILL-ABSTRACT-001: requiredSkillIds max(9) 검증.
+test("createProjectSchema: requiredSkillIds 9개 통과 (max)", () => {
+  const ids = Array.from({ length: 9 }, (_, i) =>
+    `30000000-0000-0000-0000-00000000000${i + 1}`,
+  );
+  const r = createProjectSchema.safeParse({
+    title: "x",
+    clientId: VALID_UUID,
+    requiredSkillIds: ids,
+    businessAmountKrw: 0,
+    instructorFeeKrw: 0,
+  });
+  assert.equal(r.success, true);
+});
+
+test("createProjectSchema: requiredSkillIds 10개 거부 (max 9)", () => {
+  const ids = Array.from({ length: 10 }, (_, i) =>
+    `30000000-0000-0000-0000-${(i + 1).toString(16).padStart(12, "0")}`,
+  );
+  const r = createProjectSchema.safeParse({
+    title: "x",
+    clientId: VALID_UUID,
+    requiredSkillIds: ids,
+    businessAmountKrw: 0,
+    instructorFeeKrw: 0,
+  });
+  assert.equal(r.success, false);
+});
+
 test("updateProjectSchema: 정상 — 동시성 토큰 포함", () => {
   const r = updateProjectSchema.safeParse({
     title: "x",

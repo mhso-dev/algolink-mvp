@@ -1,6 +1,8 @@
 "use client";
 
 // SPEC-PROJECT-001 §2.2 — 신규 프로젝트 등록 폼 (Server Action 연동).
+// @MX:SPEC: SPEC-PROJECT-001
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001 — 9개 chip required_skills picker (max 9, controlled).
 
 import * as React from "react";
 import { useFormState, useFormStatus } from "react-dom";
@@ -20,15 +22,12 @@ import {
   createProjectAction,
   type CreateProjectFormState,
 } from "@/app/(app)/(operator)/projects/new/actions";
-
-interface SkillOption {
-  id: string;
-  label: string;
-}
+import { SkillsPicker } from "@/components/instructor/skills-picker";
+import type { SkillCategory } from "@/lib/instructor/skill-tree";
 
 interface Props {
   clients: { id: string; name: string }[];
-  skills: SkillOption[];
+  skills: SkillCategory[];
 }
 
 const initialState: CreateProjectFormState = { ok: false };
@@ -36,7 +35,9 @@ const initialState: CreateProjectFormState = { ok: false };
 export function ProjectCreateForm({ clients, skills }: Props) {
   // useFormState 는 Next 16 에서 useActionState 로 alias 가능. 호환을 위해 그대로 사용.
   const [state, formAction] = useFormState(createProjectAction, initialState);
-  const [selectedSkills, setSelectedSkills] = React.useState<string[]>([]);
+  const [selectedSkills, setSelectedSkills] = React.useState<Set<string>>(
+    () => new Set(),
+  );
   const [projectType, setProjectType] = React.useState<"education" | "material_development">(
     "education",
   );
@@ -45,6 +46,10 @@ export function ProjectCreateForm({ clients, skills }: Props) {
 
   return (
     <form action={formAction} className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+      {/* SkillsPicker는 controlled state — selectedSkills를 hidden field로 직렬화. */}
+      {Array.from(selectedSkills).map((id) => (
+        <input key={id} type="hidden" name="requiredSkillIds[]" value={id} />
+      ))}
       <div className="flex flex-col gap-4 min-w-0">
         <Card>
           <CardHeader>
@@ -94,50 +99,14 @@ export function ProjectCreateForm({ clients, skills }: Props) {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>기술스택</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {skills.length === 0 ? (
-              <p className="text-sm text-[var(--color-text-muted)]">
-                등록된 leaf 기술 분류가 없습니다. (skill_categories seed 확인)
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {skills.map((s) => {
-                  const checked = selectedSkills.includes(s.id);
-                  return (
-                    <label
-                      key={s.id}
-                      className={
-                        checked
-                          ? "inline-flex items-center gap-2 px-3 py-1.5 rounded-md border-2 border-[var(--color-primary)] bg-[var(--color-primary-muted)] text-sm cursor-pointer"
-                          : "inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-[var(--color-border)] text-sm cursor-pointer"
-                      }
-                    >
-                      <input
-                        type="checkbox"
-                        name="requiredSkillIds[]"
-                        value={s.id}
-                        checked={checked}
-                        onChange={(e) =>
-                          setSelectedSkills((prev) =>
-                            e.target.checked
-                              ? [...prev, s.id]
-                              : prev.filter((x) => x !== s.id),
-                          )
-                        }
-                        className="sr-only"
-                      />
-                      {s.label}
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* SPEC-SKILL-ABSTRACT-001 §3.7 — 9개 chip required_skills picker. */}
+        <SkillsPicker
+          categories={skills}
+          selected={selectedSkills}
+          onChange={setSelectedSkills}
+          title="필요 기술스택 (선택)"
+          ariaLabel="프로젝트 필요 기술 카테고리"
+        />
 
         <Card>
           <CardHeader>

@@ -1,4 +1,5 @@
-// SPEC-PROJECT-001 §5.4 — 추천 점수 함수 단위 테스트.
+// SPEC-PROJECT-001 §5.4 + SPEC-SKILL-ABSTRACT-001 §3.4 — 추천 점수 함수 단위 테스트.
+// SPEC-SKILL-ABSTRACT-001: skillMatch 분자가 binary 교집합 카디널리티로 단순화.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -22,34 +23,56 @@ const projectA: ProjectInput = {
   requiredSkillIds: [SK_PY, SK_DJ],
 };
 
-test("computeSkillMatch: 2/2 매칭 (expert+advanced)", () => {
+// ---------------------------------------------------------------------------
+// SPEC-SKILL-ABSTRACT-001 §3.4 — binary 교집합 카디널리티 매칭
+// REQ-SKILL-MATCH-BINARY-001/002, REQ-SKILL-MATCH-EMPTY, REQ-SKILL-MATCH-DUPLICATE
+// ---------------------------------------------------------------------------
+
+test("computeSkillMatch: 케이스 A — required=[c1,c2,c3], 강사=[c1,c2] → 2/3", () => {
   const r = computeSkillMatch(
-    [SK_PY, SK_DJ],
-    [
-      { skillId: SK_PY, proficiency: "expert" },
-      { skillId: SK_DJ, proficiency: "advanced" },
-    ],
+    [SK_PY, SK_DJ, SK_TS],
+    [{ skillId: SK_PY }, { skillId: SK_DJ }],
   );
-  // (1.0 + 0.9) / 2 = 0.95
-  assert.ok(Math.abs(r.score - 0.95) < 1e-9);
+  assert.ok(Math.abs(r.score - 2 / 3) < 1e-9, `score ${r.score} ≠ 2/3`);
   assert.deepEqual(r.matchedSkillIds.sort(), [SK_DJ, SK_PY].sort());
 });
 
-test("computeSkillMatch: 1/2 매칭 (beginner)", () => {
-  const r = computeSkillMatch(
-    [SK_PY, SK_DJ],
-    [{ skillId: SK_PY, proficiency: "beginner" }],
-  );
-  // 0.4 / 2 = 0.2
-  assert.ok(Math.abs(r.score - 0.2) < 1e-9);
+test("computeSkillMatch: 케이스 B — required=[], 강사=[c1] → 0", () => {
+  const r = computeSkillMatch([], [{ skillId: SK_PY }]);
+  assert.equal(r.score, 0);
+  assert.deepEqual(r.matchedSkillIds, []);
 });
 
-test("computeSkillMatch: 0/2 매칭 → 0", () => {
+test("computeSkillMatch: 케이스 C — required=[c1], 강사=[] → 0", () => {
+  const r = computeSkillMatch([SK_PY], []);
+  assert.equal(r.score, 0);
+  assert.deepEqual(r.matchedSkillIds, []);
+});
+
+test("computeSkillMatch: 케이스 D — required=[c1,c2], 강사=[c1,c2,c3] → 1.0 (cap)", () => {
   const r = computeSkillMatch(
     [SK_PY, SK_DJ],
-    [{ skillId: SK_TS, proficiency: "expert" }],
+    [{ skillId: SK_PY }, { skillId: SK_DJ }, { skillId: SK_TS }],
   );
+  assert.equal(r.score, 1.0);
+  assert.deepEqual(r.matchedSkillIds.sort(), [SK_DJ, SK_PY].sort());
+});
+
+test("computeSkillMatch: 케이스 E — 강사 set 기반 (REQ-SKILL-MATCH-DUPLICATE 자동 보장, 분자 ≤ 분모)", () => {
+  // 시그니처상 동일 카테고리는 중복 보유 불가 (DB PK 제약). 본 테스트는 sanity.
+  const r = computeSkillMatch(
+    [SK_PY, SK_DJ],
+    [{ skillId: SK_PY }],
+  );
+  // 분자 = 1 (SK_PY만 매칭), 분모 = 2
+  assert.ok(Math.abs(r.score - 0.5) < 1e-9);
+  assert.deepEqual(r.matchedSkillIds, [SK_PY]);
+});
+
+test("computeSkillMatch: 0 매칭 → 0", () => {
+  const r = computeSkillMatch([SK_PY, SK_DJ], [{ skillId: SK_TS }]);
   assert.equal(r.score, 0);
+  assert.deepEqual(r.matchedSkillIds, []);
 });
 
 test("computeAvailability: 일정 없음 → 1", () => {
@@ -139,29 +162,29 @@ test("computeSatisfaction: mean 4.6 → 0.9", () => {
   );
 });
 
-test("computeFinalScore: 가중치 0.5/0.3/0.2 검증", () => {
-  // skillMatch=0.95, availability=1, satisfaction=0.9
-  // 0.5*0.95 + 0.3*1 + 0.2*0.9 = 0.475 + 0.3 + 0.18 = 0.955
-  const v = computeFinalScore(0.95, 1, 0.9);
-  assert.ok(Math.abs(v - 0.955) < 1e-9);
+test("computeFinalScore: 가중치 0.5/0.3/0.2 검증 (FROZEN)", () => {
+  // SPEC-PROJECT-001 §5.4 가중치 보존 검증.
+  // skillMatch=1.0, availability=1, satisfaction=0.9
+  // 0.5*1.0 + 0.3*1 + 0.2*0.9 = 0.5 + 0.3 + 0.18 = 0.98
+  const v = computeFinalScore(1.0, 1, 0.9);
+  assert.ok(Math.abs(v - 0.98) < 1e-9);
 });
 
-test("scoreCandidate: 종합 점수 검증 (강사 A 시나리오)", () => {
+test("scoreCandidate: 종합 점수 검증 (binary 매칭)", () => {
+  // 강사 A: 2/2 매칭 → skillMatch=1.0, availability=1, satisfaction=0.9
+  // finalScore = 0.5*1.0 + 0.3*1 + 0.2*0.9 = 0.98
   const cand: CandidateInput = {
     instructorId: "ins-A",
     displayName: "강사 A",
-    skills: [
-      { skillId: SK_PY, proficiency: "expert" },
-      { skillId: SK_DJ, proficiency: "advanced" },
-    ],
+    skills: [{ skillId: SK_PY }, { skillId: SK_DJ }],
     schedules: [],
     reviews: { meanScore: 4.6, count: 8 },
   };
   const s = scoreCandidate(projectA, cand);
-  assert.ok(Math.abs(s.skillMatch - 0.95) < 1e-9);
+  assert.equal(s.skillMatch, 1.0);
   assert.equal(s.availability, 1);
   assert.ok(Math.abs(s.satisfaction - 0.9) < 1e-9);
-  assert.ok(Math.abs(s.finalScore - 0.955) < 1e-9);
+  assert.ok(Math.abs(s.finalScore - 0.98) < 1e-9);
 });
 
 test("rankTopN: 4명 → Top-3, skillMatch=0 후보 제외", () => {
@@ -169,40 +192,42 @@ test("rankTopN: 4명 → Top-3, skillMatch=0 후보 제외", () => {
     {
       instructorId: "ins-A",
       displayName: "A",
-      skills: [
-        { skillId: SK_PY, proficiency: "expert" },
-        { skillId: SK_DJ, proficiency: "advanced" },
-      ],
+      // 2/2 매칭 → skillMatch=1.0
+      skills: [{ skillId: SK_PY }, { skillId: SK_DJ }],
       schedules: [],
       reviews: { meanScore: 4.6, count: 8 },
     },
     {
       instructorId: "ins-B",
       displayName: "B",
-      skills: [{ skillId: SK_PY, proficiency: "advanced" }],
+      // 1/2 매칭 → skillMatch=0.5
+      skills: [{ skillId: SK_PY }],
       schedules: [],
       reviews: { meanScore: 4.2, count: 5 },
     },
     {
       instructorId: "ins-C",
       displayName: "C",
-      skills: [{ skillId: SK_TS, proficiency: "expert" }], // skillMatch = 0 → 제외
+      // 0/2 매칭 → 제외
+      skills: [{ skillId: SK_TS }],
       schedules: [],
       reviews: { meanScore: null, count: 0 },
     },
     {
       instructorId: "ins-D",
       displayName: "D",
-      skills: [{ skillId: SK_PY, proficiency: "beginner" }],
+      // 1/2 매칭 → skillMatch=0.5
+      skills: [{ skillId: SK_PY }],
       schedules: [],
       reviews: { meanScore: 3.0, count: 2 },
     },
   ];
   const top = rankTopN(projectA, cands, 3);
   assert.equal(top.length, 3);
-  assert.equal(top[0].instructorId, "ins-A");
-  assert.equal(top[1].instructorId, "ins-B");
-  assert.equal(top[2].instructorId, "ins-D");
+  assert.equal(top[0]!.instructorId, "ins-A");
+  // ins-B와 ins-D는 skillMatch 동일(0.5), satisfaction이 ins-B가 높아 finalScore 우선
+  assert.equal(top[1]!.instructorId, "ins-B");
+  assert.equal(top[2]!.instructorId, "ins-D");
   // C 는 제외
   assert.ok(!top.some((t) => t.instructorId === "ins-C"));
 });
@@ -211,10 +236,7 @@ test("rankTopN: 동점 시 instructorId 사전순 stable sort", () => {
   // SPEC-RECOMMEND-001 REQ-RECOMMEND-003 — tier-3 (instructorId asc) 검증.
   // 두 후보 모두 schedule=[] → availability=1 (tier-1 동률),
   // 동일 skills+reviews → finalScore 동률 (tier-2 동률) → tier-3 instructorId asc 가 결정.
-  const baseSkills = [
-    { skillId: SK_PY, proficiency: "expert" as const },
-    { skillId: SK_DJ, proficiency: "advanced" as const },
-  ];
+  const baseSkills = [{ skillId: SK_PY }, { skillId: SK_DJ }];
   const cands: CandidateInput[] = [
     {
       instructorId: "ins-Z",
@@ -232,8 +254,8 @@ test("rankTopN: 동점 시 instructorId 사전순 stable sort", () => {
     },
   ];
   const top = rankTopN(projectA, cands, 3);
-  assert.equal(top[0].instructorId, "ins-A");
-  assert.equal(top[1].instructorId, "ins-Z");
+  assert.equal(top[0]!.instructorId, "ins-A");
+  assert.equal(top[1]!.instructorId, "ins-Z");
 });
 
 // ---------------------------------------------------------------------------
@@ -243,19 +265,16 @@ test("rankTopN: 동점 시 instructorId 사전순 stable sort", () => {
 
 test("rankTopN: tier-1 (availability) 우선 정렬", () => {
   // SPEC-RECOMMEND-001 REQ-RECOMMEND-001 — tier-1 availability 가 최상위 키.
-  // ins-A: 스킬/만족도 우수하나 일정 충돌 (availability=0, finalScore=0.7)
-  // ins-B: 스킬/만족도 보통이나 일정 OK (availability=1, finalScore=0.6)
-  // 기존 정책(단일 키 finalScore desc): ins-A 1순위.
-  // 신규 정책(tier-1 availability desc 우선): ins-B 1순위.
+  // ins-A: 스킬 매칭 풀(skillMatch=1.0)이나 일정 충돌 (availability=0).
+  //   finalScore = 0.5*1.0 + 0.3*0 + 0.2*1.0 = 0.7
+  // ins-B: 스킬 매칭 절반(skillMatch=0.5)이나 일정 OK (availability=1).
+  //   finalScore = 0.5*0.5 + 0.3*1 + 0.2*0.5 = 0.65
+  // 신규 정책(tier-1 availability desc 우선): ins-B 1순위 (finalScore 더 낮음에도).
   const cands: CandidateInput[] = [
     {
       instructorId: "ins-A",
       displayName: "A",
-      skills: [
-        { skillId: SK_PY, proficiency: "expert" }, // 1.0
-        { skillId: SK_DJ, proficiency: "expert" }, // 1.0
-      ],
-      // (1.0 + 1.0) / 2 = 1.0 skillMatch
+      skills: [{ skillId: SK_PY }, { skillId: SK_DJ }],
       schedules: [
         {
           kind: "unavailable",
@@ -263,77 +282,59 @@ test("rankTopN: tier-1 (availability) 우선 정렬", () => {
           endsAt: new Date("2026-05-13"),
         },
       ],
-      // unavailable overlaps project → availability=0
-      reviews: { meanScore: 5, count: 3 }, // satisfaction = (5-1)/4 = 1.0
+      reviews: { meanScore: 5, count: 3 }, // satisfaction = 1.0
     },
-    // finalScore = 0.5*1.0 + 0.3*0 + 0.2*1.0 = 0.7
     {
       instructorId: "ins-B",
       displayName: "B",
-      skills: [
-        { skillId: SK_PY, proficiency: "beginner" }, // 0.4
-        { skillId: SK_DJ, proficiency: "beginner" }, // 0.4
-      ],
-      // (0.4 + 0.4) / 2 = 0.4 skillMatch
+      skills: [{ skillId: SK_PY }], // skillMatch = 1/2 = 0.5
       schedules: [],
-      // availability = 1
-      reviews: { meanScore: 3, count: 2 }, // satisfaction = (3-1)/4 = 0.5
+      reviews: { meanScore: 3, count: 2 }, // satisfaction = 0.5
     },
-    // finalScore = 0.5*0.4 + 0.3*1 + 0.2*0.5 = 0.2 + 0.3 + 0.1 = 0.6
   ];
   const top = rankTopN(projectA, cands, 3);
   assert.equal(top.length, 2);
   // tier-1 으로 availability=1 인 ins-B 가 1순위.
-  assert.equal(top[0].instructorId, "ins-B");
-  assert.equal(top[0].availability, 1);
+  assert.equal(top[0]!.instructorId, "ins-B");
+  assert.equal(top[0]!.availability, 1);
   // ins-A 는 availability=0 후순위.
-  assert.equal(top[1].instructorId, "ins-A");
-  assert.equal(top[1].availability, 0);
+  assert.equal(top[1]!.instructorId, "ins-A");
+  assert.equal(top[1]!.availability, 0);
   // ins-A 의 finalScore 가 ins-B 보다 큼에도 후순위인 것이 핵심.
-  assert.ok(top[1].finalScore > top[0].finalScore);
+  assert.ok(top[1]!.finalScore > top[0]!.finalScore);
 });
 
 test("rankTopN: tier-2 (finalScore) — availability 동일 시", () => {
   // SPEC-RECOMMEND-001 REQ-RECOMMEND-001 — tier-1 동률 시 tier-2 finalScore 적용.
   // 두 후보 모두 schedule=[] → availability=1 (tier-1 동률).
-  // ins-A: finalScore 0.955, ins-C: finalScore 0.5.
-  // 입력 순서를 점수 낮은 후보 먼저 두어 정렬이 실제로 동작하는지 확인.
+  // ins-A: 2/2 매칭, satisfaction 0.9 → finalScore = 0.5*1.0 + 0.3*1 + 0.2*0.9 = 0.98
+  // ins-C: 1/2 매칭, satisfaction 0.5 → finalScore = 0.5*0.5 + 0.3*1 + 0.2*0.5 = 0.65
   const cands: CandidateInput[] = [
     {
       instructorId: "ins-C",
       displayName: "C",
-      skills: [{ skillId: SK_PY, proficiency: "beginner" }],
-      // skillMatch = 0.4 / 2 = 0.2
+      skills: [{ skillId: SK_PY }],
       schedules: [],
       reviews: { meanScore: 3, count: 2 },
-      // satisfaction = 0.5 → finalScore = 0.5*0.2 + 0.3*1 + 0.2*0.5 = 0.5
     },
     {
       instructorId: "ins-A",
       displayName: "A",
-      skills: [
-        { skillId: SK_PY, proficiency: "expert" },
-        { skillId: SK_DJ, proficiency: "advanced" },
-      ],
-      // skillMatch = (1.0 + 0.9) / 2 = 0.95
+      skills: [{ skillId: SK_PY }, { skillId: SK_DJ }],
       schedules: [],
       reviews: { meanScore: 4.6, count: 8 },
-      // satisfaction = 0.9 → finalScore = 0.5*0.95 + 0.3*1 + 0.2*0.9 = 0.955
     },
   ];
   const top = rankTopN(projectA, cands, 3);
-  assert.equal(top[0].instructorId, "ins-A");
-  assert.equal(top[1].instructorId, "ins-C");
-  assert.ok(top[0].finalScore > top[1].finalScore);
+  assert.equal(top[0]!.instructorId, "ins-A");
+  assert.equal(top[1]!.instructorId, "ins-C");
+  assert.ok(top[0]!.finalScore > top[1]!.finalScore);
 });
 
 test("rankTopN: 3-tier 통합 시나리오 — 3명 동일 (availability, finalScore)", () => {
   // SPEC-RECOMMEND-001 REQ-RECOMMEND-003 — 3명 후보가 (availability, finalScore) 모두 동률일 때
-  // tier-3 instructorId asc 로 결정. 입력 순서를 무작위로 두어 실제 정렬을 검증.
-  const baseSkills = [
-    { skillId: SK_PY, proficiency: "expert" as const },
-    { skillId: SK_DJ, proficiency: "advanced" as const },
-  ];
+  // tier-3 instructorId asc 로 결정.
+  const baseSkills = [{ skillId: SK_PY }, { skillId: SK_DJ }];
   const cands: CandidateInput[] = [
     {
       instructorId: "ins-C",
@@ -362,9 +363,8 @@ test("rankTopN: 3-tier 통합 시나리오 — 3명 동일 (availability, finalS
     top.map((t) => t.instructorId),
     ["ins-A", "ins-B", "ins-C"],
   );
-  // 모든 후보 (availability, finalScore) 동률.
   assert.ok(top.every((t) => t.availability === 1));
-  assert.ok(top.every((t) => Math.abs(t.finalScore - top[0].finalScore) < 1e-9));
+  assert.ok(top.every((t) => Math.abs(t.finalScore - top[0]!.finalScore) < 1e-9));
 });
 
 test("rankTopN: 후보가 N 미만일 때 가능한 만큼 반환", () => {
@@ -372,7 +372,7 @@ test("rankTopN: 후보가 N 미만일 때 가능한 만큼 반환", () => {
     {
       instructorId: "ins-A",
       displayName: "A",
-      skills: [{ skillId: SK_PY, proficiency: "expert" }],
+      skills: [{ skillId: SK_PY }],
       schedules: [],
       reviews: { meanScore: 5, count: 1 },
     },

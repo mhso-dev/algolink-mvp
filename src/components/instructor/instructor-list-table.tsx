@@ -1,4 +1,6 @@
 // SPEC-INSTRUCTOR-001 §2.1 + §2.7 — 리스트 테이블 + 정렬 헤더 (서버 컴포넌트).
+// @MX:SPEC: SPEC-INSTRUCTOR-001
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001 — proficiency 컬럼 부재. 강사 카테고리 chip만 표시(이름).
 
 import Link from "next/link";
 import {

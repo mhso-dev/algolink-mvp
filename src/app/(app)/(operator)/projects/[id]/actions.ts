@@ -40,10 +40,10 @@ interface InstructorRow {
   name_kr: string | null;
 }
 
+// SPEC-SKILL-ABSTRACT-001: proficiency 컬럼 제거.
 interface InstructorSkillRow {
   instructor_id: string;
   skill_id: string;
-  proficiency: "beginner" | "intermediate" | "advanced" | "expert";
 }
 
 interface ScheduleRow {
@@ -119,7 +119,7 @@ export async function runRecommendationAction(
   if (requiredSkillIds.length > 0) {
     const { data: matchRows } = await supabase
       .from("instructor_skills")
-      .select("instructor_id, skill_id, proficiency")
+      .select("instructor_id, skill_id")
       .in("skill_id", requiredSkillIds)
       .returns<InstructorSkillRow[]>();
     candidateIds = Array.from(
@@ -138,7 +138,7 @@ export async function runRecommendationAction(
           .returns<InstructorRow[]>(),
         supabase
           .from("instructor_skills")
-          .select("instructor_id, skill_id, proficiency")
+          .select("instructor_id, skill_id")
           .in("instructor_id", candidateIds)
           .returns<InstructorSkillRow[]>(),
         supabase
@@ -153,13 +153,11 @@ export async function runRecommendationAction(
           .returns<ReviewRow[]>(),
       ]);
 
-    const skillsByInstructor = new Map<
-      string,
-      { skillId: string; proficiency: InstructorSkillRow["proficiency"] }[]
-    >();
+    // SPEC-SKILL-ABSTRACT-001: proficiency 필드 제거 — binary 매칭.
+    const skillsByInstructor = new Map<string, { skillId: string }[]>();
     for (const s of allSkills ?? []) {
       const list = skillsByInstructor.get(s.instructor_id) ?? [];
-      list.push({ skillId: s.skill_id, proficiency: s.proficiency });
+      list.push({ skillId: s.skill_id });
       skillsByInstructor.set(s.instructor_id, list);
     }
 

@@ -2,6 +2,8 @@
 
 // SPEC-PROJECT-001 §2.4 REQ-PROJECT-EDIT-001~004 — 프로젝트 수정 Server Action.
 // 동시성 제어: expected_updated_at 비교 → mismatch 시 STALE_UPDATE 에러.
+// @MX:SPEC: SPEC-PROJECT-001
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001 — required_skills full-replace (DELETE all + INSERT skillIds).
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -25,6 +27,10 @@ interface ProjectStaleRow {
   status: string;
 }
 
+// @MX:ANCHOR: SPEC-PROJECT-001 §2.4 — 프로젝트 수정 진입점 (동시성 토큰 + skill full-replace).
+// @MX:REASON: project_required_skills DELETE + INSERT pattern. STALE_UPDATE 동시성 보장.
+// @MX:SPEC: SPEC-PROJECT-001
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001
 export async function updateProjectAction(
   _prev: UpdateProjectFormState | undefined,
   formData: FormData,

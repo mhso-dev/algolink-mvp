@@ -1,25 +1,29 @@
 "use client";
 
 // SPEC-INSTRUCTOR-001 §2.3 — 강사 등록 폼 (zod + Server Action).
+// @MX:SPEC: SPEC-INSTRUCTOR-001
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001 — 9개 chip SkillsPicker 통합.
 
 import { useState, useTransition } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { createInstructorAndInvite } from "@/app/(app)/(operator)/instructors/new/actions";
+import { SkillsPicker } from "./skills-picker";
+import type { SkillCategory } from "@/lib/instructor/skill-tree";
 
-type SkillOption = { id: string; name: string };
-
-export function InstructorForm({ skills }: { skills: SkillOption[] }) {
+export function InstructorForm({ skills }: { skills: SkillCategory[] }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     const fd = new FormData(e.currentTarget);
-    // checkbox는 form에서 자동 수집되지만 명시적으로 selectedSkills를 사용.
+    // SkillsPicker가 controlled state → form FormData에 직렬화.
     fd.delete("skillIds");
     for (const id of selectedSkills) fd.append("skillIds", id);
     startTransition(async () => {
@@ -27,12 +31,6 @@ export function InstructorForm({ skills }: { skills: SkillOption[] }) {
       if (!r.ok) setError(r.error);
       // 성공 시 redirect()가 throw되므로 아래는 도달 안 함.
     });
-  }
-
-  function toggleSkill(id: string) {
-    setSelectedSkills((cur) =>
-      cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
-    );
   }
 
   return (
@@ -62,34 +60,14 @@ export function InstructorForm({ skills }: { skills: SkillOption[] }) {
         />
       </div>
 
-      {skills.length > 0 ? (
-        <fieldset className="flex flex-col gap-2">
-          <legend className="text-sm font-medium">기본 기술스택 (선택)</legend>
-          <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
-            {skills.map((s) => {
-              const checked = selectedSkills.includes(s.id);
-              return (
-                <label
-                  key={s.id}
-                  className={`text-xs px-2 py-1 rounded border cursor-pointer select-none ${
-                    checked
-                      ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
-                      : "border-[var(--color-border)]"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    className="sr-only"
-                    checked={checked}
-                    onChange={() => toggleSkill(s.id)}
-                  />
-                  {s.name}
-                </label>
-              );
-            })}
-          </div>
-        </fieldset>
-      ) : null}
+      {/* SPEC-SKILL-ABSTRACT-001 §3.7 — 9개 chip 다중선택 SkillsPicker. */}
+      <SkillsPicker
+        categories={skills}
+        selected={selectedSkills}
+        onChange={setSelectedSkills}
+        title="기본 기술스택 (선택)"
+        ariaLabel="강사 기본 기술 카테고리 선택"
+      />
 
       {error ? (
         <p

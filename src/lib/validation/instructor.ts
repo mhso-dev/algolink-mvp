@@ -124,9 +124,19 @@ export const basicInfoInputSchema = z.object({
   address: z.string().max(255).optional().or(z.literal("")),
 });
 
+// SPEC-SKILL-ABSTRACT-001: proficiency 제거. 보유=1/미보유=0 binary 매칭.
+// selected=true → INSERT, selected=false → DELETE (full-replace 패턴).
 export const skillUpdateInputSchema = z.object({
   skillId: uuidLike,
-  proficiency: z.enum(["beginner", "intermediate", "advanced", "expert"]).nullable(),
+  selected: z.boolean(),
+});
+
+/**
+ * SPEC-SKILL-ABSTRACT-001 §3.2 — full-replace upsert 입력.
+ * 강사가 9개 chip 중 N개를 선택 후 저장 시 사용.
+ */
+export const skillsBulkInputSchema = z.object({
+  skillIds: z.array(uuidLike).max(9, "최대 9개까지 선택 가능합니다."),
 });
 
 // ---------- 일정 schema ----------
@@ -191,6 +201,7 @@ export type BasicInfoInput = z.infer<typeof basicInfoInputSchema>;
 export type ScheduleInput = z.infer<typeof scheduleInputSchema>;
 export type PayoutInput = z.infer<typeof payoutInputSchema>;
 export type SkillUpdateInput = z.infer<typeof skillUpdateInputSchema>;
+export type SkillsBulkInput = z.infer<typeof skillsBulkInputSchema>;
 // SPEC-INSTRUCTOR-001 §2.3 REQ-INSTRUCTOR-CREATE-002 — 강사 등록 zod 스키마.
 // SPEC-INSTRUCTOR-001 §2.1 REQ-INSTRUCTOR-LIST — 리스트 필터 zod 스키마.
 

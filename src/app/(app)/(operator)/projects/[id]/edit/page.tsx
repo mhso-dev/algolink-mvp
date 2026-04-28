@@ -1,4 +1,6 @@
 // SPEC-PROJECT-001 §2.4 — 프로젝트 수정 페이지 (풀폼 + 동시성 토큰).
+// @MX:SPEC: SPEC-PROJECT-001
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001 — 9개 추상 카테고리 로딩(tier 필터 제거).
 
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -10,6 +12,7 @@ import { requireUser } from "@/lib/auth";
 import { getCurrentUser } from "@/auth/server";
 import { STATUS_LABELS, type ProjectStatus } from "@/lib/projects";
 import { ProjectEditForm } from "@/components/projects/project-edit-form";
+import { getAllSkillCategories } from "@/lib/instructor/skill-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -31,19 +34,13 @@ interface ProjectRow {
   updated_at: string;
 }
 
-interface SkillRow {
-  id: string;
-  name: string;
-  tier: "large" | "medium" | "small";
-}
-
 export default async function EditProjectPage({ params }: PageProps) {
   await requireUser();
   const user = await getCurrentUser();
   const { id } = await params;
   const supabase = createClient(await cookies());
 
-  const [{ data: project }, { data: clientsRaw }, { data: skillsRaw }, { data: reqSkillsRaw }] =
+  const [{ data: project }, { data: clientsRaw }, skillCategories, { data: reqSkillsRaw }] =
     await Promise.all([
       supabase
         .from("projects")
@@ -56,10 +53,7 @@ export default async function EditProjectPage({ params }: PageProps) {
         .from("clients")
         .select("id, company_name")
         .returns<{ id: string; company_name: string | null }[]>(),
-      supabase
-        .from("skill_categories")
-        .select("id, name, tier")
-        .returns<SkillRow[]>(),
+      getAllSkillCategories(),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase as any)
         .from("project_required_skills")
@@ -76,9 +70,6 @@ export default async function EditProjectPage({ params }: PageProps) {
     id: c.id,
     name: c.company_name ?? "(이름 없음)",
   }));
-  const skills = (skillsRaw ?? [])
-    .filter((s) => s.tier === "small")
-    .map((s) => ({ id: s.id, label: s.name }));
   const requiredSkillIds = ((reqSkillsRaw ?? []) as { skill_id: string }[]).map(
     (r) => r.skill_id,
   );
@@ -126,7 +117,7 @@ export default async function EditProjectPage({ params }: PageProps) {
       <ProjectEditForm
         project={initial}
         clients={clients}
-        skills={skills}
+        skills={skillCategories}
         locked={lockedDueToTaskDone}
       />
     </div>

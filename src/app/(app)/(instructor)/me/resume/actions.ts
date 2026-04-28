@@ -370,7 +370,11 @@ export async function deleteOtherActivity(id: string) {
 }
 
 // ---------- 강의가능 기술스택 (instructor_skills) ----------
+// SPEC-SKILL-ABSTRACT-001 §3.2 — proficiency 제거 + full-replace upsert.
 
+// @MX:ANCHOR: SPEC-SKILL-ABSTRACT-001 — 단일 chip 토글 server action.
+// @MX:REASON: SkillsPicker가 chip 클릭 시마다 호출. selected=true → INSERT, selected=false → DELETE.
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001
 export async function updateSkill(input: SkillUpdateInput): Promise<ActionResult> {
   const ctx = await ensureInstructorRow();
   if (!ctx) return NOT_INSTRUCTOR;
@@ -378,7 +382,7 @@ export async function updateSkill(input: SkillUpdateInput): Promise<ActionResult
   if (!r.success) return { ok: false, message: "입력 값을 확인해 주세요.", fieldErrors: fieldErrorsFromZod(r.error.issues) };
   const supabase = createClient(await cookies());
 
-  if (r.data.proficiency === null) {
+  if (!r.data.selected) {
     // DELETE
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
@@ -391,7 +395,7 @@ export async function updateSkill(input: SkillUpdateInput): Promise<ActionResult
       return { ok: false, message: "삭제에 실패했습니다." };
     }
   } else {
-    // UPSERT
+    // INSERT (proficiency 컬럼 부재)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
       .from("instructor_skills")
@@ -399,7 +403,6 @@ export async function updateSkill(input: SkillUpdateInput): Promise<ActionResult
         {
           instructor_id: ctx.instructorId,
           skill_id: r.data.skillId,
-          proficiency: r.data.proficiency,
         },
         { onConflict: "instructor_id,skill_id" },
       );
@@ -413,6 +416,7 @@ export async function updateSkill(input: SkillUpdateInput): Promise<ActionResult
 }
 
 // updateSkills: 일괄 (전체 교체)
+// SPEC-SKILL-ABSTRACT-001 §3.2 REQ-SKILL-INSTRUCTOR-MAP-003 — full-replace upsert pattern.
 export async function updateSkills(
   inputs: SkillUpdateInput[],
 ): Promise<ActionResult<{ updated: number }>> {
@@ -427,8 +431,8 @@ export async function updateSkills(
     validated.push(r.data);
   }
   const supabase = createClient(await cookies());
-  const toDelete = validated.filter((v) => v.proficiency === null).map((v) => v.skillId);
-  const toUpsert = validated.filter((v) => v.proficiency !== null);
+  const toDelete = validated.filter((v) => !v.selected).map((v) => v.skillId);
+  const toInsert = validated.filter((v) => v.selected);
   if (toDelete.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase as any)
@@ -437,15 +441,14 @@ export async function updateSkills(
       .eq("instructor_id", ctx.instructorId)
       .in("skill_id", toDelete);
   }
-  if (toUpsert.length > 0) {
+  if (toInsert.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
       .from("instructor_skills")
       .upsert(
-        toUpsert.map((v) => ({
+        toInsert.map((v) => ({
           instructor_id: ctx.instructorId,
           skill_id: v.skillId,
-          proficiency: v.proficiency,
         })),
         { onConflict: "instructor_id,skill_id" },
       );

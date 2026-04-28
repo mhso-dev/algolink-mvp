@@ -1,9 +1,9 @@
 // @MX:ANCHOR: SPEC-PROJECT-001 §5.4 REQ-PROJECT-RECOMMEND-002 — Top-3 추천 점수 함수.
 // @MX:REASON: KPI(1순위 채택률 ≥ 60%)의 핵심 입력. 가중치 변경은 SPEC 개정 필요.
 // @MX:SPEC: SPEC-PROJECT-001
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001
 
 import {
-  PROFICIENCY_WEIGHT,
   SATISFACTION_PRIOR,
   WEIGHTS,
   type CandidateInput,
@@ -16,8 +16,10 @@ import {
 
 /**
  * skillMatch ∈ [0, 1]
- * = Σ(matched proficiency_weight) / required_skill_count.
- * 미매칭 skill 은 0 기여. 매칭은 강사가 보유한 proficiency 가중치를 사용.
+ * = (강사 보유 카테고리 ∩ required) 카디널리티 / required_skill_count.
+ *
+ * SPEC-SKILL-ABSTRACT-001: 보유=1/미보유=0 binary 매칭. proficiency 가중치 사용 안 함.
+ * 강사가 동일 카테고리를 중복 보유할 수 없으므로(DB PK 제약), 분자가 분모를 초과하지 않음.
  */
 export function computeSkillMatch(
   required: readonly string[],
@@ -26,19 +28,16 @@ export function computeSkillMatch(
   if (required.length === 0) {
     return { score: 0, matchedSkillIds: [] };
   }
-  const ownedById = new Map<string, InstructorSkillInput>();
-  for (const s of instructorSkills) ownedById.set(s.skillId, s);
+  const ownedIds = new Set<string>();
+  for (const s of instructorSkills) ownedIds.add(s.skillId);
 
   const matched: string[] = [];
-  let sum = 0;
   for (const reqId of required) {
-    const owned = ownedById.get(reqId);
-    if (owned) {
+    if (ownedIds.has(reqId)) {
       matched.push(reqId);
-      sum += PROFICIENCY_WEIGHT[owned.proficiency];
     }
   }
-  return { score: sum / required.length, matchedSkillIds: matched };
+  return { score: matched.length / required.length, matchedSkillIds: matched };
 }
 
 /**
@@ -116,6 +115,7 @@ export function scoreCandidate(
 // @MX:REASON: KPI(1순위 채택률 ≥ 60%) 분자가 top3_jsonb[0]에 의존하므로 정렬 결정성 필수.
 // @MX:SPEC: SPEC-RECOMMEND-001
 // @MX:SPEC: SPEC-PROJECT-001 (가중치 FROZEN — REQ-RECOMMEND-007 보존)
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001
 /**
  * 후보 리스트 → Top-N (3-tier 안정 정렬, skillMatch=0 후보 제외).
  * 정렬 키 (SPEC-RECOMMEND-001 REQ-RECOMMEND-001):

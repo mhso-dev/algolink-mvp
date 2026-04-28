@@ -1,6 +1,8 @@
 "use client";
 
 // SPEC-PROJECT-001 §2.4 — 프로젝트 수정 풀폼 (동시성 토큰 hidden field 포함).
+// @MX:SPEC: SPEC-PROJECT-001
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001 — 9개 chip required_skills picker. locked 상태 시 readOnly.
 
 import * as React from "react";
 import { useFormState, useFormStatus } from "react-dom";
@@ -20,11 +22,8 @@ import {
   updateProjectAction,
   type UpdateProjectFormState,
 } from "@/app/(app)/(operator)/projects/[id]/edit/actions";
-
-interface SkillOption {
-  id: string;
-  label: string;
-}
+import { SkillsPicker } from "@/components/instructor/skills-picker";
+import type { SkillCategory } from "@/lib/instructor/skill-tree";
 
 interface ProjectInitial {
   id: string;
@@ -44,7 +43,7 @@ interface ProjectInitial {
 interface Props {
   project: ProjectInitial;
   clients: { id: string; name: string }[];
-  skills: SkillOption[];
+  skills: SkillCategory[];
   locked: boolean;
 }
 
@@ -60,8 +59,8 @@ function isoToLocalInput(iso: string | null): string {
 
 export function ProjectEditForm({ project, clients, skills, locked }: Props) {
   const [state, formAction] = useFormState(updateProjectAction, initialState);
-  const [selectedSkills, setSelectedSkills] = React.useState<string[]>(
-    project.requiredSkillIds,
+  const [selectedSkills, setSelectedSkills] = React.useState<Set<string>>(
+    () => new Set(project.requiredSkillIds),
   );
   const [projectType, setProjectType] = React.useState<
     "education" | "material_development"
@@ -76,6 +75,10 @@ export function ProjectEditForm({ project, clients, skills, locked }: Props) {
     <form action={formAction} className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
       <input type="hidden" name="projectId" value={project.id} />
       <input type="hidden" name="expectedUpdatedAt" value={updatedAtToken} />
+      {/* SkillsPicker controlled state → hidden field 직렬화. */}
+      {Array.from(selectedSkills).map((id) => (
+        <input key={id} type="hidden" name="requiredSkillIds[]" value={id} />
+      ))}
 
       <div className="flex flex-col gap-4 min-w-0">
         <Card>
@@ -146,51 +149,15 @@ export function ProjectEditForm({ project, clients, skills, locked }: Props) {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>기술스택</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {skills.length === 0 ? (
-              <p className="text-sm text-[var(--color-text-muted)]">
-                등록된 leaf 기술 분류가 없습니다.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {skills.map((s) => {
-                  const checked = selectedSkills.includes(s.id);
-                  return (
-                    <label
-                      key={s.id}
-                      className={
-                        checked
-                          ? "inline-flex items-center gap-2 px-3 py-1.5 rounded-md border-2 border-[var(--color-primary)] bg-[var(--color-primary-muted)] text-sm cursor-pointer"
-                          : "inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-[var(--color-border)] text-sm cursor-pointer"
-                      }
-                    >
-                      <input
-                        type="checkbox"
-                        name="requiredSkillIds[]"
-                        value={s.id}
-                        checked={checked}
-                        disabled={locked}
-                        onChange={(e) =>
-                          setSelectedSkills((prev) =>
-                            e.target.checked
-                              ? [...prev, s.id]
-                              : prev.filter((x) => x !== s.id),
-                          )
-                        }
-                        className="sr-only"
-                      />
-                      {s.label}
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* SPEC-SKILL-ABSTRACT-001 §3.7 — 9개 chip required_skills picker. locked 상태 시 readOnly. */}
+        <SkillsPicker
+          categories={skills}
+          selected={selectedSkills}
+          onChange={setSelectedSkills}
+          readOnly={locked}
+          title="필요 기술스택"
+          ariaLabel="프로젝트 필요 기술 카테고리"
+        />
 
         <Card>
           <CardHeader>

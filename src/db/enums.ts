@@ -60,13 +60,5 @@ export const notificationType = pgEnum("notification_type", [
   "assignment_request",
 ]);
 
-// 강사-기술 매핑 난이도.
-export const proficiency = pgEnum("proficiency", [
-  "beginner",
-  "intermediate",
-  "advanced",
-  "expert",
-]);
-
-// 기술 분류 3-tier 계층.
-export const skillTier = pgEnum("skill_tier", ["large", "medium", "small"]);
+// SPEC-SKILL-ABSTRACT-001: 강사 기술 분류 enum 제거 (3-tier 분류, 숙련도).
+// 강사 기술 분류는 9개 추상 카테고리(단일 레벨) + 보유=1/미보유=0 binary 매칭으로 단순화.

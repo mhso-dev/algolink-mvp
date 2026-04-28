@@ -14,21 +14,21 @@ const project: ProjectInput = {
   requiredSkillIds: [SK_PY, SK_DJ],
 };
 
+// SPEC-SKILL-ABSTRACT-001: proficiency 필드 제거 — binary 매칭.
 const candidates: CandidateInput[] = [
   {
     instructorId: "ins-A",
     displayName: "강사 A",
-    skills: [
-      { skillId: SK_PY, proficiency: "expert" },
-      { skillId: SK_DJ, proficiency: "advanced" },
-    ],
+    // 2/2 매칭 → skillMatch = 1.0
+    skills: [{ skillId: SK_PY }, { skillId: SK_DJ }],
     schedules: [],
     reviews: { meanScore: 4.6, count: 8 },
   },
   {
     instructorId: "ins-B",
     displayName: "강사 B",
-    skills: [{ skillId: SK_PY, proficiency: "advanced" }],
+    // 1/2 매칭 → skillMatch = 0.5
+    skills: [{ skillId: SK_PY }],
     schedules: [],
     reviews: { meanScore: 4.2, count: 5 },
   },
@@ -163,11 +163,8 @@ test("generateRecommendations: tier sort 결과가 candidates 배열 순서로 �
     {
       instructorId: "ins-A",
       displayName: "A",
-      skills: [
-        { skillId: SK_PY_LOCAL, proficiency: "expert" },
-        { skillId: SK_DJ_LOCAL, proficiency: "expert" },
-      ],
-      // skillMatch = 1.0
+      // 2/2 매칭 → skillMatch = 1.0
+      skills: [{ skillId: SK_PY_LOCAL }, { skillId: SK_DJ_LOCAL }],
       schedules: [
         {
           kind: "unavailable",
@@ -182,15 +179,12 @@ test("generateRecommendations: tier sort 결과가 candidates 배열 순서로 �
     {
       instructorId: "ins-B",
       displayName: "B",
-      skills: [
-        { skillId: SK_PY_LOCAL, proficiency: "beginner" },
-        { skillId: SK_DJ_LOCAL, proficiency: "beginner" },
-      ],
-      // skillMatch = 0.4
+      // 1/2 매칭 → skillMatch = 0.5
+      skills: [{ skillId: SK_PY_LOCAL }],
       schedules: [],
       // availability = 1
       reviews: { meanScore: 3, count: 2 }, // satisfaction = 0.5
-      // finalScore = 0.5*0.4 + 0.3*1 + 0.2*0.5 = 0.6
+      // finalScore = 0.5*0.5 + 0.3*1 + 0.2*0.5 = 0.65
     },
   ];
   const result = await generateRecommendations(project, localCandidates, null, 3);

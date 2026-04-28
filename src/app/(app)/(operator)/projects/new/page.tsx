@@ -1,45 +1,34 @@
 // SPEC-PROJECT-001 §2.2 — 신규 프로젝트 등록 페이지.
+// @MX:SPEC: SPEC-PROJECT-001
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001 — 9개 추상 카테고리 로딩(tier 필터 제거).
 
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { ChevronLeft } from "lucide-react";
-import { createClient } from "@/utils/supabase/server";
 import { Button } from "@/components/ui/button";
 import { ProjectCreateForm } from "@/components/projects/project-create-form";
 import { requireUser } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { createClient } from "@/utils/supabase/server";
+import { getAllSkillCategories } from "@/lib/instructor/skill-queries";
 
 export const dynamic = "force-dynamic";
-
-interface SkillRow {
-  id: string;
-  name: string;
-  tier: "large" | "medium" | "small";
-}
 
 export default async function NewProjectPage() {
   await requireUser();
   const supabase = createClient(await cookies());
 
-  const [{ data: clientsRaw }, { data: skillsRaw }] = await Promise.all([
+  const [{ data: clientsRaw }, skillCategories] = await Promise.all([
     supabase
       .from("clients")
       .select("id, company_name")
       .returns<{ id: string; company_name: string | null }[]>(),
-    supabase
-      .from("skill_categories")
-      .select("id, name, tier")
-      .returns<SkillRow[]>(),
+    getAllSkillCategories(),
   ]);
 
   const clients = (clientsRaw ?? []).map((c) => ({
     id: c.id,
     name: c.company_name ?? "(이름 없음)",
   }));
-
-  // leaf-only 노출: small tier 만 사용. (3-tier 정합성은 SPEC-DB-001 trigger 가 강제)
-  const skills = (skillsRaw ?? [])
-    .filter((s) => s.tier === "small")
-    .map((s) => ({ id: s.id, label: s.name }));
 
   return (
     <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-6">
@@ -53,13 +42,13 @@ export default async function NewProjectPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">새 교육 프로젝트</h1>
             <p className="text-sm text-[var(--color-text-muted)] mt-0.5">
-              의뢰 내용을 입력하고 등록하세요. 상세 페이지에서 AI 추천을 실행할 수 있습니다.
+              의뢰 내용을 입력하고 등록하세요. 상세 페이지에서 강사 추천을 실행할 수 있습니다.
             </p>
           </div>
         </div>
       </header>
 
-      <ProjectCreateForm clients={clients} skills={skills} />
+      <ProjectCreateForm clients={clients} skills={skillCategories} />
     </div>
   );
 }

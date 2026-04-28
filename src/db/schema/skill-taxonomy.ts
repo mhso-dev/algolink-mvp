@@ -1,5 +1,7 @@
-// @MX:ANCHOR: SPEC-DB-001 §2.4 REQ-DB001-SKILL-TAXONOMY — 3-tier self-ref 분류 + N:M 강사 매핑.
-// @MX:REASON: 본 테이블은 강사 추천/검색/리포팅의 분류 축. 모든 검색 UI가 의존.
+// @MX:ANCHOR: SPEC-SKILL-ABSTRACT-001 §2.2 — 9개 추상 카테고리(단일 레벨) + N:M 강사 매핑.
+// @MX:REASON: 강사 추천/검색/리포팅의 분류 축. 모든 검색/필터 UI가 의존하는 단일 진실.
+// @MX:SPEC: SPEC-DB-001 (supersede §2.4)
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001
 import {
   pgTable,
   uuid,
@@ -8,34 +10,22 @@ import {
   timestamp,
   unique,
   index,
-  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
-import { skillTier, proficiency } from "../enums";
 import { instructors } from "./instructor";
 
 export const skillCategories = pgTable(
   "skill_categories",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    tier: skillTier("tier").notNull(),
     name: text("name").notNull(),
-    // 자기 참조 FK — large는 NULL, medium은 large 참조, small은 medium 참조.
-    // leaf 검증은 트리거에서 (자식이 없는 노드만 instructor_skills.skill_id 가능).
-    parentId: uuid("parent_id").references((): AnyPgColumn => skillCategories.id, {
-      onDelete: "restrict",
-    }),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    unique("uq_skill_categories_tier_parent_name").on(t.tier, t.parentId, t.name),
-    index("idx_skill_categories_tier").on(t.tier),
-    index("idx_skill_categories_parent").on(t.parentId),
-  ],
+  (t) => [unique("uq_skill_categories_name").on(t.name)],
 );
 
-// 강사-기술 N:M + 난이도 (REQ-DB001-SKILL-INSTRUCTOR-MAP).
-// REQ-DB001-SKILL-LEAF: skill_id는 leaf node만 허용 (자식이 없는 노드) — 트리거에서 강제.
+// 강사-기술 N:M (REQ-SKILL-INSTRUCTOR-MAP-001~002).
+// proficiency 컬럼 제거 — 보유=1/미보유=0 binary 매칭.
 export const instructorSkills = pgTable(
   "instructor_skills",
   {
@@ -45,7 +35,6 @@ export const instructorSkills = pgTable(
     skillId: uuid("skill_id")
       .notNull()
       .references(() => skillCategories.id, { onDelete: "restrict" }),
-    proficiency: proficiency("proficiency").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
