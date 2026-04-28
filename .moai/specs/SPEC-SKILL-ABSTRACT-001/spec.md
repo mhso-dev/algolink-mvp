@@ -1,7 +1,7 @@
 ---
 id: SPEC-SKILL-ABSTRACT-001
-version: 0.1.0
-status: draft
+version: 1.0.0
+status: completed
 created: 2026-04-29
 updated: 2026-04-29
 author: 철
@@ -13,6 +13,7 @@ issue_number: null
 
 ## HISTORY
 
+- **2026-04-29 (v1.0.0)**: 본 SPEC 구현 완료. Phase 1~6 전부 PASS. TRUST 5 + 4-dim eval (0.864) 통과. db:verify 24/24, typecheck/lint/test:unit 회귀 0, @MX:SPEC 21 file 부착. claude.ts 비회귀 (REQ-SKILL-CLAUDE-PRESERVE 보존). status: draft → completed.
 - **2026-04-29 (v0.1.0)**: 초기 작성. 3-tier(large/medium/small) 매우 세분화된 기술 분류 체계를 9개 추상 카테고리(단일 레벨)로 단순화. 동시에 강사 보유 기술의 숙련도(proficiency) 개념을 완전히 제거하여 추천 점수를 보유=1/미보유=0 binary 매칭으로 단순화.
 - **Supersede 관계**:
   - **SPEC-DB-001 §2.4 REQ-DB001-SKILL-TAXONOMY**: 3-tier 분류 + leaf-only 매핑 + proficiency enum 정의를 본 SPEC이 supersede. SPEC-DB-001 문서 자체는 수정하지 않으며, 본 SPEC HISTORY로만 supersede 관계 기록.
