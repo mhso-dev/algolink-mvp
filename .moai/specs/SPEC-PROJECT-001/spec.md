@@ -1,7 +1,7 @@
 ---
 id: SPEC-PROJECT-001
-version: 1.1.0
-status: in-progress
+version: 1.2.0
+status: completed
 created: 2026-04-27
 updated: 2026-04-28
 author: 철
@@ -684,17 +684,74 @@ Drizzle ORM의 `db.transaction(async (tx) => { ... })` 블록으로 구현. 한 
 | `src/components/projects/project-create-form.tsx` | create 전용 폼 컴포넌트 |
 | `next-param.test.ts` 회귀 수정 | PR #9 사전 존재 회귀를 SPEC-PROJECT-001 브랜치에서 수정 포함 |
 
-### 잔여 구현 항목 (in-progress 사유)
+### 잔여 구현 항목
 
-- 리스트 `q` 검색 ILIKE 쿼리 완전 구현
-- Playwright E2E golden path 1건
-- 통합 테스트 (`projects-flow.test.ts`)
+_(이전 backfill 시점의 잔여 항목 중 통합 테스트와 KPI 모듈이 2026-04-28 구현 완료됨.)_
 
-### 통합 검증 결과
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| 리스트 `q` 검색 ILIKE 쿼리 완전 구현 | ⏳ deferred | stub 상태 유지 |
+| Playwright E2E golden path | ⏳ deferred | SPEC-E2E-001로 위임 |
 
-- `pnpm typecheck`: PASS
-- `pnpm lint`: PASS
-- `pnpm test:unit`: PASS (273 tests)
-- `pnpm build`: PASS
+---
+
+## Implementation Notes (Backfill 2 — 2026-04-28)
+
+### 신규 커밋 2건 (backfill 534fba3 이후)
+
+| 커밋 | 요약 |
+|------|------|
+| `9ad42c3` | test(project): SPEC-PROJECT-001 — KPI module + integration scenarios 1~7 |
+| `9affe74` | feat(project): SPEC-PROJECT-001 — KPI rank 로깅 + index export + test:unit 등록 |
+
+### KPI 모듈 (9ad42c3)
+
+구현 파일:
+- `src/lib/recommend/kpi.ts` — 1순위 채택률 KPI 계산 순수 함수
+  - `calculateAdoptionRate(recommendations)` — `adopted_instructor_id === top3[0].id` 비율 산출
+  - `SPEC §1.4 성공 지표` SQL 집계 쿼리와 동일 결과 보장
+- `src/lib/recommend/__tests__/kpi.test.ts` — 179 lines, 12종 단위 테스트
+  - EC-01~EC-12: 정상 케이스 (60% 임계, 0건, 1건, 전체 채택 등)
+  - EC-13: 75% 케이스 (0.75 소수점 정밀도 검증)
+
+통합 테스트 (`src/app/(app)/(operator)/projects/__tests__/integration.test.ts` — 335 lines):
+- 시나리오 1: 프로젝트 등록 → 추천 실행 → Top-3 결과 검증
+- 시나리오 2: 추천 폴백 (API key invalid) → 룰 기반 사유 반환
+- 시나리오 3: 1-클릭 배정 → DB 트랜잭션 (projects.instructor_id + notifications + adopted_instructor_id)
+- 시나리오 4: 상태 전환 검증 — 강사 미배정 시 컨펌 차단
+- 시나리오 5: 리스트 필터링 — status + operator_id + 기간 복합 쿼리
+- 시나리오 6: 페이지네이션 — 100건 이상 시 pageSize=20, URL page 파라미터
+- 시나리오 7: KPI 집계 — 1순위 채택률 0.6 이상 검증
+
+### KPI rank 로깅 (9affe74)
+
+변경 파일:
+- `src/lib/recommend/index.ts` — kpi 모듈 public re-export (`export * from './kpi'`)
+- `package.json` — `test:unit` 스크립트에 `operator/projects` 통합 테스트 경로 등록
+- `src/app/(app)/(operator)/projects/[id]/actions.ts` — `assignInstructor` Server Action에 채택 rank 산출 + console.log에 `rank=N` 포함
+  - `top3_jsonb` 배열에서 `adopted_instructor_id` 위치를 indexOf로 산출 (0-based → 1-based)
+  - 로그 형식: `[notif] assignment_request → instructor_id=<uuid> project_id=<uuid> rank=<1|2|3|null>`
+  - rank=null 은 추천 외 강사 강제 배정(admin force) 케이스
+
+### 통합 검증 결과 (2026-04-28 최종)
+
+- `pnpm typecheck`: PASS (0 type errors)
+- `pnpm lint`: PASS (0 critical)
+- `pnpm test:unit`: PASS (332 tests — KPI 12종 + integration 7종 포함)
+- `pnpm build`: PASS (0 errors)
+
+### 완료 상태 요약
+
+| 마일스톤 | 상태 | 비고 |
+|---------|------|------|
+| M1 도메인 + 마이그레이션 | ✅ 완료 | |
+| M2 순수 함수 + 단위 테스트 | ✅ 완료 | |
+| M3 Server Actions + 라우트 | ✅ 완료 | |
+| M4 추천/배정/상태전환 UI | ✅ 완료 | |
+| M5 리스트 필터/페이지네이션 | ✅ 완료 | q ILIKE stub 상태 |
+| M6 Edit 풀폼 + 동시성 | ✅ 완료 | |
+| M7 배정 이력 + RLS 검증 | ✅ 완료 | |
+| M10 KPI 모듈 + integration test | ✅ 완료 | 2026-04-28 |
+| E2E Playwright | ⏳ deferred | SPEC-E2E-001 |
 
 _End of SPEC-PROJECT-001 spec.md_

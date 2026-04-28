@@ -23,6 +23,7 @@ MVP 단계의 절대 우선순위:
 | 데이터 페칭 | **TanStack Query** | v5 | 서버 상태 캐시, 낙관적 업데이트 |
 | 차트 | **Recharts** | latest | 매출/매입 대시보드 |
 | 캘린더 | **FullCalendar** | v6.1.20 | 월/주 뷰, 드래그 편집 (daygrid/timegrid/interaction/react 패키지) |
+| PDF | **@react-pdf/renderer** | latest | 이력서 PDF 다운로드 (한국어 NotoSansKR 폰트 필수, public/fonts/) |
 | DnD | **@dnd-kit** | core^6.3.1, sortable^10.0.0 | 드래그 앤 드롭 (Kanban 컬럼 등) |
 | 날짜 | **date-fns** + **date-fns-tz** | ^4.1.0 / ^3.2.0 | 날짜 포맷·연산, Asia/Seoul 타임존 처리 |
 | 날짜 피커 | **react-day-picker** | ^9.14.0 | 날짜 범위 선택 UI |
@@ -100,6 +101,9 @@ src/auth/     → Supabase 세션, 역할 가드
 
 - Supabase RLS: 모든 테이블 기본 deny, 역할별 정책 명시
 - 강사 민감정보(주민번호, 계좌): `pgcrypto`로 application-level 암호화
+  - 암호화 패턴: `SECURITY DEFINER` RPC (`encrypt_payout_field` / `decrypt_payout_field`) 경유
+  - GUC 키: `app.pii_encryption_key` — DB 설정에서 주입, 코드/환경변수 평문 저장 절대 금지
+  - 마이그레이션: `supabase/migrations/20260428000010_pgcrypto_payout_rpc.sql`
 - Storage 버킷: 강사 본인 + 담당자만 read 가능한 RLS
 - AI 호출 시 PII 마스킹 후 전송(이름/이메일은 OK, 주민번호/계좌는 제거)
 
@@ -140,5 +144,15 @@ pnpm lint && pnpm typecheck
 
 ---
 
-Version: 1.1.0
+## 8. 주요 패턴 결정 (ADR 추가)
+
+| ID | 결정 | 사유 |
+|---|---|---|
+| ADR-009 | PDF 한국어 렌더링: public/fonts/NotoSansKR-*.ttf 등록 필수 | @react-pdf/renderer는 시스템 폰트 접근 불가, TTF 직접 등록만 동작 |
+| ADR-010 | pgcrypto RPC 패턴: SECURITY DEFINER + GUC 키 | 평문을 App 레이어가 직접 다루지 않고, DB 함수가 암호화/복호화 전담. GUC 키는 DB 설정값으로만 관리 |
+| ADR-011 | KPI 모듈 분리: src/lib/recommend/kpi.ts | product.md §5 KPI를 SQL 집계 쿼리와 동일하게 순수 함수로 구현, 단위 테스트 12종으로 검증 |
+
+---
+
+Version: 1.2.0
 Last Updated: 2026-04-28

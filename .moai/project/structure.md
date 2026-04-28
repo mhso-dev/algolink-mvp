@@ -36,9 +36,23 @@ algolink/
 ├── src/
 │   ├── lib/                      # 순수 도메인 로직 (테스트 대상)
 │   │   ├── dashboard/            # 담당자 대시보드 (calendar-events, queries, transitions, types) ✅ SPEC-DASHBOARD-001
-│   │   ├── instructor/           # 강사 도메인 (queries, me-queries, types, link-user, resume-mask, pii-encrypt, settlement-summary, ...) ✅ SPEC-INSTRUCTOR-001
+│   │   ├── instructor/           # 강사 도메인 ✅ SPEC-ME-001 (M1~M8 완료)
+│   │   │   ├── skill-tree.ts     # 3-tier skill_categories 트리 빌더 (순수 함수)
+│   │   │   ├── skill-queries.ts  # instructor_skills UPSERT/DELETE + skill_categories 조회
+│   │   │   ├── settlement-grouping.ts  # 월별 그룹핑 + 분기 계산 (순수 함수)
+│   │   │   ├── settlement-queries.ts   # settlements + projects join 쿼리
+│   │   │   ├── resume-pdf-data.ts      # PDF 생성용 데이터 조립 + 마스킹 적용
+│   │   │   ├── pii-encrypt.ts    # pgcrypto RPC 래퍼 (encrypt/decrypt)
+│   │   │   ├── payout-queries.ts # instructors PII 컬럼 UPDATE + pii_access_log
+│   │   │   ├── payout-bank-bundle.ts   # 계좌 번호 묶음 직렬화 helper
+│   │   │   └── ...               # (me-queries, resume-mask, settlement-summary 등 기존 모듈)
 │   │   ├── projects/             # 프로젝트 CRUD (list-query, list-queries, status-machine, errors) ✅ SPEC-PROJECT-001
-│   │   ├── recommend/            # AI 추천 엔진 (engine, score, index, types) ✅ SPEC-PROJECT-001
+│   │   ├── recommend/            # AI 추천 엔진 ✅ SPEC-PROJECT-001
+│   │   │   ├── engine.ts         # 추천 실행 오케스트레이터
+│   │   │   ├── score.ts          # 점수 계산 순수 함수
+│   │   │   ├── kpi.ts            # 1순위 채택률 KPI 계산 (2026-04-28)
+│   │   │   ├── types.ts          # Candidate, RecommendationResult 타입
+│   │   │   └── index.ts          # public re-export (kpi 포함)
 │   │   ├── ai/                   # AI 클라이언트 (anthropic-client, claude, instructor-summary) ✅ SPEC-INSTRUCTOR-001
 │   │   ├── validation/           # zod 스키마 (auth, instructor, project)
 │   │
@@ -85,7 +99,13 @@ algolink/
 │   │   ├── ui/                   # shadcn 자동 생성
 │   │   ├── app/                  # 앱 레이아웃 (Nav, Sidebar)
 │   │   ├── dashboard/            # 담당자 대시보드 컴포넌트 ✅ SPEC-DASHBOARD-001
-│   │   ├── instructor/           # 강사 관리 컴포넌트 ✅ SPEC-INSTRUCTOR-001
+│   │   ├── instructor/           # 강사 관리 + 개인영역 컴포넌트 ✅ SPEC-INSTRUCTOR-001 + SPEC-ME-001
+│   │   │   ├── skills-picker.tsx          # 3-tier SkillsPicker (M3, 2026-04-28)
+│   │   │   ├── settlement-list.tsx        # 월별 그룹 정산 리스트 (M5, 2026-04-28)
+│   │   │   ├── settlement-summary-widget.tsx  # 합계 위젯 (M5, 2026-04-28)
+│   │   │   ├── resume-pdf-document.tsx    # @react-pdf/renderer 문서 (M8, 2026-04-28)
+│   │   │   ├── payout-settings-form.tsx   # 마스킹 표시 + 지급정보 입력 (M7, 2026-04-28)
+│   │   │   └── ...                        # (기존 컴포넌트)
 │   │   ├── projects/             # 프로젝트 관리 컴포넌트 ✅ SPEC-PROJECT-001
 │   │   └── resume/               # 이력서 관련 컴포넌트 ✅ SPEC-ME-001
 │   │
@@ -97,6 +117,14 @@ algolink/
 │   └── e2e/                      # Playwright
 │
 ├── public/
+│   └── fonts/                    # 한국어 PDF 렌더링용 폰트 (SPEC-ME-001 M8)
+│       ├── NotoSansKR-Regular.ttf  # 4.4 MB — @react-pdf/renderer 필수
+│       └── NotoSansKR-Bold.ttf     # 4.6 MB
+│
+├── supabase/
+│   └── migrations/
+│       └── 20260428000010_pgcrypto_payout_rpc.sql  # encrypt/decrypt RPC (SPEC-ME-001 M7)
+│
 ├── .moai/                        # MoAI-ADK 메타
 ├── .claude/                      # Claude Code 설정
 │
@@ -226,5 +254,5 @@ NODE_ENV=development|production
 
 ---
 
-Version: 1.1.0
+Version: 1.2.0
 Last Updated: 2026-04-28

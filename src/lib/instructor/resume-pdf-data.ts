@@ -1,4 +1,7 @@
 // SPEC-ME-001 §2.2 REQ-ME-RESUME-PDF — PDF 생성에 필요한 평탄화된 입력 데이터.
+// @MX:ANCHOR: 이력서 PDF 내보내기의 단일 데이터 조립 진입점.
+// @MX:REASON: export route + 마스킹 경로 두 곳에서 호출하며 이후 PDF 미리보기 API 추가 시 fan_in >= 3 예상.
+// @MX:SPEC: SPEC-ME-001
 import {
   maskEmail,
   maskPhone,

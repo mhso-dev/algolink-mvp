@@ -1,7 +1,7 @@
 ---
 id: SPEC-ME-001
-version: 1.1.0
-status: in-progress
+version: 1.2.0
+status: completed
 created: 2026-04-27
 updated: 2026-04-28
 author: 철
@@ -717,12 +717,13 @@ SPEC-DB-001의 `20260427000020_pgcrypto_functions.sql`를 우선 활용. helper 
 
 ### Deferred Items (후속 SPEC 또는 M-완료 대기)
 
+_(이전 backfill에서 deferred로 기록된 M3/M5/M7/M8은 2026-04-28 모두 구현 완료됨. 하기 항목만 잔여.)_
+
 | 항목 | 이유 | 후속 경로 |
 |------|------|----------|
-| **M3 기술스택 체크리스트 (SkillsPicker)** | skill_categories seed 데이터 미완비, SPEC-DB-002 의존 | SPEC-ME-001 M3 재개 또는 SPEC-DB-002 완료 후 |
-| **M5 정산 조회 (`/me/settlements`)** | 정산 테이블 seed + SPEC-SETTLEMENT-001 연동 검토 필요 | SPEC-SETTLEMENT-001 진행 후 |
-| **M7 지급 정보 등록 (pgcrypto)** | `payout-documents` Storage 버킷 SPEC-DB-001 미포함, SPEC-DB-002 의존 | SPEC-DB-002 완료 후 |
-| **M8 PDF 다운로드** | `@react-pdf/renderer` 미설치, SPEC-DB-002 이후 진행 | SPEC-ME-001 M8 재개 |
+| **M9 캘린더 운영 단계 기능** | RRULE 반복 일정, 외부 캘린더(Google/iCal) 연동 | 운영 단계 별도 SPEC |
+| **이력서 버전 관리 / Diff** | 단일 active 이력서 방침 유지 | 운영 단계 별도 SPEC |
+| **이력서 공개 URL** | 비즈니스 결정 미확정 | (검토 후 결정) |
 
 ### Unplanned Additions
 
@@ -732,13 +733,93 @@ SPEC-DB-001의 `20260427000020_pgcrypto_functions.sql`를 우선 활용. helper 
 | `src/lib/instructor/settlement-summary.ts` + 단위 테스트 | M5 deferred에도 불구하고 정산 합계 순수 함수 선구현 (BigInt 100% 커버) |
 | `src/lib/instructor/pii-encrypt.ts` | M7 deferred에도 불구하고 PII 암호화 모듈 선구현 |
 | `src/lib/instructor/resume-parser.ts` | AI 파싱 응답 zod 검증 분리 |
-| `/me/settings/payout` page (placeholder) | payout form UI 골격만 (데이터 저장 미구현) |
+| `public/fonts/NotoSansKR-Regular.ttf` + `NotoSansKR-Bold.ttf` | M8 한국어 PDF 렌더링 필수 폰트 (public/fonts/ 경로) |
 
-### 통합 검증 결과
+---
 
-- `pnpm typecheck`: PASS
-- `pnpm lint`: PASS
-- `pnpm test:unit`: PASS (273 tests — settlement-summary 100% 포함)
-- `pnpm build`: PASS
+## Implementation Notes (Backfill 2 — 2026-04-28)
+
+### 신규 커밋 5건 (backfill 534fba3 이후)
+
+| 커밋 | 요약 |
+|------|------|
+| `86306bd` | merge: SPEC-ME-001 M3 + M5 — 3-tier SkillsPicker + 정산 조회 |
+| `bb0a369` | merge: SPEC-ME-001 M8 — 이력서 PDF 다운로드 (마스킹/원본) |
+| `28fc5c1` | merge: SPEC-ME-001 M7 — 지급 정보 pgcrypto 암호화 (RPC) |
+
+### M3 — 3-tier SkillsPicker (86306bd 포함 커밋: f7d590ff)
+
+구현 파일:
+- `src/components/instructor/skills-picker.tsx` — large→medium→small 트리 UI, 선택 시 proficiency 라디오 인라인
+- `src/lib/instructor/skill-tree.ts` — skill_categories → 트리 변환 순수 함수
+- `src/lib/instructor/skill-queries.ts` — instructor_skills UPSERT/DELETE + skill_categories 조회
+- `src/lib/instructor/__tests__/skill-tree.test.ts` — 93 lines, 트리 변환 케이스 커버
+- `src/app/(app)/(instructor)/me/resume/page.tsx` — SkillsPicker 통합 + instructor_skills 초기값 로드
+
+### M5 — 정산 조회 (86306bd 포함 커밋: f57e37dd / 38d1456f)
+
+구현 파일:
+- `src/components/instructor/settlement-list.tsx` — 월별 그룹 + 인건비/세금계산서 분기 테이블
+- `src/components/instructor/settlement-summary-widget.tsx` — 합계 위젯 (총 강사료/원천세/세후)
+- `src/lib/instructor/settlement-grouping.ts` — 월별 그룹핑 + 분기 계산 순수 함수
+- `src/lib/instructor/settlement-queries.ts` — settlements + projects join 쿼리
+- `src/lib/instructor/__tests__/settlement-grouping.test.ts` — 120 lines
+- `src/app/(app)/(instructor)/me/settlements/page.tsx` — 상단 요약 위젯 + 월별 리스트 통합
+
+### M8 — 이력서 PDF 다운로드 (bb0a369)
+
+구현 파일:
+- `src/app/(app)/(instructor)/me/resume/export/route.tsx` — GET handler, mask=true|false 쿼리 처리, `application/pdf` 스트림 응답
+- `src/components/instructor/resume-pdf-document.tsx` — @react-pdf/renderer Document/Page/Text 구조, 7개 섹션 렌더
+- `src/lib/instructor/resume-pdf-data.ts` — DB에서 이력서 7개 섹션 조회 + resume-mask 적용
+- `src/lib/instructor/__tests__/resume-pdf-data.test.ts` — 102 lines
+
+신규 의존성:
+- `@react-pdf/renderer` — PDF 렌더링 라이브러리
+- `public/fonts/NotoSansKR-Regular.ttf` (4.4 MB) — 한국어 정상 렌더링 필수
+- `public/fonts/NotoSansKR-Bold.ttf` (4.6 MB) — 한국어 볼드 폰트
+
+### M7 — 지급 정보 pgcrypto 암호화 (28fc5c1)
+
+구현 파일:
+- `supabase/migrations/20260428000010_pgcrypto_payout_rpc.sql` — `encrypt_pii` / `decrypt_pii` SECURITY DEFINER RPC (GUC 키 `app.pii_encryption_key` 사용)
+- `src/lib/instructor/pii-encrypt.ts` — RPC 래퍼, SupabaseClient 제네릭 widen 대응
+- `src/lib/instructor/payout-queries.ts` — instructors row PII 컬럼 UPDATE + pii_access_log INSERT
+- `src/lib/instructor/payout-bank-bundle.ts` — 계좌 번호 묶음 검증 헬퍼
+- `src/app/(app)/(instructor)/me/settings/payout/actions.ts` — submitPayoutSettings Server Action (Storage 업로드 + RPC 암호화 + DB UPDATE)
+- `src/app/(app)/(instructor)/me/settings/payout/page.tsx` — 폼 UI 완성
+- `src/components/instructor/payout-settings-form.tsx` — 마스킹 표시 + 입력 폼
+- `src/lib/instructor/__tests__/pii-encrypt.test.ts` — 156 lines
+- `src/lib/instructor/__tests__/payout-bank-bundle.test.ts` — 42 lines
+
+신규 마이그레이션:
+- `supabase/migrations/20260428000010_pgcrypto_payout_rpc.sql`
+  - `pgcrypto` extension enable
+  - `app.encrypt_pii(plaintext text)` SECURITY DEFINER → `pgp_sym_encrypt(plaintext, current_setting('app.pii_encryption_key'))`
+  - `app.decrypt_pii(ciphertext bytea)` SECURITY DEFINER → `pgp_sym_decrypt`
+  - `pii_access_log` 테이블 INSERT 정책
+
+GUC 키 주입 방식: `app.pii_encryption_key` 는 Supabase Secrets (env) → `ALTER DATABASE ... SET app.pii_encryption_key = '...'` 방식으로 런타임 주입. 평문 절대 코드 저장 금지.
+
+### 통합 검증 결과 (2026-04-28 최종)
+
+- `pnpm typecheck`: PASS (0 type errors)
+- `pnpm lint`: PASS (0 critical)
+- `pnpm test:unit`: PASS (332 tests — M3/M5/M7/M8 신규 테스트 포함)
+- `pnpm build`: PASS (0 errors)
+
+### 완료 상태 요약
+
+| 마일스톤 | 상태 | 비고 |
+|---------|------|------|
+| M1 도메인 + 골격 | ✅ 완료 | |
+| M2 이력서 7섹션 CRUD | ✅ 완료 | |
+| M3 3-tier SkillsPicker | ✅ 완료 | 2026-04-28 |
+| M4 FullCalendar 캘린더 | ✅ 완료 | |
+| M5 정산 조회 | ✅ 완료 | 2026-04-28 |
+| M6 AI 이력서 파싱 | ✅ 완료 | |
+| M7 pgcrypto 지급정보 암호화 | ✅ 완료 | 2026-04-28 |
+| M8 이력서 PDF 다운로드 | ✅ 완료 | 2026-04-28 |
+| M9 운영 단계 기능 | ⏳ deferred | RRULE/캘린더 연동 등 |
 
 _End of SPEC-ME-001 spec.md_
