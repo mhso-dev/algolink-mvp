@@ -1,6 +1,16 @@
 // SPEC-ME-001 §2.7 REQ-ME-PAYOUT-002 — 강사 입력 검증.
 import { z } from "zod";
 
+// zod v4 의 z.string().uuid() 는 RFC 4122 version/variant 비트를 강제 검증한다.
+// 시드/synthetic UUID (예: 20000000-0000-0000-0000-000000000001) 는 PostgreSQL
+// uuid 컬럼은 허용하지만 zod v4 strict UUID 는 거부한다. 형태만 검증한다.
+const uuidLike = z
+  .string()
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+    { message: "UUID 형식이 아닙니다." },
+  );
+
 /**
  * 한국 주민등록번호 체크섬 검증.
  * 가중치: [2,3,4,5,6,7,8,9,2,3,4,5]
@@ -115,7 +125,7 @@ export const basicInfoInputSchema = z.object({
 });
 
 export const skillUpdateInputSchema = z.object({
-  skillId: z.string().uuid(),
+  skillId: uuidLike,
   proficiency: z.enum(["beginner", "intermediate", "advanced", "expert"]).nullable(),
 });
 
@@ -214,7 +224,7 @@ export const instructorCreateSchema = z.object({
         .regex(phoneRegex, "올바른 전화번호 형식을 입력해주세요."),
     ])
     .optional(),
-  skillIds: z.array(z.string().uuid()).default([]),
+  skillIds: z.array(uuidLike).default([]),
 });
 
 export type InstructorCreateInput = z.infer<typeof instructorCreateSchema>;
@@ -222,7 +232,7 @@ export type InstructorCreateInput = z.infer<typeof instructorCreateSchema>;
 export const instructorListFilterSchema = z
   .object({
     name: z.string().trim().optional(),
-    skillIds: z.array(z.string().uuid()).optional(),
+    skillIds: z.array(uuidLike).optional(),
     scoreMin: z.coerce.number().min(0).max(5).optional(),
     scoreMax: z.coerce.number().min(0).max(5).optional(),
     sort: z

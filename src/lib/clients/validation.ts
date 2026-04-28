@@ -4,6 +4,15 @@
 import { z } from "zod";
 import { CLIENT_ERRORS } from "./errors";
 
+// zod v4 의 z.string().uuid() 는 RFC 4122 version/variant 비트를 강제 검증한다.
+// 시드/synthetic UUID 는 PostgreSQL uuid 컬럼은 허용하지만 zod v4 strict UUID 는 거부한다.
+const uuidLike = z
+  .string()
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+    { message: "UUID 형식이 아닙니다." },
+  );
+
 export const FILE_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 export const FILE_MIME_WHITELIST = [
   "application/pdf",
@@ -16,7 +25,7 @@ export type AllowedMimeType = (typeof FILE_MIME_WHITELIST)[number];
 const HANDOVER_MEMO_MAX = 500;
 
 export const contactSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: uuidLike.optional(),
   name: z
     .string()
     .trim()
@@ -47,7 +56,7 @@ export const createClientSchema = z.object({
   contacts: z
     .array(contactSchema)
     .min(1, CLIENT_ERRORS.CONTACTS_MIN_ONE),
-  businessLicenseFileId: z.string().uuid().nullish().transform((v) => v ?? null),
+  businessLicenseFileId: uuidLike.nullish().transform((v) => v ?? null),
 });
 
 export const updateClientSchema = createClientSchema.partial({

@@ -48,7 +48,10 @@ export type SettlementUpdateInput = z.infer<typeof settlementUpdateSchema>;
 
 /** 상태 전환 입력 스키마. */
 export const statusTransitionSchema = z.object({
-  settlementId: z.string().uuid(),
+  // zod v4 strict uuid() 는 시드/synthetic UUID 를 거부 → 형태만 검증.
+  settlementId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/),
   to: z.enum(SETTLEMENT_STATUSES),
 });
 

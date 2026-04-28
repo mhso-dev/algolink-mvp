@@ -17,7 +17,10 @@ const monthRe = /^\d{4}-(0[1-9]|1[0-2])$/;
 const quarterRe = /^\d{4}-Q[1-4]$/;
 const yearRe = /^\d{4}$/;
 
-const uuidSchema = z.string().uuid();
+// zod v4 strict uuid() 는 시드/synthetic UUID 를 거부 → 형태만 검증.
+const uuidSchema = z
+  .string()
+  .regex(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/);
 
 export type PeriodKind = "month" | "quarter" | "year";
 

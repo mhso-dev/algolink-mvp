@@ -44,7 +44,10 @@ export interface ProjectListQuery {
 }
 
 const isoDateRe = /^\d{4}-\d{2}-\d{2}$/;
-const uuidSchema = z.string().uuid();
+// zod v4 strict uuid() 는 시드/synthetic UUID 를 거부 → 형태만 검증.
+const uuidSchema = z
+  .string()
+  .regex(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/);
 
 /** searchParams → ProjectListQuery. 잘못된 값은 무시 (기본값 사용). */
 export function parseProjectListQuery(
