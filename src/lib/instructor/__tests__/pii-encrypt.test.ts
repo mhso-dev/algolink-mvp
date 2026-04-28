@@ -64,9 +64,10 @@ test("encryptPayoutField: base64 응답도 Uint8Array 로 변환", async () => {
   assert.deepEqual(Array.from(out!), [1, 2, 3, 4]);
 });
 
-test("encryptPayoutField: pgcrypto 미설치 RPC 에러 → 한국어 메시지", async () => {
+test("encryptPayoutField: pgcrypto 확장 미설치 → 한국어 안내", async () => {
+  // pgcrypto 미설치 시 Postgres 가 발생시키는 전형적 메시지 (function 단어 없음).
   const { client } = makeMockSupabase(() => ({
-    error: { message: 'function pgp_sym_encrypt(text, text) does not exist' },
+    error: { message: 'pgp_sym_encrypt: pgcrypto extension not loaded' },
   }));
   await assert.rejects(
     () => encryptPayoutField(client, "test"),
