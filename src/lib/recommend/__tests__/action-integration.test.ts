@@ -59,21 +59,19 @@ test("도메인 합성: generateRecommendations(_, _, null, 3) → 모든 source
     endAt: new Date("2026-05-14T00:00:00Z"),
     requiredSkillIds: ["skill-python", "skill-django"],
   };
+  // SPEC-SKILL-ABSTRACT-001: proficiency 필드 제거 — binary 매칭.
   const candidates: CandidateInput[] = [
     {
       instructorId: "ins-A",
       displayName: "강사 A",
-      skills: [
-        { skillId: "skill-python", proficiency: "expert" },
-        { skillId: "skill-django", proficiency: "advanced" },
-      ],
+      skills: [{ skillId: "skill-python" }, { skillId: "skill-django" }],
       schedules: [],
       reviews: { meanScore: 4.6, count: 8 },
     },
     {
       instructorId: "ins-B",
       displayName: "강사 B",
-      skills: [{ skillId: "skill-python", proficiency: "advanced" }],
+      skills: [{ skillId: "skill-python" }],
       schedules: [],
       reviews: { meanScore: 4.2, count: 5 },
     },

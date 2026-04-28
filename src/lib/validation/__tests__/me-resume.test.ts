@@ -12,6 +12,7 @@ import {
   otherActivityInputSchema,
   basicInfoInputSchema,
   skillUpdateInputSchema,
+  skillsBulkInputSchema,
 } from "../instructor";
 
 // ---------- educationInputSchema ----------
@@ -195,20 +196,21 @@ test("basicInfoInputSchema: 잘못된 phone 거부", () => {
   assert.equal(r.success, false);
 });
 
-// ---------- skillUpdateInputSchema ----------
+// ---------- skillUpdateInputSchema (SPEC-SKILL-ABSTRACT-001) ----------
+// proficiency 필드 제거 — selected boolean으로 대체.
 
-test("skillUpdateInputSchema: 정상 추가", () => {
+test("skillUpdateInputSchema: 정상 선택 (selected=true)", () => {
   const r = skillUpdateInputSchema.safeParse({
     skillId: "3b1f7c8a-9d2e-4f5a-b8c0-1234567890ab",
-    proficiency: "advanced",
+    selected: true,
   });
   assert.equal(r.success, true);
 });
 
-test("skillUpdateInputSchema: proficiency null (삭제 신호)", () => {
+test("skillUpdateInputSchema: 정상 해제 (selected=false)", () => {
   const r = skillUpdateInputSchema.safeParse({
     skillId: "3b1f7c8a-9d2e-4f5a-b8c0-1234567890ab",
-    proficiency: null,
+    selected: false,
   });
   assert.equal(r.success, true);
 });
@@ -216,15 +218,42 @@ test("skillUpdateInputSchema: proficiency null (삭제 신호)", () => {
 test("skillUpdateInputSchema: 잘못된 uuid 거부", () => {
   const r = skillUpdateInputSchema.safeParse({
     skillId: "not-uuid",
-    proficiency: "beginner",
+    selected: true,
   });
   assert.equal(r.success, false);
 });
 
-test("skillUpdateInputSchema: 잘못된 proficiency 거부", () => {
+test("skillUpdateInputSchema: selected 누락 거부", () => {
   const r = skillUpdateInputSchema.safeParse({
     skillId: "3b1f7c8a-9d2e-4f5a-b8c0-1234567890ab",
-    proficiency: "guru",
   });
+  assert.equal(r.success, false);
+});
+
+// ---------- skillsBulkInputSchema (SPEC-SKILL-ABSTRACT-001 §3.2) ----------
+
+test("skillsBulkInputSchema: 빈 배열 통과", () => {
+  const r = skillsBulkInputSchema.safeParse({ skillIds: [] });
+  assert.equal(r.success, true);
+});
+
+test("skillsBulkInputSchema: 9개 UUID 통과 (max)", () => {
+  const ids = Array.from({ length: 9 }, (_, i) =>
+    `30000000-0000-0000-0000-00000000000${i + 1}`,
+  );
+  const r = skillsBulkInputSchema.safeParse({ skillIds: ids });
+  assert.equal(r.success, true);
+});
+
+test("skillsBulkInputSchema: 10개 이상 거부 (max 9)", () => {
+  const ids = Array.from({ length: 10 }, (_, i) =>
+    `30000000-0000-0000-0000-${(i + 1).toString(16).padStart(12, "0")}`,
+  );
+  const r = skillsBulkInputSchema.safeParse({ skillIds: ids });
+  assert.equal(r.success, false);
+});
+
+test("skillsBulkInputSchema: 잘못된 uuid 거부", () => {
+  const r = skillsBulkInputSchema.safeParse({ skillIds: ["not-uuid"] });
   assert.equal(r.success, false);
 });

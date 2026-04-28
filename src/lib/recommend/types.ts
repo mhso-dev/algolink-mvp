@@ -1,13 +1,9 @@
 // @MX:NOTE: SPEC-PROJECT-001 §2.6 — 추천 엔진 도메인 타입.
 // React/Next/Supabase/Anthropic 의존성 없음 (REQ-PROJECT-RECOMMEND-008 순수성).
-
-import type { proficiency as proficiencyEnum } from "@/db/enums";
-
-export type Proficiency = (typeof proficiencyEnum.enumValues)[number];
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001 — proficiency 제거, binary 매칭 단순화.
 
 export interface InstructorSkillInput {
   skillId: string;
-  proficiency: Proficiency;
 }
 
 export interface InstructorScheduleInput {
@@ -59,20 +55,12 @@ export interface RecommendationResult {
   generatedAt: string; // ISO
 }
 
-/** 점수 계산 가중치 (FROZEN — SPEC §5.4). */
+/** 점수 계산 가중치 (FROZEN — SPEC-PROJECT-001 §5.4). */
 export const WEIGHTS = {
   skill: 0.5,
   availability: 0.3,
   satisfaction: 0.2,
 } as const;
-
-/** proficiency → weight (SPEC §5.4). */
-export const PROFICIENCY_WEIGHT: Record<Proficiency, number> = {
-  beginner: 0.4,
-  intermediate: 0.7,
-  advanced: 0.9,
-  expert: 1.0,
-};
 
 /** 리뷰 0건 강사의 만족도 prior (cold-start). */
 export const SATISFACTION_PRIOR = 0.6;

@@ -42,7 +42,8 @@ export const createProjectSchema = z
     projectType: z.enum(["education", "material_development"]).default("education"),
     startAt: isoDateLike.optional(),
     endAt: isoDateLike.optional(),
-    requiredSkillIds: z.array(uuidLike).default([]),
+    // SPEC-SKILL-ABSTRACT-001: required_skills는 9개 추상 카테고리 중 선택.
+    requiredSkillIds: z.array(uuidLike).max(9, "최대 9개까지 선택 가능합니다.").default([]),
     businessAmountKrw: optionalNonNegativeInt,
     instructorFeeKrw: optionalNonNegativeInt,
     notes: z.string().max(2000).optional(),

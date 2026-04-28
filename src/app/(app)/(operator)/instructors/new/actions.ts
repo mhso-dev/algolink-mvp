@@ -71,6 +71,7 @@ export async function createInstructorAndInvite(
   }
   const instructorId = (createdRaw as { id: string }).id;
 
+  // SPEC-SKILL-ABSTRACT-001: proficiency 컬럼 제거 — binary 매칭.
   // 3. INSERT instructor_skills (best-effort; 부분 실패 시 운영 점검).
   if (parsed.data.skillIds.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,7 +79,6 @@ export async function createInstructorAndInvite(
       parsed.data.skillIds.map((skillId) => ({
         instructor_id: instructorId,
         skill_id: skillId,
-        proficiency: "intermediate" as const,
       })),
     );
   }

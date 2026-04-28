@@ -37,23 +37,20 @@ const INS_D = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 
 const CLI_1 = "11111111-1111-4111-8111-111111111111";
 
+// SPEC-SKILL-ABSTRACT-001: proficiency 필드 제거 — binary 매칭.
 function buildCandidates(): CandidateInput[] {
   return [
     {
       instructorId: INS_A,
       displayName: "강사 A",
-      skills: [
-        { skillId: SK_PY, proficiency: "expert" },
-        { skillId: SK_DJ, proficiency: "advanced" },
-        { skillId: SK_PG, proficiency: "intermediate" },
-      ],
+      skills: [{ skillId: SK_PY }, { skillId: SK_DJ }, { skillId: SK_PG }],
       schedules: [],
       reviews: { meanScore: 4.6, count: 8 },
     },
     {
       instructorId: INS_B,
       displayName: "강사 B",
-      skills: [{ skillId: SK_PY, proficiency: "advanced" }],
+      skills: [{ skillId: SK_PY }],
       schedules: [
         {
           kind: "unavailable",
@@ -73,7 +70,7 @@ function buildCandidates(): CandidateInput[] {
     {
       instructorId: INS_D,
       displayName: "강사 D",
-      skills: [{ skillId: SK_PY, proficiency: "beginner" }],
+      skills: [{ skillId: SK_PY }],
       schedules: [],
       reviews: { meanScore: 3.0, count: 2 },
     },
@@ -133,8 +130,9 @@ test("시나리오 2: 정상 추천 — Top-3 점수/순위 검증 + Claude reas
   assert.equal(ranked[1].instructorId, INS_B);
   assert.equal(ranked[2].instructorId, INS_D);
   assert.ok(!ranked.some((r) => r.instructorId === INS_C));
-  // INS-A: 0.5*(1.0+0.9)/2 + 0.3 + 0.2*((4.6-1)/4) = 0.475+0.3+0.18 = 0.955
-  assert.ok(Math.abs(ranked[0].finalScore - 0.955) < 1e-9);
+  // SPEC-SKILL-ABSTRACT-001: binary 매칭. INS-A 2/2 매칭 → skillMatch=1.0
+  // finalScore = 0.5*1.0 + 0.3*1 + 0.2*((4.6-1)/4) = 0.5+0.3+0.18 = 0.98
+  assert.ok(Math.abs(ranked[0]!.finalScore - 0.98) < 1e-9, `finalScore ${ranked[0]!.finalScore} ≠ 0.98`);
   const claudeMock: ReasonGenerator = {
     modelName: "claude-sonnet-4-6",
     async generate({ topCandidates }) {

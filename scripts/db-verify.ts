@@ -62,38 +62,75 @@ async function main() {
     assert(count >= 25, `테이블 수 ${count} < 25`);
   });
 
-  // ===== Section 4: Skill Taxonomy =====
-  await check("AC-DB001-SKILL-01: 대단위 카테고리 정확히 12개", async () => {
-    const [{ count }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM skill_categories WHERE tier = 'large'`;
-    assert(count === 12, `large tier ${count} ≠ 12`);
+  // ===== Section 4: Skill Taxonomy (SPEC-SKILL-ABSTRACT-001) =====
+  // 3-tier (large/medium/small) → 9개 추상 카테고리 단일 레벨로 supersede.
+  await check("AC-SKILL-ABS-01: skill_categories 정확히 9 row", async () => {
+    const [{ count }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM skill_categories`;
+    assert(count === 9, `skill_categories ${count} ≠ 9`);
   });
 
-  await check("AC-DB001-SKILL-02: leaf node가 아닌 카테고리에 강사 매핑 거부", async () => {
-    // 대단위 '프로그래밍'(자식 있음)에 매핑 시도 → 트리거 거부
-    const inst = await sql<{ id: string }[]>`SELECT id FROM instructors LIMIT 1`;
-    if (inst.length === 0) throw new Error("샘플 강사가 없음 (seed 미실행?)");
-    const instructorId = inst[0].id;
-    const largeProgramming = "10000000-0000-0000-0000-000000000001";
-    let rejected = false;
-    try {
-      await sql`INSERT INTO instructor_skills (instructor_id, skill_id, proficiency)
-                VALUES (${instructorId}, ${largeProgramming}, 'expert')`;
-    } catch {
-      rejected = true;
-      // 정상: 트리거가 23514로 거부.
-    }
-    assert(rejected, "대단위 카테고리 매핑이 거부되지 않음");
-  });
-
-  await check("AC-DB001-SKILL-03: 3-tier 계층 무결성", async () => {
-    const rows = await sql<{ count: number }[]>`
-      SELECT count(*)::int AS count
-      FROM skill_categories s
-      JOIN skill_categories m ON s.parent_id = m.id
-      JOIN skill_categories l ON m.parent_id = l.id
-      WHERE s.tier = 'small' AND m.tier = 'medium' AND l.tier = 'large'
+  await check("AC-SKILL-ABS-02: 9개 카테고리 UUID/이름/sort_order 정합", async () => {
+    const rows = await sql<{ id: string; name: string; sort_order: number }[]>`
+      SELECT id, name, sort_order FROM skill_categories ORDER BY sort_order
     `;
-    assert(rows[0].count > 0, "3-tier 무결성 위반: small→medium→large 체인 없음");
+    const expected = [
+      { id: "30000000-0000-0000-0000-000000000001", name: "데이터 분석", sort_order: 1 },
+      { id: "30000000-0000-0000-0000-000000000002", name: "데이터 사이언스", sort_order: 2 },
+      { id: "30000000-0000-0000-0000-000000000003", name: "AI·ML", sort_order: 3 },
+      { id: "30000000-0000-0000-0000-000000000004", name: "백엔드", sort_order: 4 },
+      { id: "30000000-0000-0000-0000-000000000005", name: "프론트엔드", sort_order: 5 },
+      { id: "30000000-0000-0000-0000-000000000006", name: "풀스택", sort_order: 6 },
+      { id: "30000000-0000-0000-0000-000000000007", name: "모바일", sort_order: 7 },
+      { id: "30000000-0000-0000-0000-000000000008", name: "인프라·DevOps", sort_order: 8 },
+      { id: "30000000-0000-0000-0000-000000000009", name: "클라우드", sort_order: 9 },
+    ];
+    assert(rows.length === expected.length, `row count ${rows.length} ≠ ${expected.length}`);
+    for (let i = 0; i < expected.length; i++) {
+      assert(rows[i]!.id === expected[i]!.id, `idx ${i} id ${rows[i]!.id} ≠ ${expected[i]!.id}`);
+      assert(rows[i]!.name === expected[i]!.name, `idx ${i} name ${rows[i]!.name} ≠ ${expected[i]!.name}`);
+      assert(rows[i]!.sort_order === expected[i]!.sort_order, `idx ${i} sort_order ${rows[i]!.sort_order} ≠ ${expected[i]!.sort_order}`);
+    }
+  });
+
+  await check("AC-SKILL-ABS-03: skill_categories에 tier/parent_id 컬럼 부재", async () => {
+    const rows = await sql<{ column_name: string }[]>`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'skill_categories'
+    `;
+    const names = rows.map((r) => r.column_name);
+    assert(!names.includes("tier"), `tier 컬럼이 여전히 존재: ${names.join(", ")}`);
+    assert(!names.includes("parent_id"), `parent_id 컬럼이 여전히 존재: ${names.join(", ")}`);
+  });
+
+  await check("AC-SKILL-ABS-04: instructor_skills에 proficiency 컬럼 부재", async () => {
+    const rows = await sql<{ column_name: string }[]>`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'instructor_skills'
+    `;
+    const names = rows.map((r) => r.column_name);
+    assert(!names.includes("proficiency"), `proficiency 컬럼이 여전히 존재: ${names.join(", ")}`);
+    // 핵심 컬럼 존재 검증
+    assert(names.includes("instructor_id"), "instructor_id 컬럼 누락");
+    assert(names.includes("skill_id"), "skill_id 컬럼 누락");
+    assert(names.includes("created_at"), "created_at 컬럼 누락");
+  });
+
+  await check("AC-SKILL-ABS-05: pg_type에 proficiency/skill_tier enum 부재", async () => {
+    const rows = await sql<{ typname: string }[]>`
+      SELECT typname FROM pg_type WHERE typname IN ('proficiency', 'skill_tier')
+    `;
+    assert(rows.length === 0, `잔존 enum 타입: ${rows.map((r) => r.typname).join(", ")}`);
+  });
+
+  await check("AC-SKILL-ABS-06: leaf-only enforcement 트리거 부재", async () => {
+    const rows = await sql<{ tgname: string }[]>`
+      SELECT tgname FROM pg_trigger
+      WHERE tgname IN (
+        'trg_instructor_skills_leaf_check',
+        'trg_project_required_skills_leaf_check'
+      )
+    `;
+    assert(rows.length === 0, `잔존 트리거: ${rows.map((r) => r.tgname).join(", ")}`);
   });
 
   // ===== Section 5: Project Workflow =====
@@ -292,24 +329,23 @@ async function main() {
     assert(count === 1, `operator2 행 ${count} ≠ 1 — 20260428000020_e2e_seed_phase2.sql 미적용?`);
   });
 
-  // ===== Section 12: Seed =====
+  // ===== Section 12: Seed (SPEC-SKILL-ABSTRACT-001 갱신) =====
   await check("AC-DB001-SEED-01: 필수 데이터 존재", async () => {
     const [r] = await sql<{
       admin_count: number; client_count: number; instructor_count: number;
-      large_skill: number; total_skill: number;
+      total_skill: number;
     }[]>`
       SELECT
         (SELECT count(*)::int FROM users WHERE role = 'admin') AS admin_count,
         (SELECT count(*)::int FROM clients) AS client_count,
         (SELECT count(*)::int FROM instructors) AS instructor_count,
-        (SELECT count(*)::int FROM skill_categories WHERE tier = 'large') AS large_skill,
         (SELECT count(*)::int FROM skill_categories) AS total_skill
     `;
     assert(r.admin_count >= 1, `admin ${r.admin_count} < 1`);
     assert(r.client_count >= 2, `client ${r.client_count} < 2`);
     assert(r.instructor_count >= 3, `instructor ${r.instructor_count} < 3`);
-    assert(r.large_skill === 12, `large_skill ${r.large_skill} ≠ 12`);
-    assert(r.total_skill >= 60, `total_skill ${r.total_skill} < 60`);
+    // SPEC-SKILL-ABSTRACT-001: 9개 추상 카테고리(단일 레벨)
+    assert(r.total_skill === 9, `total_skill ${r.total_skill} ≠ 9`);
   });
 
   // ===== Section 3: PII =====

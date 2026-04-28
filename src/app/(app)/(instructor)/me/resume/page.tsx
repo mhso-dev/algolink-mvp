@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { ensureInstructorRow, getMyBasicInfo, getMyResumeSections } from "@/lib/instructor/me-queries";
 import { getAllSkillCategories, getMySkills } from "@/lib/instructor/skill-queries";
 import { MeResumeForm } from "@/components/instructor/me-resume-form";
-import { SkillsPicker } from "@/components/instructor/skills-picker";
+import { MeSkillsPickerSection } from "@/components/instructor/me-skills-picker-section";
 
 export const dynamic = "force-dynamic";
 
@@ -92,7 +92,10 @@ export default async function ResumePage() {
         }}
       />
 
-      <SkillsPicker categories={skillCategories} initialSelections={mySkills} />
+      <MeSkillsPickerSection
+        categories={skillCategories}
+        initialSelectedIds={mySkills.map((s) => s.skillId)}
+      />
     </div>
   );
 }
