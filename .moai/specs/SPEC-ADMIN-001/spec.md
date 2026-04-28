@@ -1,7 +1,7 @@
 ---
 id: SPEC-ADMIN-001
-version: 0.1.0
-status: draft
+version: 1.0.0
+status: completed
 created: 2026-04-28
 updated: 2026-04-28
 author: 철
@@ -179,3 +179,36 @@ RLS 변경 없음. 기존 `users` admin SELECT/UPDATE 정책으로 충분.
 - REQ → 코드: 각 EARS 항목은 `acceptance.md`의 테스트 시나리오와 1:1 매핑.
 - 코드 → 테스트: `src/lib/admin/users/__tests__/`, `src/lib/admin/aggregations/__tests__/`.
 - SPEC → PR: 머지 시 PR 본문에 `SPEC-ADMIN-001` 명시.
+
+## Implementation Notes (2026-04-28, v1.0.0)
+
+### 구현 결과
+- **마이그레이션 1건**: `supabase/migrations/20260428120000_admin_user_active.sql` — `users.is_active boolean DEFAULT true` + 부분 인덱스 (false만)
+- **Drizzle 스키마**: `src/db/schema/auth.ts`에 `isActive` 컬럼 동기화
+- **F-301 도메인** (`src/lib/admin/users/`): validation/audit/list-query/queries (4파일 + 4 테스트)
+- **F-302 도메인** (`src/lib/admin/aggregations/`): period/queries + 6 wrapper(revenue/cost/margin/by-month/by-client/by-instructor) + 2 테스트
+- **Server Actions**: `users/[id]/{role, active}/actions.ts`
+- **UI**: role-form / active-form (`useActionState`), 자기 자신 토글 비표시
+- **페이지**: `users/page.tsx` (필터+검색+페이지네이션) + `users/[id]/page.tsx` (상세) + `dashboard/page.tsx` (KPI 3종 + 6개월 추이 + Top 5 고객사/강사)
+- **미들웨어 차단** (최소 침습): `src/utils/supabase/middleware.ts` + `src/proxy.ts` — JWT 검증 후 1회 SELECT, `is_active=false`면 `/login?error=deactivated` redirect + 세션 만료
+- **단위 테스트**: 30건 PASS — 기존 auth 회귀 25/25 PASS (LESSON-003 적용)
+
+### MX 태그 추가
+- `@MX:ANCHOR` users.queries (updateUserRole/setUserActive 진입점)
+- `@MX:ANCHOR` aggregations.queries (집계 단일 라운드트립)
+- `@MX:WARN` aggregations.queries — GENERATED(`margin_krw`/`profit_krw`) 직접 SELECT
+- `@MX:WARN` middleware — 인증 요청당 추가 SELECT 비용 (부분 인덱스 완화)
+- `@MX:NOTE` validation.ts — 자가 lockout 의도, period.ts — 반열린 구간
+
+### Deferred Items
+| 항목 | 이유 | 후속 |
+|---|---|---|
+| audit_log 테이블 영속화 | 인터페이스만 호환, 콘솔 로그 stub | SPEC-AUDIT-001 |
+| Access token hook 내 is_active 임베딩 | 미들웨어 SELECT 제거 최적화 | 후속 최적화 |
+| 차트 라이브러리 신규 도입 | SVG/기존 라이브러리 우선 | UX 폴리시 |
+| 회원 일괄 업로드 (CSV) | MVP 외 | Phase 3+ |
+
+### 품질 게이트 결과
+- typecheck: 0 errors
+- lint: 0 errors / 0 warnings (admin 영역)
+- test:unit: 30/30 PASS (admin) + 25/25 PASS (auth 회귀)

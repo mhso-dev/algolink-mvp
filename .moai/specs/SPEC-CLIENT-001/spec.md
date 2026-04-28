@@ -1,7 +1,7 @@
 ---
 id: SPEC-CLIENT-001
-version: 0.1.0
-status: draft
+version: 1.0.0
+status: completed
 created: 2026-04-28
 updated: 2026-04-28
 author: 철
@@ -334,3 +334,32 @@ CREATE POLICY clients_operator_admin_all ON clients
 - `react-hook-form` + `@hookform/resolvers/zod` (폼)
 - `@supabase/supabase-js` (Storage)
 - `node:test` + `tsx --test` (테스트)
+
+## Implementation Notes (2026-04-28, v1.0.0)
+
+### 구현 결과
+- **마이그레이션 0건** — 기존 SPEC-DB-001 스키마(`clients` + `client_contacts` + `files`) 재사용
+- **신규 모듈** (`src/lib/clients/`): types/errors/validation/list-query/contacts/queries/file-upload (7파일)
+- **단위 테스트**: 35건 PASS (`tsx --test`)
+- **라우트**: `(operator)/clients/{page, new, [id], [id]/edit}` + `_components/client-form` + `_components/delete-client-button`
+- **Storage**: `business-licenses/{client_id}/{uuid}.{ext}` — 5MB 제한, mime 화이트리스트 (pdf/png/jpeg)
+- **검색 + 페이지네이션**: `company_name ILIKE` + 20건/page offset 기반
+- **Soft delete**: `deleted_at = now()` — projects FK는 보존
+- **트랜잭션 보상**: Storage 업로드 실패 시 `deleteOrphanFile`
+
+### MX 태그 추가
+- `@MX:ANCHOR` `createClient`, `listClients` (queries.ts) — fan_in 진입점
+- `@MX:WARN` `createClient` Supabase 트랜잭션 미지원·보상 soft-delete
+- `@MX:WARN` `uploadBusinessLicense` Storage+DB 일관성
+
+### Deferred Items
+| 항목 | 이유 | 후속 |
+|---|---|---|
+| RLS 정책 마이그레이션 | spec 가정: 기존 정책 재사용 | 검증 필요 시 별도 SPEC |
+| Storage bucket 자동 생성 | `business-licenses` 사전 존재 가정 | 누락 시 수동 또는 `supabase storage` |
+| Playwright E2E | 본 SPEC 범위 외 | SPEC-E2E-001 회귀망 합류 검토 |
+
+### 품질 게이트 결과
+- typecheck: 0 errors
+- lint: 0 errors (1 _bucket prefix-underscore warning — 의도된 mock 컨벤션)
+- test:unit: 35/35 PASS

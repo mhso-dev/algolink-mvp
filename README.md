@@ -72,6 +72,14 @@ pnpm e2e             # Playwright E2E (Phase 1 SPEC 시나리오)
 | SPEC-PROJECT-SEARCH-001 | 프로젝트 리스트 다중 컬럼 검색 (title + clients.company_name + notes) | 완료 |
 | SPEC-E2E-001 | Phase 1 골든패스 E2E 회귀 스위트 (Playwright) | 완료 |
 
+## SPEC 추적 (Phase 2)
+
+| SPEC | 영역 | 상태 |
+|---|---|---|
+| SPEC-CLIENT-001 | 고객사 관리 (F-204) — 등록/조회/메모/사업자등록증 업로드 | 완료 |
+| SPEC-PAYOUT-001 | 정산 관리 (F-205) — 4-state 머신 + 세율 검증 + 매입매출 | 완료 |
+| SPEC-ADMIN-001 | 회원·권한 (F-301) + 매출매입 집계 (F-302) — users.is_active 도입 | 완료 |
+
 ## 코드 컨텍스트 (@MX 태그)
 
 핵심 invariant와 회귀 위험은 코드에 직접 `@MX:ANCHOR` / `@MX:WARN` 으로 고정.

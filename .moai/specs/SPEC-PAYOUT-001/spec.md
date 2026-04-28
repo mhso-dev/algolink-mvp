@@ -1,7 +1,7 @@
 ---
 id: SPEC-PAYOUT-001
-version: 0.1.0
-status: draft
+version: 1.0.0
+status: completed
 created: 2026-04-28
 updated: 2026-04-28
 author: 철
@@ -702,3 +702,34 @@ KST 범위 계산은 `Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul' })` 
 ---
 
 _End of SPEC-PAYOUT-001 spec.md_
+
+## Implementation Notes (2026-04-28, v1.0.0)
+
+### 구현 결과
+- **마이그레이션 0건** — `settlements` 스키마 + CHECK 제약 + 트리거(history 자동 기록) 모두 SPEC-DB-001에서 완비
+- **신규 모듈** (`src/lib/payouts/`): types/errors/constants/status-machine/tax-calculator/validation/queries/aggregations/mail-stub/list-query (11파일) + `index.ts` barrel
+- **단위 테스트**: 46건 PASS (status 16조합 100% 커버, 세율 DB 공식 정합 검증)
+- **Server Actions**: `[id]/{request, mark-paid, hold, unhold}/actions.ts` 4종
+- **페이지**: 리스트(필터+위젯+페이지네이션) + 상세(stepper + actions-panel)
+- **GENERATED 컬럼 보호**: `sanitizePayload` 화이트리스트 + grep 회귀 가드
+- **메일 스텁**: 콘솔 로그 형식 `[notif] settlement_requested → instructor_id=<uuid> settlement_id=<uuid>` + notifications insert (SPEC-NOTIFY-001 후속 hook 식별자)
+
+### MX 태그 추가
+- `@MX:ANCHOR` `validateTransition` (status-machine, fan_in 4)
+- `@MX:ANCHOR` `validateTaxRate` + `calculateWithholdingAmount` (tax-calculator, DB 공식 동기화)
+- `@MX:ANCHOR` `queries.ts` settlements CRUD 단일 통로
+- `@MX:WARN` `sanitizePayload` GENERATED 컬럼 INSERT/UPDATE 차단
+- `@MX:NOTE` `mail-stub.ts` SPEC-NOTIFY-001 hook 식별자
+
+### Deferred Items
+| 항목 | 이유 | 후속 |
+|---|---|---|
+| 강사 combobox 필터 | UX 폴리시 | M5 후속 |
+| 상세 컴포넌트 분리 (`src/components/payouts/*`) | MVP 인라인 우선 | M9 polish |
+| 통합 테스트 (DB-backed) | 시드 의존, 본 PR 범위 외 | SPEC-E2E-001 합류 |
+| a11y axe 매뉴얼 검증 | M9 단계 | 후속 |
+
+### 품질 게이트 결과
+- typecheck: 0 errors
+- lint: 0 errors / 0 warnings (payouts 영역)
+- test:unit: 46/46 PASS
