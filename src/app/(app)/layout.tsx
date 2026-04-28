@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app/app-shell";
 import { getCurrentUser } from "@/auth/server";
 import { extractDisplayName } from "@/lib/auth";
+import { NotificationBell } from "@/components/notification-center/NotificationBell";
 
 // SPEC-AUTH-001 §2.7 REQ-AUTH-SHELL-001/002/003.
 // (app) 그룹 진입 시 인증 가드 + AppShell 통합 + 에러 fallback.
@@ -56,7 +57,7 @@ export default async function AppLayout({
         displayName: extractDisplayName(user.email),
       }}
       role={user.role}
-      unreadNotifications={0}
+      notificationSlot={<NotificationBell />}
     >
       {children}
     </AppShell>

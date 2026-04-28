@@ -22,9 +22,11 @@ interface TopBarProps {
   user: { email: string; displayName: string };
   role: AppRole;
   unreadNotifications?: number;
+  /** SPEC-NOTIFY-001 §M5: server-rendered NotificationBell 슬롯. */
+  notificationSlot?: React.ReactNode;
 }
 
-export function TopBar({ user, role, unreadNotifications = 0 }: TopBarProps) {
+export function TopBar({ user, role, unreadNotifications = 0, notificationSlot }: TopBarProps) {
   const initial = user.displayName.trim().slice(0, 1) || "?";
   const router = useRouter();
 
@@ -55,20 +57,22 @@ export function TopBar({ user, role, unreadNotifications = 0 }: TopBarProps) {
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
-        {/* 알림 */}
-        <Button variant="ghost" size="icon" aria-label="알림 보기">
-          <div className="relative">
-            <Bell className="h-4 w-4" />
-            {unreadNotifications > 0 && (
-              <span
-                className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[var(--color-state-alert)] px-0.5 text-[9px] font-bold text-white"
-                aria-label={`읽지 않은 알림 ${unreadNotifications}건`}
-              >
-                {unreadNotifications > 9 ? "9+" : unreadNotifications}
-              </span>
-            )}
-          </div>
-        </Button>
+        {/* 알림 — SPEC-NOTIFY-001 §M5: NotificationBell server component slot. */}
+        {notificationSlot ?? (
+          <Button variant="ghost" size="icon" aria-label="알림 보기">
+            <div className="relative">
+              <Bell className="h-4 w-4" />
+              {unreadNotifications > 0 && (
+                <span
+                  className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[var(--color-state-alert)] px-0.5 text-[9px] font-bold text-white"
+                  aria-label={`읽지 않은 알림 ${unreadNotifications}건`}
+                >
+                  {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                </span>
+              )}
+            </div>
+          </Button>
+        )}
 
         {/* 프로필 드롭다운 */}
         <DropdownMenu>

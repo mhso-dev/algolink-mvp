@@ -11,6 +11,7 @@ interface AppShellProps {
   user: { email: string; displayName: string };
   role: AppRole;
   unreadNotifications?: number;
+  notificationSlot?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -18,6 +19,7 @@ export function AppShell({
   user,
   role,
   unreadNotifications = 0,
+  notificationSlot,
   children,
 }: AppShellProps) {
   const sections = React.useMemo(() => getNavSections(role), [role]);
@@ -26,7 +28,12 @@ export function AppShell({
     <div className="flex h-dvh w-full overflow-hidden">
       <Sidebar sections={sections} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar user={user} role={role} unreadNotifications={unreadNotifications} />
+        <TopBar
+          user={user}
+          role={role}
+          unreadNotifications={unreadNotifications}
+          notificationSlot={notificationSlot}
+        />
         <main className="flex-1 overflow-y-auto bg-[var(--color-background)]">
           {children}
         </main>

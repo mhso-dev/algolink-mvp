@@ -10,7 +10,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "sh -c 'tsc --noEmit'",
-    "test:unit": "tsx --test src/auth/__tests__/*.test.ts src/lib/validation/__tests__/*.test.ts src/lib/projects/__tests__/*.test.ts src/lib/recommend/__tests__/*.test.ts src/lib/instructor/__tests__/*.test.ts src/lib/dashboard/__tests__/*.test.ts src/lib/ai/__tests__/*.test.ts src/lib/payouts/__tests__/*.test.ts src/lib/clients/__tests__/*.test.ts src/lib/admin/users/__tests__/*.test.ts src/lib/admin/aggregations/__tests__/*.test.ts",
+    "test:unit": "tsx --test src/auth/__tests__/*.test.ts src/lib/validation/__tests__/*.test.ts src/lib/projects/__tests__/*.test.ts src/lib/recommend/__tests__/*.test.ts src/lib/instructor/__tests__/*.test.ts src/lib/dashboard/__tests__/*.test.ts src/lib/ai/__tests__/*.test.ts src/lib/payouts/__tests__/*.test.ts src/lib/clients/__tests__/*.test.ts src/lib/admin/users/__tests__/*.test.ts src/lib/admin/aggregations/__tests__/*.test.ts src/lib/notifications/__tests__/*.test.ts src/lib/notifications/__tests__/triggers/*.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:push": "drizzle-kit push",

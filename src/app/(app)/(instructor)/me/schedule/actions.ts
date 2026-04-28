@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { ensureInstructorRow } from "@/lib/instructor/me-queries";
 import { scheduleInputSchema, type ScheduleInput } from "@/lib/validation/instructor";
+import { checkScheduleConflict } from "@/lib/notifications/triggers/schedule-conflict";
 
 export interface ScheduleActionResult {
   ok: boolean;
@@ -77,6 +78,15 @@ export async function createSchedule(input: ScheduleInput): Promise<ScheduleActi
   if (error || !data) {
     console.error("[createSchedule] failed", error);
     return { ok: false, message: "일정 저장에 실패했습니다." };
+  }
+  // SPEC-NOTIFY-001 §M4 — 일정 등록 직후 충돌 검사 (silent failure).
+  try {
+    await checkScheduleConflict(supabase, ctx.instructorId, {
+      start: new Date(r.data.startsAt).toISOString(),
+      end: new Date(r.data.endsAt).toISOString(),
+    });
+  } catch (e) {
+    console.warn("[notify.trigger] schedule-conflict failed", e);
   }
   revalidatePath("/me/schedule");
   revalidatePath("/me");

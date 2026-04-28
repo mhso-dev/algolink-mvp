@@ -19,6 +19,9 @@ import { buildClaudeReasonGenerator } from "@/lib/ai/claude";
 import { validateTransition } from "@/lib/projects/status-machine";
 import { PROJECT_ERRORS } from "@/lib/projects/errors";
 import type { ProjectStatus } from "@/lib/projects";
+import { emitNotification } from "@/lib/notifications/emit";
+import { checkLowSatisfaction } from "@/lib/notifications/triggers/low-satisfaction";
+import { checkScheduleConflict } from "@/lib/notifications/triggers/schedule-conflict";
 
 interface ProjectRow {
   id: string;
@@ -322,29 +325,18 @@ export async function assignInstructorAction(input: {
       .eq("id", input.recommendationId);
   }
 
-  // notifications INSERT (user_id 없는 강사는 skip)
+  // notifications INSERT — SPEC-NOTIFY-001 §M4: emit 헬퍼 사용. 콘솔 로그 형식 보존.
   if (instructor?.user_id) {
-    const insertNotif: {
-      recipient_id: string;
-      type: string;
-      title: string;
-      body: string;
-      link_url: string;
-    } = {
-      recipient_id: instructor.user_id,
-      // assignment_request enum 값은 마이그레이션 91 에서 추가됨 — supabase types 미반영 → 캐스트.
+    const r = await emitNotification(supabase, {
+      recipientId: instructor.user_id,
       type: "assignment_request",
       title: `[배정 요청] ${project.title}`,
       body: `프로젝트: ${project.title}\n시작: ${project.education_start_at ?? "-"}\n종료: ${project.education_end_at ?? "-"}`,
-      link_url: "/me",
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: nErr } = await (supabase as any)
-      .from("notifications")
-      .insert(insertNotif);
-    if (nErr) {
+      linkUrl: "/me",
+      logContext: `instructor_id=${input.instructorId} project_id=${input.projectId} rank=${acceptedRank ?? "force"}`,
+    });
+    if (!r.ok) {
       // 실패 시 보상 — 변경 롤백 (Best effort)
-      console.warn("[assignInstructor] notifications insert failed", nErr);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any)
         .from("projects")
@@ -357,10 +349,23 @@ export async function assignInstructorAction(input: {
     }
   }
 
-  // KPI 로그 — 채택 rank 포함 (1순위 채택률 측정용 raw signal).
-  console.log(
-    `[notif] assignment_request → instructor_id=${input.instructorId} project_id=${input.projectId} rank=${acceptedRank ?? "force"}`,
-  );
+  // SPEC-NOTIFY-001 §M4 — 트리거 호출 (silent failure, parent action 중단 금지).
+  try {
+    await checkLowSatisfaction(
+      supabase,
+      input.instructorId,
+      auth.user!.id,
+      input.projectId,
+    );
+    if (project.education_start_at && project.education_end_at) {
+      await checkScheduleConflict(supabase, input.instructorId, {
+        start: project.education_start_at,
+        end: project.education_end_at,
+      });
+    }
+  } catch (e) {
+    console.warn("[notify.trigger] post-assign trigger failed", e);
+  }
 
   revalidatePath(`/projects/${input.projectId}`);
   revalidatePath("/projects");

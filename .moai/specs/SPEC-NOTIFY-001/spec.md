@@ -1,7 +1,7 @@
 ---
 id: SPEC-NOTIFY-001
-version: 0.1.0
-status: draft
+version: 1.0.0
+status: completed
 created: 2026-04-28
 updated: 2026-04-28
 author: 철
@@ -619,6 +619,42 @@ CREATE INDEX IF NOT EXISTS idx_notifications_recipient_type_created
 
 ---
 
-Version: 0.1.0
-Status: draft
+Version: 1.0.0
+Status: completed
 Last Updated: 2026-04-28
+
+## Implementation Notes (2026-04-28, v1.0.0)
+
+### 구현 결과
+- **마이그레이션 0건** — `notifications` 테이블 + RLS 4종 + 인덱스 3종 SPEC-DB-001에서 완비
+- **신규 모듈** (`src/lib/notifications/`): types/constants/errors/validation/dedup/emit/queries/list-query (8 + barrel) + triggers/{assignment-overdue, schedule-conflict, low-satisfaction, dday-unprocessed, rate-limit, types, index}
+- **단위 테스트**: 55건 신규 PASS (총 512/512)
+- **UI** (`src/components/notification-center/`): NotificationBell(RSC) + NotificationDropdown(Popover) + NotificationItem + NotificationFiltersBar + MarkAllReadButton + Pagination
+- **페이지**: `/notifications` 풀 리스트 (필터, 페이지네이션, 모두 읽음)
+- **emit 호출 통합**: 5개 지점
+  - `src/lib/payouts/mail-stub.ts` — direct INSERT → `emitNotification` (콘솔 로그 형식 보존)
+  - `(operator)/projects/[id]/actions.ts` — assign 직후 + low-satisfaction + schedule-conflict 검사
+  - `(instructor)/me/schedule/actions.ts` — createSchedule 직후 충돌 검사
+  - `(app)/layout.tsx` + `app-shell.tsx` + `topbar.tsx` — `<NotificationBell />` slot 주입
+
+### MX 태그 추가
+- `@MX:ANCHOR` `emitNotification` (모든 도메인 INSERT 단일 진입점)
+- `@MX:ANCHOR` `queries.ts` (헤더/페이지 fan_in)
+- `@MX:NOTE` 트리거 4종 lazy 검사 의도
+- `@MX:REASON` 콘솔 로그 형식 회귀 hook (mail-stub LOG_RE)
+
+### Deferred Items
+| 항목 | 이유 | 후속 |
+|---|---|---|
+| 통합 테스트 (DB-backed) | 시드 의존 | SPEC-E2E-001 합류 |
+| `getUnreadCount` 내 lazy 트리거 hook | RSC 캐시 충돌 가능성 | 다음 PR |
+| `dedup_key` 전용 컬럼 | race condition proxy 키만 사용 | 후속 마이그레이션 |
+| pg_cron 트리거 자동 검사 | 인프라 미준비 | Phase 3+ |
+| Playwright E2E 시나리오 1·2·3·8 | 본 SPEC 외 | SPEC-E2E-001 |
+
+### 품질 게이트 결과
+- typecheck: 0 errors
+- test:unit: 512/512 PASS (NOTIFY 신규 55 + 기존 457 회귀)
+- lint: 0 errors (기존 7 warnings 동일)
+- build: SUCCESS (`/notifications` Dynamic 라우트 등록)
+- mail-stub `LOG_RE` 정규식 회귀 매칭 PASS (콘솔 로그 형식 보존 검증)

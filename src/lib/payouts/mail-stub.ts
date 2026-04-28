@@ -1,12 +1,10 @@
 // SPEC-PAYOUT-001 §2.5 REQ-PAYOUT-MAIL-003 — 1-클릭 정산요청 메일 스텁.
-// 실제 이메일 발송은 SPEC-NOTIFY-001 후속. 본 모듈은:
-//   1) instructors.user_id 조회
-//   2) notifications INSERT (type='settlement_requested')
-//   3) console.log("[notif] settlement_requested → instructor_id=<uuid> settlement_id=<uuid>")
+// SPEC-NOTIFY-001 §M4: emit 통합 — emitNotification 단일 진입점 사용.
+// 콘솔 로그 형식은 SPEC-NOTIFY-001 LOG_RE 회귀 테스트 hook. 형식 보존.
 //
 // @MX:NOTE: 콘솔 로그 형식은 SPEC-NOTIFY-001 어댑터의 첫 hook 이다. 형식을 변경하지 말 것.
 
-import { NOTIF_LOG_PREFIX } from "./constants";
+import { emitNotification } from "@/lib/notifications/emit";
 import { PAYOUT_ERRORS } from "./errors";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,30 +65,18 @@ export async function sendSettlementRequestStub(
     `수익 ${input.amounts.profitKrw.toLocaleString("ko-KR")}원 · ` +
     `원천세 ${input.amounts.taxKrw.toLocaleString("ko-KR")}원`;
 
-  const { data, error } = await supabase
-    .from("notifications")
-    .insert({
-      recipient_id: userId,
-      type: "settlement_requested",
-      title,
-      body,
-      link_url: "/me/payouts",
-    })
-    .select("id")
-    .single();
+  const r = await emitNotification(supabase, {
+    recipientId: userId,
+    type: "settlement_requested",
+    title,
+    body,
+    linkUrl: "/me/payouts",
+    logContext: `instructor_id=${input.instructorId} settlement_id=${input.settlementId}`,
+  });
 
-  if (error) {
-    console.error("[payouts.mail-stub] notifications INSERT failed", error);
+  if (!r.ok) {
     return { ok: false, error: PAYOUT_ERRORS.MAIL_STUB_FAILED };
   }
 
-  // 정확한 1줄 콘솔 로그 — SPEC-NOTIFY-001 hook 식별자.
-  console.log(
-    `${NOTIF_LOG_PREFIX} settlement_requested → instructor_id=${input.instructorId} settlement_id=${input.settlementId}`,
-  );
-
-  return {
-    ok: true,
-    notificationId: (data as { id: string } | null)?.id,
-  };
+  return { ok: true, notificationId: r.id };
 }
