@@ -174,6 +174,25 @@ export async function getMyResumeSections(instructorId: string) {
   };
 }
 
+/** 본인 schedule_items 일괄 조회 (캘린더 표시용) */
+export async function getMySchedules(instructorId: string) {
+  const supabase = createClient(await cookies());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase as any)
+    .from("schedule_items")
+    .select("id, schedule_kind, title, starts_at, ends_at, notes")
+    .eq("instructor_id", instructorId)
+    .order("starts_at", { ascending: true });
+  return (data ?? []) as Array<{
+    id: string;
+    schedule_kind: "system_lecture" | "personal" | "unavailable";
+    title: string | null;
+    starts_at: string;
+    ends_at: string;
+    notes: string | null;
+  }>;
+}
+
 /** 본인 row 권한 검증 — instructorId가 self가 아니면 false */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function assertOwnership(
