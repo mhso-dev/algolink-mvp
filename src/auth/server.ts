@@ -53,7 +53,43 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   if (!isValidRole(candidate)) return null;
 
+  // SPEC-ADMIN-002 — 비활성화된 계정은 즉시 인증 실패 처리.
+  // 매 요청마다 fresh read 로 `users.is_active` 를 검증한다 (REQ-ADMIN002-003).
+  // 캐시 없음 — admin 의 setUserActive 직후 다음 SSR 요청에서 즉시 차단.
+  const { data: userRow } = await supabase
+    .from("users")
+    .select("is_active")
+    .eq("id", sub)
+    .maybeSingle();
+  if (userRow && (userRow as { is_active?: boolean }).is_active === false) {
+    return null;
+  }
+
   return { id: sub, email, role: candidate };
+}
+
+/**
+ * 현재 세션에 supabase auth user 가 존재하지만 `getCurrentUser` 가 null 을 반환할 때
+ * 그 사유가 "비활성화" 인지 식별한다.
+ *
+ * SPEC-ADMIN-002 — requireUser 가 활성 세션과 비활성화된 세션을 구분하기 위함.
+ * 비활성화 식별 시 호출처가 `/login?error=deactivated` 로 분기.
+ */
+export async function isSessionDeactivated(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const supabase = createSsrServerClient(cookieStore);
+  const { data: claims } = await supabase.auth.getClaims();
+  const sub =
+    claims?.claims && typeof (claims.claims as { sub?: unknown }).sub === "string"
+      ? ((claims.claims as { sub: string }).sub)
+      : null;
+  if (!sub) return false;
+  const { data: userRow } = await supabase
+    .from("users")
+    .select("is_active")
+    .eq("id", sub)
+    .maybeSingle();
+  return Boolean(userRow && (userRow as { is_active?: boolean }).is_active === false);
 }
 
 /**

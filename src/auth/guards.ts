@@ -5,7 +5,11 @@ import "server-only";
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getCurrentUser, type CurrentUser } from "./server";
+import {
+  getCurrentUser,
+  isSessionDeactivated,
+  type CurrentUser,
+} from "./server";
 import { roleHomePath, type UserRole } from "./roles";
 
 async function readPathname(): Promise<string> {
@@ -29,6 +33,13 @@ async function readPathname(): Promise<string> {
 export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) {
+    // SPEC-ADMIN-002 REQ-ADMIN002-001/002:
+    //   getCurrentUser 가 null 을 반환하는 두 가지 사유 구분:
+    //   (a) 세션 자체가 없거나 잘못됨 → /login?next=... 로 silent redirect (기존 동작)
+    //   (b) 세션은 살아있으나 admin 이 비활성화함 → /login?error=deactivated 안내 redirect
+    if (await isSessionDeactivated()) {
+      redirect("/login?error=deactivated");
+    }
     const next = await readPathname();
     redirect(`/login?next=${encodeURIComponent(next)}`);
   }

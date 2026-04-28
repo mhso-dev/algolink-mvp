@@ -18,10 +18,24 @@ interface LoginFormProps {
   next: string;
 }
 
+// 로컬 dev 환경 빠른 로그인용 시드 자격증명. supabase/migrations/20260427000070_seed.sql +
+// 20260428000020_e2e_seed_phase2.sql 와 1:1 일치. localhost/127.0.0.1 에서만 노출.
+const DEV_TEST_ACCOUNTS: ReadonlyArray<{
+  label: string;
+  email: string;
+  password: string;
+}> = [
+  { label: "관리자", email: "admin@algolink.local", password: "DevAdmin!2026" },
+  { label: "운영자", email: "operator@algolink.local", password: "DevOperator!2026" },
+  { label: "운영자2", email: "operator2@algolink.local", password: "DevOperator2!2026" },
+  { label: "강사", email: "instructor1@algolink.local", password: "DevInstructor!2026" },
+];
+
 export function LoginForm({ next }: LoginFormProps) {
   const {
     register,
     handleSubmit,
+    setValue,
     setFocus,
     setError,
     formState: { errors, isSubmitting },
@@ -33,6 +47,14 @@ export function LoginForm({ next }: LoginFormProps) {
 
   const [showPw, setShowPw] = React.useState(false);
   const [serverError, setServerError] = React.useState<string | null>(null);
+  const [isDevHost, setIsDevHost] = React.useState(false);
+
+  // 클라이언트 마운트 시 hostname 확인 — localhost/127.0.0.1 에서만 dev 패널 노출.
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const host = window.location.hostname;
+    setIsDevHost(host === "localhost" || host === "127.0.0.1" || host.endsWith(".local"));
+  }, []);
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
@@ -66,9 +88,48 @@ export function LoginForm({ next }: LoginFormProps) {
     errors.email?.message ??
     (errors.password?.type !== "server" ? errors.password?.message : undefined);
 
+  // 개발 환경 빠른 로그인: 클릭 시 자격증명 자동 입력 + 즉시 폼 제출.
+  const fillAndSubmit = React.useCallback(
+    (email: string, password: string) => {
+      setValue("email", email, { shouldValidate: false });
+      setValue("password", password, { shouldValidate: false });
+      // setValue 가 controlled state 를 업데이트한 다음 tick 에서 submit.
+      setTimeout(() => {
+        void onSubmit();
+      }, 0);
+    },
+    [setValue, onSubmit],
+  );
+
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
       {next ? <input type="hidden" name="next" value={next} /> : null}
+
+      {isDevHost ? (
+        <div
+          className="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-bg-muted)] px-3 py-2.5 text-xs"
+          role="region"
+          aria-label="개발 환경 빠른 로그인"
+        >
+          <p className="font-semibold text-[var(--color-text-muted)] mb-1.5">
+            개발 환경 빠른 로그인 (시드 계정)
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {DEV_TEST_ACCOUNTS.map((acc) => (
+              <button
+                key={acc.email}
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => fillAndSubmit(acc.email, acc.password)}
+                className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 font-mono hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                title={`${acc.email} 으로 즉시 로그인`}
+              >
+                {acc.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="login-email" required>

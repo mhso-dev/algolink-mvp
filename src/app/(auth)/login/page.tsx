@@ -11,7 +11,11 @@ export const metadata: Metadata = {
 };
 
 interface PageProps {
-  searchParams: Promise<{ next?: string | string[]; reset?: string }>;
+  searchParams: Promise<{
+    next?: string | string[];
+    reset?: string;
+    error?: string;
+  }>;
 }
 
 export default async function LoginPage({ searchParams }: PageProps) {
@@ -19,6 +23,8 @@ export default async function LoginPage({ searchParams }: PageProps) {
   const rawNext = sp.next;
   const next = Array.isArray(rawNext) ? rawNext[0] ?? "" : rawNext ?? "";
   const showResetToast = sp.reset === "1";
+  // SPEC-ADMIN-002 REQ-ADMIN002-005 — 비활성화 안내 배너.
+  const showDeactivatedBanner = sp.error === "deactivated";
 
   return (
     <div className="flex flex-col gap-6">
@@ -39,6 +45,16 @@ export default async function LoginPage({ searchParams }: PageProps) {
         >
           <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
           <span>{AUTH_MSG.passwordResetCompleted}</span>
+        </p>
+      ) : null}
+
+      {showDeactivatedBanner ? (
+        <p
+          role="alert"
+          aria-live="assertive"
+          className="rounded-md border border-[var(--color-destructive)]/30 bg-[var(--color-destructive-muted,_#fee2e2)] px-3 py-2 text-sm text-[var(--color-destructive,_#b91c1c)]"
+        >
+          이 계정은 관리자에 의해 비활성화되었습니다. 권한이 필요하면 관리자에게 문의해 주세요.
         </p>
       ) : null}
 

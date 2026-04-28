@@ -72,6 +72,20 @@ export async function login(
     email: parsed.data.email,
   });
 
+  // SPEC-ADMIN-002 REQ-ADMIN002-002 — 비활성화된 계정 즉시 거부.
+  //   supabase 자격 검증은 통과했으나 admin 이 사용자 비활성화 했을 수 있다.
+  //   public.users.is_active=false 이면 세션 종료 후 안내 메시지 반환.
+  const supabaseForActive = await getServerSupabase();
+  const { data: userRow } = await supabaseForActive
+    .from("users")
+    .select("is_active")
+    .eq("id", data.user.id)
+    .maybeSingle();
+  if (userRow && (userRow as { is_active?: boolean }).is_active === false) {
+    await supabaseForActive.auth.signOut();
+    return { error: "이 계정은 비활성화 상태입니다. 관리자에게 문의해 주세요." };
+  }
+
   // 쿠키가 방금 세팅됐으므로 다음 SSR 요청 컨텍스트에서 claims를 읽을 수 있다.
   const current = await getCurrentUser();
   const role = current?.role ?? null;
