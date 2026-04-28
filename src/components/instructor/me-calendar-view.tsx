@@ -155,7 +155,7 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
               const newEnd = info.event.end ?? new Date((info.event.start?.getTime() ?? 0) + 60 * 60 * 1000);
               if (!newStart || !newEnd) return info.revert();
               const r = await updateSchedule(ev.id, {
-                scheduleKind: ev.scheduleKind === "system_lecture" ? "unavailable" : ev.scheduleKind,
+                scheduleKind: ev.scheduleKind,
                 title: ev.title ?? "",
                 startsAt: toLocalInput(newStart),
                 endsAt: toLocalInput(newEnd),
@@ -180,7 +180,7 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
               const newEnd = info.event.end;
               if (!newStart || !newEnd) return info.revert();
               const r = await updateSchedule(ev.id, {
-                scheduleKind: ev.scheduleKind === "system_lecture" ? "unavailable" : ev.scheduleKind,
+                scheduleKind: ev.scheduleKind,
                 title: ev.title ?? "",
                 startsAt: toLocalInput(newStart),
                 endsAt: toLocalInput(newEnd),
