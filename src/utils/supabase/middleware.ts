@@ -11,6 +11,13 @@ export interface UpdateSessionResult {
   response: NextResponse;
   /** JWKS로 서명 검증된 access token claims. 미인증/오류 시 null. */
   claims: Record<string, unknown> | null;
+  /**
+   * SPEC-ADMIN-001 EARS B-9: 인증된 사용자의 `users.is_active` 값.
+   * - claims가 null이면 null (확인 불필요).
+   * - 사용자 row가 없거나 SELECT 실패 시 true (회귀 회피 — 기본 활성).
+   * - 명시적으로 false인 경우만 차단 대상.
+   */
+  isActive: boolean | null;
 }
 
 /**
@@ -55,5 +62,28 @@ export const updateSession = async (
       ? (data.claims as Record<string, unknown>)
       : null;
 
-  return { response: supabaseResponse, claims };
+  // @MX:WARN: SPEC-ADMIN-001 EARS B-9 — 인증된 요청마다 users.is_active 1회 SELECT.
+  // @MX:REASON: 비활성 사용자 차단을 미들웨어 단계에서 수행. 콜드 SELECT 1회 추가 비용.
+  // 향후 access token hook에 is_active를 포함시키면 본 SELECT 제거 가능 (후속 SPEC).
+  let isActive: boolean | null = null;
+  if (claims) {
+    const sub = typeof claims.sub === "string" ? claims.sub : null;
+    if (sub) {
+      try {
+        const { data: row } = await supabase
+          .from("users")
+          .select("is_active")
+          .eq("id", sub)
+          .maybeSingle();
+        // row가 없거나 컬럼 미수신 시 기본 활성 (true)으로 fallback — 회귀 회피.
+        isActive = row && typeof (row as { is_active?: unknown }).is_active === "boolean"
+          ? ((row as { is_active: boolean }).is_active)
+          : true;
+      } catch {
+        isActive = true;
+      }
+    }
+  }
+
+  return { response: supabaseResponse, claims, isActive };
 };

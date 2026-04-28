@@ -19,7 +19,7 @@ function isPublicPath(pathname: string): boolean {
 }
 
 export async function proxy(request: NextRequest) {
-  const { response, claims } = await updateSession(request);
+  const { response, claims, isActive } = await updateSession(request);
 
   const { pathname, search } = request.nextUrl;
 
@@ -35,6 +35,21 @@ export async function proxy(request: NextRequest) {
     // updateSession이 갱신한 쿠키를 redirect 응답에도 attach.
     response.cookies.getAll().forEach((c) => {
       redirectResponse.cookies.set(c.name, c.value);
+    });
+    return redirectResponse;
+  }
+
+  // SPEC-ADMIN-001 EARS B-9: 비활성 사용자(`users.is_active=false`) 즉시 차단.
+  // null/true는 통과; 명시적 false만 거부 (회귀 회피).
+  if (isActive === false) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "";
+    url.searchParams.set("error", "deactivated");
+    const redirectResponse = NextResponse.redirect(url);
+    // 세션 쿠키를 만료시켜 강제 로그아웃 효과를 함께 제공.
+    response.cookies.getAll().forEach((c) => {
+      redirectResponse.cookies.set(c.name, "", { maxAge: 0, path: "/" });
     });
     return redirectResponse;
   }

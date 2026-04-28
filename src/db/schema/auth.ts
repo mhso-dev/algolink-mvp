@@ -1,6 +1,6 @@
 // @MX:ANCHOR: SPEC-DB-001 REQ-DB001-AUTH — Supabase auth.users를 신원 소스로 사용.
 // @MX:REASON: users.id는 auth.uid()와 동일한 UUID이며 모든 도메인 테이블이 FK로 참조 (fan_in 매우 높음).
-import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, boolean } from "drizzle-orm/pg-core";
 import { userRole } from "../enums";
 
 /**
@@ -15,6 +15,8 @@ export const users = pgTable("users", {
   role: userRole("role").notNull(),
   nameKr: text("name_kr").notNull(),
   email: text("email").notNull().unique(),
+  // SPEC-ADMIN-001 F-301: admin이 비활성화 가능. false면 미들웨어가 다음 로그인부터 차단.
+  isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
