@@ -41,4 +41,11 @@ export const SEED_USERS = {
     process.env.SEED_INSTRUCTOR_PASSWORD,
     { email: PERSONAS.instructor.email, password: PERSONAS.instructor.password },
   ),
+  // SPEC-SEED-002 — 보조 operator (Phase 2 ADMIN 비활성화 시나리오용).
+  // 시드 SQL `20260428000020_e2e_seed_phase2.sql` 와 동일 자격증명.
+  operator2: pick(
+    process.env.SEED_OPERATOR2_EMAIL,
+    process.env.SEED_OPERATOR2_PASSWORD,
+    { email: "operator2@algolink.local", password: "DevOperator2!2026" },
+  ),
 } as const;

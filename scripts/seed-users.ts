@@ -41,6 +41,13 @@ const SEED_USERS: SeedUser[] = [
   { email: "admin@algolink.local",      password: "DevAdmin!2026",      role: "admin",      name_kr: "관리자" },
   { email: "operator@algolink.local",   password: "DevOperator!2026",   role: "operator",   name_kr: "운영자" },
   { email: "instructor1@algolink.local", password: "DevInstructor!2026", role: "instructor", name_kr: "강사 사용자" },
+  // SPEC-SEED-002 — 보조 operator (Phase 2 ADMIN 시나리오용)
+  {
+    email: process.env.SEED_OPERATOR2_EMAIL?.trim() || "operator2@algolink.local",
+    password: process.env.SEED_OPERATOR2_PASSWORD?.trim() || "DevOperator2!2026",
+    role: "operator",
+    name_kr: "운영자2",
+  },
 ];
 
 const FIRST_INSTRUCTOR_ID = "30000000-0000-0000-0000-000000000001";
