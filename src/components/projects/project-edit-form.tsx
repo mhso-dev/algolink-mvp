@@ -50,12 +50,12 @@ interface Props {
 
 const initialState: UpdateProjectFormState = { ok: false };
 
-/** ISO → datetime-local input value (YYYY-MM-DDTHH:mm) in local timezone. */
+/** ISO → date input value (YYYY-MM-DD) in local timezone. */
 function isoToLocalInput(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export function ProjectEditForm({ project, clients, skills, locked }: Props) {
@@ -125,20 +125,20 @@ export function ProjectEditForm({ project, clients, skills, locked }: Props) {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="시작일시" htmlFor="startAt" error={fieldErr("startAt")}>
+            <Field label="시작일" htmlFor="startAt" error={fieldErr("startAt")}>
               <Input
                 id="startAt"
                 name="startAt"
-                type="datetime-local"
+                type="date"
                 defaultValue={isoToLocalInput(project.startAt)}
                 disabled={locked}
               />
             </Field>
-            <Field label="종료일시" htmlFor="endAt" error={fieldErr("endAt")}>
+            <Field label="종료일" htmlFor="endAt" error={fieldErr("endAt")}>
               <Input
                 id="endAt"
                 name="endAt"
-                type="datetime-local"
+                type="date"
                 defaultValue={isoToLocalInput(project.endAt)}
                 disabled={locked}
               />

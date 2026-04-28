@@ -85,11 +85,11 @@ export function ProjectCreateForm({ clients, skills }: Props) {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="시작일시" htmlFor="startAt" error={fieldErr("startAt")}>
-              <Input id="startAt" name="startAt" type="datetime-local" />
+            <Field label="시작일" htmlFor="startAt" error={fieldErr("startAt")}>
+              <Input id="startAt" name="startAt" type="date" />
             </Field>
-            <Field label="종료일시" htmlFor="endAt" error={fieldErr("endAt")}>
-              <Input id="endAt" name="endAt" type="datetime-local" />
+            <Field label="종료일" htmlFor="endAt" error={fieldErr("endAt")}>
+              <Input id="endAt" name="endAt" type="date" />
             </Field>
           </CardContent>
         </Card>
