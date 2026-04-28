@@ -48,9 +48,12 @@ const KIND_COLORS: Record<MeScheduleEvent["scheduleKind"], { bg: string; border:
 export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEvent[] }) {
   const [events, setEvents] = React.useState<MeScheduleEvent[]>(initialEvents);
   const [dialogState, setDialogState] = React.useState<DialogState>({ kind: "closed" });
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => setMounted(true), []);
+  // useSyncExternalStore로 mounted 가드 (set-state-in-effect 회피).
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   const fcEvents = React.useMemo(
     () =>

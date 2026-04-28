@@ -194,8 +194,8 @@ export async function getMySchedules(instructorId: string) {
 }
 
 /** 본인 row 권한 검증 — instructorId가 self가 아니면 false */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function assertOwnership(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   table: ResumeSection,
   rowId: string,
