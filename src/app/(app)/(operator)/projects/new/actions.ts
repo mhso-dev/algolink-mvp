@@ -1,6 +1,8 @@
 "use server";
 
 // SPEC-PROJECT-001 §2.2 REQ-PROJECT-CREATE-001~005 — 프로젝트 신규 등록 Server Action.
+// @MX:SPEC: SPEC-PROJECT-001
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001 — required_skills는 9개 추상 카테고리 중 선택(max 9).
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -17,6 +19,10 @@ export interface CreateProjectFormState {
   projectId?: string;
 }
 
+// @MX:ANCHOR: SPEC-PROJECT-001 §2.2 — 프로젝트 생성 진입점 (zod + INSERT + skill mapping).
+// @MX:REASON: fan_in=1 (page.tsx) 이지만 외부 트랜잭션 경계 + project_required_skills FK INSERT.
+// @MX:SPEC: SPEC-PROJECT-001
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001
 export async function createProjectAction(
   _prev: CreateProjectFormState | undefined,
   formData: FormData,

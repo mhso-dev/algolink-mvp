@@ -1,5 +1,8 @@
 "use client";
 
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001 — proficiency 입력 제거. 9개 추상 카테고리 chip 다중선택.
+// 정적 데모/템플릿 — 실제 /me/resume 페이지는 me-resume-form.tsx + me-skills-picker-section.tsx 사용.
+
 import * as React from "react";
 import { Plus, Upload, Download, Eye, EyeOff, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,13 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const SECTIONS = [
   { id: "basic", label: "기본사항" },
@@ -28,26 +24,17 @@ const SECTIONS = [
   { id: "skills", label: "강의가능분야" },
 ] as const;
 
+// SPEC-SKILL-ABSTRACT-001 — 9개 추상 카테고리.
 const SKILL_CATEGORIES = [
   "프로그래밍",
-  "운영체제",
+  "운영체제·인프라",
   "프론트엔드",
   "백엔드",
   "모바일",
-  "데이터분석",
-  "인공지능",
-  "생성형 AI",
-  "인프라",
-  "클라우드",
-  "자동화",
+  "데이터·AI",
+  "보안",
+  "자동화·도구",
   "산업 도메인",
-];
-
-const PROFICIENCY_OPTIONS = [
-  { value: "beginner", label: "초급" },
-  { value: "intermediate", label: "중급" },
-  { value: "advanced", label: "고급" },
-  { value: "expert", label: "전문가" },
 ];
 
 export function ResumeForm() {
@@ -186,34 +173,20 @@ export function ResumeForm() {
           inputTypes={["month", "text", "text"]}
         />
 
-        {/* 강의가능분야 */}
+        {/* 강의가능분야 — SPEC-SKILL-ABSTRACT-001: 9개 chip 다중선택, proficiency 부재. */}
         <Section id="skills" title="강의가능분야">
-          <div className="space-y-3">
+          <p className="text-xs text-[var(--color-text-muted)] -mt-1">
+            보유한 카테고리만 선택하세요. 난이도/세부 기술 입력은 사용하지 않습니다.
+          </p>
+          <div className="flex flex-wrap gap-2">
             {SKILL_CATEGORIES.map((cat) => (
-              <div
+              <label
                 key={cat}
-                className="grid grid-cols-1 md:grid-cols-[140px_1fr_120px] gap-3 items-center rounded-md border border-[var(--color-border)] p-3"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-[var(--color-border)] text-sm cursor-pointer"
               >
-                <div className="flex items-center gap-2">
-                  <Checkbox id={`skill-${cat}`} />
-                  <Label htmlFor={`skill-${cat}`} className="text-sm font-medium">
-                    {cat}
-                  </Label>
-                </div>
-                <Input placeholder="세부 기술 (쉼표로 구분)" />
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="난이도" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROFICIENCY_OPTIONS.map((p) => (
-                      <SelectItem key={p.value} value={p.value}>
-                        {p.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                <Checkbox id={`skill-${cat}`} className="sr-only" />
+                <span>{cat}</span>
+              </label>
             ))}
           </div>
           <Field label="강의력·성향·소프트스킬" hint="자유 텍스트 — 강의 스타일을 알릴 수 있는 정보">

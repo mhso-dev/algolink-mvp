@@ -2,6 +2,9 @@
 
 // SPEC-PROJECT-001 §2.6/§2.7 — 추천 결과 표시 + 1-클릭 배정 버튼.
 // SPEC-RECOMMEND-001 §3 REQ-RECOMMEND-006 — AI 어휘 제거 + model/source 배지 미노출.
+// @MX:SPEC: SPEC-PROJECT-001
+// @MX:SPEC: SPEC-RECOMMEND-001
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001 — proficiency 배지 부재. binary skillMatch 표시(0~100%).
 
 import * as React from "react";
 import { Sparkles, CheckCircle2, AlertTriangle } from "lucide-react";

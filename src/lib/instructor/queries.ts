@@ -6,6 +6,7 @@
 // @MX:NOTE: [AUTO] 강사 도메인의 기본 쿼리 허브. 현재 fan_in=2 (list 페이지, detail 페이지).
 // @MX:NOTE: [AUTO] fan_in이 3 이상으로 증가 시 @MX:ANCHOR로 승격 필요.
 // @MX:SPEC: SPEC-INSTRUCTOR-001
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001
 
 import "server-only";
 import { cookies } from "next/headers";
@@ -16,6 +17,7 @@ import type {
   InstructorListFilter,
   InstructorListRow,
 } from "./types";
+import type { SkillCategory } from "./skill-tree";
 
 const COMPLETED_PROJECT_STATUSES = [
   "education_done",
@@ -339,14 +341,19 @@ export async function getInstructorDetailForOperator(
   };
 }
 
-export async function getAllSkillCategories(): Promise<
-  { id: string; name: string }[]
-> {
+// @MX:NOTE: SPEC-SKILL-ABSTRACT-001 §2.1 — 9개 추상 카테고리 마스터 (sort_order 포함).
+// 단일 레벨 — tier/parent_id 부재. SkillsPicker controlled API와 호환.
+// @MX:SPEC: SPEC-SKILL-ABSTRACT-001
+export async function getAllSkillCategories(): Promise<SkillCategory[]> {
   const supabase = createClient(await cookies());
   const { data } = await supabase
     .from("skill_categories")
-    .select("id, name")
+    .select("id, name, sort_order")
     .order("sort_order", { ascending: true })
-    .returns<{ id: string; name: string }[]>();
-  return data ?? [];
+    .returns<{ id: string; name: string; sort_order: number }[]>();
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    sortOrder: r.sort_order,
+  }));
 }
