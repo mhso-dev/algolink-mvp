@@ -16,17 +16,39 @@ GRANT ALL ON ALL TABLES    IN SCHEMA public TO service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
 GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO service_role;
 
--- Default privileges so future tables created by postgres in public also auto-grant
--- to service_role (matching Supabase's stock setup).
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES    TO service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO service_role;
+-- authenticated / anon need CRUD on all public tables — RLS policies remain the
+-- gate for row-level access. Matches Supabase stock setup where these roles get
+-- table-level privileges and RLS controls visibility.
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, anon;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated, anon;
 
--- Same default privileges for the postgres role (default owner) so subsequent
--- migrations creating tables in public propagate ownership/grants correctly.
+-- Default privileges so future tables created by postgres in public also auto-grant
+-- to all expected roles (matching Supabase's stock setup).
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON TABLES TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON SEQUENCES TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON FUNCTIONS TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated, anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO authenticated, anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT EXECUTE ON FUNCTIONS TO authenticated, anon;
+
+-- Same default privileges scoped to the postgres role (default migration owner).
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
-  GRANT ALL ON TABLES    TO service_role;
+  GRANT ALL ON TABLES TO service_role;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   GRANT ALL ON SEQUENCES TO service_role;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   GRANT ALL ON FUNCTIONS TO service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated, anon;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO authenticated, anon;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT EXECUTE ON FUNCTIONS TO authenticated, anon;
