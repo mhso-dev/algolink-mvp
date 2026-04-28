@@ -13,6 +13,9 @@
 --   - 070_seed.sql 의 어떤 행도 수정하지 않는다 (add-only).
 --   - 모든 INSERT 는 ON CONFLICT DO NOTHING 으로 멱등성 보장.
 --   - operator@algolink.local 의 자격 증명은 절대 변경하지 않는다.
+
+-- Cloud Supabase 호환: pgcrypto 는 extensions 스키마에 설치되어 있으므로 search_path 확장.
+SET LOCAL search_path TO pg_catalog, public, extensions, auth, pg_temp;
 --
 -- 관련 SPEC: SPEC-SEED-002, SPEC-DB-001, SPEC-E2E-002, SPEC-ADMIN-001
 

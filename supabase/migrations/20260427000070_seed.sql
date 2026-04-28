@@ -6,6 +6,10 @@
 -- supabase db reset 시: postgres role의 default config 또는
 -- ALTER DATABASE postgres SET app.pii_encryption_key = '<dev-key>'; 사전 설정 필요.
 
+-- Cloud Supabase 호환: pgcrypto (gen_salt/crypt/pgp_sym_*) 는 extensions 스키마에
+-- 설치되어 있다. 본 마이그 트랜잭션에서 schema-qualify 없이 호출 가능하도록 search_path 확장.
+SET LOCAL search_path TO pg_catalog, public, extensions, auth, pg_temp;
+
 -- 안전: seed 키가 없으면 즉시 종료 (운영 env에서 실행 시 가드).
 DO $$
 BEGIN
