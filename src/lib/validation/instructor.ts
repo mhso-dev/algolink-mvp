@@ -61,6 +61,62 @@ export const certificationInputSchema = z.object({
   name: z.string().min(1, "자격증명을 입력해주세요."),
   issuer: z.string().optional(),
   issuedDate: dateOpt,
+  expiresDate: dateOpt,
+  description: z.string().optional(),
+});
+
+export const teachingExperienceInputSchema = z.object({
+  title: z.string().min(1, "강의명을 입력해주세요."),
+  organization: z.string().optional(),
+  startDate: dateOpt,
+  endDate: dateOpt,
+  description: z.string().optional(),
+});
+
+export const instructorProjectInputSchema = z.object({
+  title: z.string().min(1, "프로젝트명을 입력해주세요."),
+  role: z.string().optional(),
+  startDate: dateOpt,
+  endDate: dateOpt,
+  description: z.string().optional(),
+});
+
+export const publicationInputSchema = z.object({
+  title: z.string().min(1, "도서명을 입력해주세요."),
+  publisher: z.string().optional(),
+  publishedDate: dateOpt,
+  isbn: z.string().optional(),
+  description: z.string().optional(),
+});
+
+export const otherActivityInputSchema = z.object({
+  title: z.string().min(1, "활동명을 입력해주세요."),
+  category: z.string().optional(),
+  activityDate: dateOpt,
+  description: z.string().optional(),
+});
+
+export const basicInfoInputSchema = z.object({
+  nameKr: z.string().min(1, "이름(한글)을 입력해주세요.").max(100),
+  nameHanja: z.string().max(50).optional().or(z.literal("")),
+  nameEn: z.string().max(100).optional().or(z.literal("")),
+  birthDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD 형식")
+    .optional()
+    .or(z.literal("")),
+  email: z.string().email("올바른 이메일 형식을 입력해주세요.").optional().or(z.literal("")),
+  phone: z
+    .string()
+    .regex(/^[0-9\-+()\s]{6,20}$/, "올바른 전화번호 형식")
+    .optional()
+    .or(z.literal("")),
+  address: z.string().max(255).optional().or(z.literal("")),
+});
+
+export const skillUpdateInputSchema = z.object({
+  skillId: z.string().uuid(),
+  proficiency: z.enum(["beginner", "intermediate", "advanced", "expert"]).nullable(),
 });
 
 // ---------- 일정 schema ----------
@@ -117,8 +173,14 @@ export const payoutInputSchema = z.object({
 export type EducationInput = z.infer<typeof educationInputSchema>;
 export type WorkExperienceInput = z.infer<typeof workExperienceInputSchema>;
 export type CertificationInput = z.infer<typeof certificationInputSchema>;
+export type TeachingExperienceInput = z.infer<typeof teachingExperienceInputSchema>;
+export type InstructorProjectInput = z.infer<typeof instructorProjectInputSchema>;
+export type PublicationInput = z.infer<typeof publicationInputSchema>;
+export type OtherActivityInput = z.infer<typeof otherActivityInputSchema>;
+export type BasicInfoInput = z.infer<typeof basicInfoInputSchema>;
 export type ScheduleInput = z.infer<typeof scheduleInputSchema>;
 export type PayoutInput = z.infer<typeof payoutInputSchema>;
+export type SkillUpdateInput = z.infer<typeof skillUpdateInputSchema>;
 // SPEC-INSTRUCTOR-001 §2.3 REQ-INSTRUCTOR-CREATE-002 — 강사 등록 zod 스키마.
 // SPEC-INSTRUCTOR-001 §2.1 REQ-INSTRUCTOR-LIST — 리스트 필터 zod 스키마.
 
