@@ -80,6 +80,7 @@ pnpm e2e             # Playwright E2E (Phase 1 SPEC 시나리오)
 | SPEC-PAYOUT-001 | 정산 관리 (F-205) — 4-state 머신 + 세율 검증 + 매입매출 | 완료 |
 | SPEC-ADMIN-001 | 회원·권한 (F-301) + 매출매입 집계 (F-302) — users.is_active 도입 | 완료 |
 | SPEC-NOTIFY-001 | 알림 센터 (F-002) + 트리거 4종 (F-206) — emit 단일 진입점 + lazy 검사 | 완료 |
+| SPEC-E2E-002 | Phase 2 골든패스 E2E 회귀 스위트 (CLIENT/PAYOUT/ADMIN/NOTIFY 4 시나리오) | 완료 |
 
 ## 코드 컨텍스트 (@MX 태그)
 
