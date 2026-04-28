@@ -19,6 +19,9 @@ const VALID_ROLES: ReadonlySet<string> = new Set<string>([
   "admin",
 ]);
 
+// @MX:ANCHOR: [AUTO] roleHomePath — 역할별 home 경로 결정 단일 진실원
+// @MX:REASON: fan_in 5, 가드/login redirect/(auth) layout이 의존. 매핑 변경 시 무한 redirect 또는 권한 우회 위험.
+// @MX:SPEC: SPEC-AUTH-001 §2.6 REQ-AUTH-ROLE-007
 export function roleHomePath(role: UserRole): string {
   return ROLE_HOME[role];
 }

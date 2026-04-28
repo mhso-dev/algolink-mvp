@@ -29,6 +29,8 @@ function pad(n: number): string {
 }
 
 /** `2026-04-27 (월)` 형식. */
+// @MX:ANCHOR: [AUTO] formatKstDate — KST 날짜 표시 단일 표준
+// @MX:REASON: fan_in 4, 강사/정산/이력 화면이 의존. 포맷 변경 시 일관된 KST 표기 invariant 깨짐.
 export function formatKstDate(input: Date | string | number): string {
   const d = toKstDate(input);
   // toKstDate가 UTC시간을 KST 시각으로 옮겨놓음 → UTC getter로 KST 값 추출.

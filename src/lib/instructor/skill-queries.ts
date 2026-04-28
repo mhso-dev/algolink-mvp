@@ -15,6 +15,8 @@ interface RawCategoryRow {
 }
 
 /** skill_categories 전체 마스터를 평면 배열로 반환. */
+// @MX:ANCHOR: [AUTO] getAllSkillCategories — 스킬 마스터 데이터 단일 진입점
+// @MX:REASON: fan_in 3, 강사 등록/이력서/operator 강사 목록이 동일 마스터에 의존. 시그니처 변경 시 UI 트리/필터 동시 회귀.
 export async function getAllSkillCategories(): Promise<SkillCategoryRow[]> {
   const supabase = createClient(await cookies());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

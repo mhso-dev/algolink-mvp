@@ -47,6 +47,9 @@ function firstIp(forwardedFor: string | null): string | null {
  * auth_events 테이블에 이벤트를 기록한다.
  * 실패는 절대 throw하지 않으며 (REQ-AUTH-OBS-005), 호출 측 인증 흐름을 중단시키지 않는다.
  */
+// @MX:ANCHOR: [AUTO] logAuthEvent — 인증 감사 로그 기록 진입점
+// @MX:REASON: fan_in 6, 모든 인증 server action(login/forgot/reset/invite/accept-invite)이 호출. throw 정책(non-throwing) 위반 시 인증 흐름 중단 위험.
+// @MX:SPEC: SPEC-AUTH-001 §2.10 REQ-AUTH-OBS-005
 export async function logAuthEvent(
   eventType: AuthEventType,
   ctx: AuthEventContext = {},

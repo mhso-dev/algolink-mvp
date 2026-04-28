@@ -87,6 +87,8 @@ export function columnBadgeVariant(column: KanbanColumnKey):
   return column === "in_progress" ? "in-progress" : column;
 }
 
+// @MX:ANCHOR: [AUTO] statusBadgeVariant — 프로젝트 상태 배지 색상 단일 표준
+// @MX:REASON: fan_in 3, 프로젝트 리스트/상세/폼이 동일한 시각적 매핑에 의존. 변경 시 UX 일관성 회귀.
 export function statusBadgeVariant(status: ProjectStatus) {
   return columnBadgeVariant(statusToColumn(status));
 }

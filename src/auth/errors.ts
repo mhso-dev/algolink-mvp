@@ -30,6 +30,9 @@ function asRecord(value: unknown): MaybeAuthError | null {
   return value as MaybeAuthError;
 }
 
+// @MX:ANCHOR: [AUTO] mapAuthError — Supabase 에러를 한국어 사용자 메시지로 매핑
+// @MX:REASON: fan_in 8, 모든 인증 server action(login/forgot/reset/invite/callback)이 의존. 매핑 누락 시 사용자에게 raw 에러 노출 위험.
+// @MX:SPEC: SPEC-AUTH-001 §2.11 REQ-AUTH-ERROR-001
 export function mapAuthError(error: unknown): string {
   // 네트워크 오류 (TypeError + fetch 실패 패턴)
   if (error instanceof TypeError) {

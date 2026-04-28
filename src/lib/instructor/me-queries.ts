@@ -39,6 +39,9 @@ export interface MeContext {
  *
  * 강사가 아닌 사용자가 호출하면 null 반환.
  */
+// @MX:ANCHOR: [AUTO] ensureInstructorRow — 강사 me 컨텍스트 idempotent 부트스트랩
+// @MX:REASON: fan_in 9, (instructor)/me/* 모든 페이지·액션이 진입 시 호출. role 체크/중복 생성 방지 invariant 위반 시 데이터 정합성 깨짐.
+// @MX:SPEC: SPEC-ME-001
 export async function ensureInstructorRow(): Promise<MeContext | null> {
   const user = await getCurrentUser();
   if (!user || user.role !== "instructor") return null;

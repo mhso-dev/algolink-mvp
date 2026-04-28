@@ -5,6 +5,8 @@ import { twMerge } from "tailwind-merge";
  * Tailwind 클래스 병합 헬퍼.
  * shadcn/ui 표준 패턴 — 조건부 클래스 + 충돌 해결.
  */
+// @MX:ANCHOR: [AUTO] cn — Tailwind 클래스 병합 헬퍼 (shadcn/ui 표준)
+// @MX:REASON: fan_in 24, 거의 모든 컴포넌트가 사용. 시그니처 변경 시 전 UI 회귀.
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -12,6 +14,8 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * 한국 원화 포맷터.
  */
+// @MX:ANCHOR: [AUTO] formatKRW — 원화 표시 포맷 단일 표준
+// @MX:REASON: fan_in 8, 정산/프로젝트/대시보드 표시 일관성 보장. 포맷 변경 시 KPI/UI 전반 영향.
 export function formatKRW(amount: number, opts?: { sign?: boolean }): string {
   const formatted = amount.toLocaleString("ko-KR");
   return opts?.sign ? `₩${formatted}` : formatted;

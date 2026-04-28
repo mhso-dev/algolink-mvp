@@ -23,6 +23,9 @@ async function readPathname(): Promise<string> {
 /**
  * 인증된 사용자만 통과시킨다. 미인증 시 `/login?next=...`로 silent redirect.
  */
+// @MX:ANCHOR: [AUTO] requireUser — (app) 라우트의 인증 가드 진입점
+// @MX:REASON: fan_in 21+, 모든 보호 라우트가 이 함수에 의존. signature 변경 시 전 영역 회귀 위험.
+// @MX:SPEC: SPEC-AUTH-001 §2.5 REQ-AUTH-GUARD-001
 export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) {
@@ -37,6 +40,9 @@ export async function requireUser(): Promise<CurrentUser> {
  * 무한 redirect 방지: 이미 home에 있는 사용자가 home에서 차단되는 모순적 호출을 막기 위해
  * 현재 경로가 자기 home과 동일한 경우 throw하여 상위 error.tsx로 위임한다.
  */
+// @MX:ANCHOR: [AUTO] requireRole — 역할 기반 라우트 보호 가드
+// @MX:REASON: fan_in 6, (operator)/(instructor)/(admin) 레이아웃과 server action에서 사용. 역할 매핑 변경 시 권한 우회 위험.
+// @MX:SPEC: SPEC-AUTH-001 §2.5 REQ-AUTH-GUARD-002
 export async function requireRole(
   allowed: UserRole | readonly UserRole[],
 ): Promise<CurrentUser> {
