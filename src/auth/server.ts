@@ -23,7 +23,7 @@ export interface CurrentUser {
 // @MX:ANCHOR: getCurrentUser — 모든 보호 라우트 SSR 인증 진입점.
 // @MX:REASON: fan_in 14, JWKS 서명 검증된 claims에서 비즈니스 role 추출하는 단일 신뢰 경계.
 // @MX:WARN: claims.role(top-level)에 비즈니스 role(operator/instructor/admin)을 절대 넣지 말 것.
-// @MX:REASON: PostgREST가 top-level role을 DB role로 해석하여 SET ROLE 시도 → "role does not exist"로 모든 RLS 쿼리 폭발. 비즈니스 role은 반드시 app_metadata.role에만 저장한다 (SPEC-AUTH-001 §5.1, 2026-04-28 P0 incident, fix migration 20260428000010_fix_custom_access_token_role.sql).
+// @MX:REASON: PostgREST가 top-level role을 DB role로 해석하여 SET ROLE 시도 → "role does not exist"로 모든 RLS 쿼리 폭발. 비즈니스 role은 반드시 app_metadata.role에만 저장한다 (SPEC-AUTH-001 §5.1, 2026-04-28 P0 incident, fix migration 20260428000011_fix_custom_access_token_role.sql).
 // @MX:SPEC: SPEC-AUTH-001 §2.2 REQ-AUTH-SESSION-002, §5.1
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const cookieStore = await cookies();
