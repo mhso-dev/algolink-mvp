@@ -93,6 +93,18 @@
   --motion-duration-slow: 200ms;
   --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --motion-easing-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* Mobile responsive (SPEC-MOBILE-001 REQ-MOB-TOKEN-001) — extension only, never modify SPEC-LAYOUT-001 tokens */
+  --touch-target-min: 44px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --mobile-spacing-xs: 12px;
+  --mobile-spacing-sm: 16px;
+  --mobile-spacing-md: 20px;
+  --container-mobile-max: 100%;
+  --container-tablet-max: calc(100% - 32px);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -161,6 +173,41 @@
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
+
+  /* Mobile (SPEC-MOBILE-001 REQ-MOB-TOKEN-001) — Tailwind 노출 (h-touch / w-touch / min-h-touch 등 spacing scale) */
+  --spacing-touch: var(--touch-target-min);
+}
+
+/* ============================================================
+   Mobile utilities (SPEC-MOBILE-001 REQ-MOB-TOKEN-004)
+   safe-area-inset 패딩 + 44×44px 터치 타겟 — Tailwind v4 @utility directive
+   ============================================================ */
+
+@utility pt-safe {
+  padding-top: var(--safe-top);
+}
+@utility pb-safe {
+  padding-bottom: var(--safe-bottom);
+}
+@utility pl-safe {
+  padding-left: var(--safe-left);
+}
+@utility pr-safe {
+  padding-right: var(--safe-right);
+}
+@utility px-safe {
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+@utility py-safe {
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+@utility min-h-touch {
+  min-height: var(--touch-target-min);
+}
+@utility min-w-touch {
+  min-width: var(--touch-target-min);
 }
 
 /* ============================================================

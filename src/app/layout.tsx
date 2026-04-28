@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -17,6 +17,18 @@ export const metadata: Metadata = {
   description:
     "AI Agentic 기반 한국 교육 컨설팅 워크플로우 — 의뢰부터 정산까지 한 화면에서.",
   applicationName: "Algolink",
+};
+
+// SPEC-MOBILE-001 REQ-MOB-VIEWPORT-001: Next.js 16 Viewport API
+// device-width + viewport-fit=cover (notch/safe-area 활성화) + theme-color (light/dark)
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FAFAFA" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090B" },
+  ],
 };
 
 export default function RootLayout({
