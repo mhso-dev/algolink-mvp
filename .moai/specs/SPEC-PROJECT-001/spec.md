@@ -1,9 +1,9 @@
 ---
 id: SPEC-PROJECT-001
-version: 0.1.0
-status: draft
+version: 1.1.0
+status: in-progress
 created: 2026-04-27
-updated: 2026-04-27
+updated: 2026-04-28
 author: 철
 priority: high
 issue_number: null
@@ -636,5 +636,65 @@ Drizzle ORM의 `db.transaction(async (tx) => { ... })` 블록으로 구현. 한 
   - https://www.w3.org/WAI/WCAG21/quickref/
 
 ---
+
+---
+
+## Implementation Notes
+
+> 2026-04-28 backfill — main 브랜치에 머지 완료된 구현 기록. 리스트 검색/필터/페이지네이션 + Edit 풀폼 완료. 일부 항목 deferred.
+
+### 머지된 커밋
+
+| 해시 | 메시지 |
+|------|--------|
+| `59643de` | merge: SPEC-PROJECT-001 — 프로젝트 관리 + AI 강사 추천 (M1-M7) |
+| `72b0f64` | feat(project): SPEC-PROJECT-001 M1+M2 — 마이그레이션 + 도메인 순수 함수 + 단위 테스트 |
+| `c352ffa` | feat(project): SPEC-PROJECT-001 M3-M7 — Server Actions + 라우트 + 추천/배정/상태전환 UI |
+| `17d4b5f` | feat(projects): SPEC-PROJECT-001 §2.1 — 리스트 검색·필터·페이지네이션 |
+| `65290f7` | feat(projects): SPEC-PROJECT-001 §2.4/§2.3 — Edit 풀폼 + 동시성 + 배정 이력 |
+| `79b20ec` | merge: SPEC-PROJECT-001 잔여 — 리스트 필터/페이지네이션 + Edit 풀폼 + 배정 이력 |
+
+### 구현 완료된 마일스톤
+
+- **M1**: DB 마이그레이션 — `project_required_skills` junction 테이블, `notification_type` enum `assignment_request` 추가
+- **M2**: 도메인 순수 함수 + 단위 테스트
+  - `src/lib/projects/status-machine.ts` (7단계 매핑 + 전환 그래프, `@MX:ANCHOR`)
+  - `src/lib/recommend/score.ts`, `engine.ts`, `types.ts` (추천 엔진)
+  - `src/lib/projects/errors.ts` (한국어 에러 상수)
+- **M3**: Server Actions — `createProject`, `runRecommendation`, `assignInstructor`, `transitionStatus`
+- **M4**: 리스트 페이지 (`/projects`) — 검색·필터·페이지네이션 (`src/lib/projects/list-query.ts`)
+- **M5**: 신규 등록 폼 (`/projects/new`) + zod validation
+- **M6**: 상세 페이지 (`/projects/[id]`) — 추천 섹션, 배정 이력, 상태 stepper
+- **M7**: Edit 풀폼 (`/projects/[id]/edit`) + 낙관적 동시성 (`expected_updated_at`)
+
+### Deferred Items
+
+| 항목 | 이유 | 후속 경로 |
+|------|------|----------|
+| **검색 `q` 파라미터 ILIKE 구현** | 리스트 페이지 URL 파라미터 파싱 완료, DB 쿼리 ILIKE 부분 stub | 다음 SPEC 재개 시 완성 |
+| **Playwright E2E 시나리오** | 빌드 우선, E2E 환경 미구성 | SPEC-E2E-001 또는 별도 작업 |
+| **통합 테스트 (`projects-flow.test.ts`)** | SPEC §4.7 명시, 단위 테스트만 완성 | 후속 coverage SPEC |
+
+### Unplanned Additions
+
+| 항목 | 내용 |
+|------|------|
+| `src/lib/projects/list-queries.ts` (복수) | `list-query.ts`와 별도로 Supabase select chain 헬퍼 분리 |
+| `src/components/projects/project-edit-form.tsx` | edit 전용 폼 컴포넌트 (SPEC은 mode prop 단일 `ProjectForm` 명시) |
+| `src/components/projects/project-create-form.tsx` | create 전용 폼 컴포넌트 |
+| `next-param.test.ts` 회귀 수정 | PR #9 사전 존재 회귀를 SPEC-PROJECT-001 브랜치에서 수정 포함 |
+
+### 잔여 구현 항목 (in-progress 사유)
+
+- 리스트 `q` 검색 ILIKE 쿼리 완전 구현
+- Playwright E2E golden path 1건
+- 통합 테스트 (`projects-flow.test.ts`)
+
+### 통합 검증 결과
+
+- `pnpm typecheck`: PASS
+- `pnpm lint`: PASS
+- `pnpm test:unit`: PASS (273 tests)
+- `pnpm build`: PASS
 
 _End of SPEC-PROJECT-001 spec.md_

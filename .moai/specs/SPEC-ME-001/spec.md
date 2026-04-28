@@ -1,9 +1,9 @@
 ---
 id: SPEC-ME-001
-version: 0.1.0
-status: draft
+version: 1.1.0
+status: in-progress
 created: 2026-04-27
-updated: 2026-04-27
+updated: 2026-04-28
 author: 철
 priority: high
 issue_number: null
@@ -677,5 +677,68 @@ SPEC-DB-001의 `20260427000020_pgcrypto_functions.sql`를 우선 활용. helper 
   - https://react-pdf.org
 
 ---
+
+---
+
+## Implementation Notes
+
+> 2026-04-28 backfill — main 브랜치에 머지 완료된 구현 기록. 일부 마일스톤 deferred.
+
+### 머지된 커밋
+
+| 해시 | 메시지 |
+|------|--------|
+| `cd54c93` | merge: SPEC-ME-001 — 강사 개인영역 (도메인 + 골격) |
+| `6430d8e` | feat(me): SPEC-ME-001 강사 개인영역 핵심 도메인 + 페이지 골격 |
+| `8076549` | feat(me): SPEC-ME-001 M2 — 이력서 7-section CRUD Server Actions |
+| `b4dfebd` | feat(me): SPEC-ME-001 M4 partial — schedule-conflict 헬퍼 + 테스트 |
+| `85ceb06` | feat(me): SPEC-ME-001 M4 partial — schedule Server Actions |
+| `b22452b` | feat(me): SPEC-ME-001 M4 partial — getMySchedules query |
+| `e01ee2c` | feat(me): SPEC-ME-001 M4 partial — MeCalendarView (FullCalendar) |
+| `ef504b9` | feat(me): SPEC-ME-001 M4 — schedule page wires FullCalendar |
+| `8e45409` | fix(me): SPEC-ME-001 M4 — TS narrowing 정정 (eventDrop/eventResize) |
+| `cfd1b49` | feat(me): SPEC-ME-001 M6 partial — parseResume / applyParsedResume Server Actions |
+| `2f4a463` | feat(me): SPEC-ME-001 M6 — ResumeImportClient AI 파싱 + apply 흐름 |
+| `f8ed5e8` | fix(me): SPEC-ME-001 — lint 정리 (eslint-disable 위치/useSyncExternalStore) |
+| `3f6b783` | merge: SPEC-ME-001 M2/M4/M6 — 이력서 CRUD + FullCalendar + AI 파싱 |
+
+### 구현 완료된 마일스톤
+
+- **M1**: 도메인 골격 — 페이지 구조, `ensureInstructorRow`, `me-queries.ts`, 타입 정의
+- **M2**: 이력서 7-섹션 CRUD Server Actions (`src/app/(app)/(instructor)/me/resume/actions.ts`)
+  - 학력/경력/강의이력/자격/저서/프로젝트/기타활동 add/edit/delete/reorder
+  - zod 검증, sort_order, `pii-encrypt.ts`
+- **M4**: 캘린더 — FullCalendar v6 (daygrid + timegrid + interaction)
+  - `MeCalendarView` 컴포넌트, schedule Server Actions, `schedule-conflict.ts`
+  - system_lecture read-only 강제, personal/unavailable CRUD
+- **M6**: AI 이력서 파싱 — `parseResume` + `applyParsedResume` Server Actions
+  - SHA-256 캐시 (`ai_resume_parses`), Claude API + fallback
+  - `ResumeImportClient` (진행 표시 + review UI)
+
+### Deferred Items (후속 SPEC 또는 M-완료 대기)
+
+| 항목 | 이유 | 후속 경로 |
+|------|------|----------|
+| **M3 기술스택 체크리스트 (SkillsPicker)** | skill_categories seed 데이터 미완비, SPEC-DB-002 의존 | SPEC-ME-001 M3 재개 또는 SPEC-DB-002 완료 후 |
+| **M5 정산 조회 (`/me/settlements`)** | 정산 테이블 seed + SPEC-SETTLEMENT-001 연동 검토 필요 | SPEC-SETTLEMENT-001 진행 후 |
+| **M7 지급 정보 등록 (pgcrypto)** | `payout-documents` Storage 버킷 SPEC-DB-001 미포함, SPEC-DB-002 의존 | SPEC-DB-002 완료 후 |
+| **M8 PDF 다운로드** | `@react-pdf/renderer` 미설치, SPEC-DB-002 이후 진행 | SPEC-ME-001 M8 재개 |
+
+### Unplanned Additions
+
+| 항목 | 내용 |
+|------|------|
+| `src/lib/instructor/resume-mask.ts` | M2와 함께 구현 (M8 PDF 다운로드 사전 준비) |
+| `src/lib/instructor/settlement-summary.ts` + 단위 테스트 | M5 deferred에도 불구하고 정산 합계 순수 함수 선구현 (BigInt 100% 커버) |
+| `src/lib/instructor/pii-encrypt.ts` | M7 deferred에도 불구하고 PII 암호화 모듈 선구현 |
+| `src/lib/instructor/resume-parser.ts` | AI 파싱 응답 zod 검증 분리 |
+| `/me/settings/payout` page (placeholder) | payout form UI 골격만 (데이터 저장 미구현) |
+
+### 통합 검증 결과
+
+- `pnpm typecheck`: PASS
+- `pnpm lint`: PASS
+- `pnpm test:unit`: PASS (273 tests — settlement-summary 100% 포함)
+- `pnpm build`: PASS
 
 _End of SPEC-ME-001 spec.md_

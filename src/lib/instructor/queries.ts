@@ -2,6 +2,10 @@
 //
 // PII 차단 (REQ-INSTRUCTOR-DATA-003): instructors_safe view만 SELECT.
 // Supabase 생성 타입의 relationship 모호성으로 .returns<...>()로 명시한다.
+//
+// @MX:NOTE: [AUTO] 강사 도메인의 기본 쿼리 허브. 현재 fan_in=2 (list 페이지, detail 페이지).
+// @MX:NOTE: [AUTO] fan_in이 3 이상으로 증가 시 @MX:ANCHOR로 승격 필요.
+// @MX:SPEC: SPEC-INSTRUCTOR-001
 
 import "server-only";
 import { cookies } from "next/headers";

@@ -35,11 +35,12 @@ algolink/
 │
 ├── src/
 │   ├── lib/                      # 순수 도메인 로직 (테스트 대상)
-│   │   ├── settlement/           # 정산 계산 (3.3%/8.8%/세금계산서)
-│   │   ├── recommendation/       # 강사 추천 알고리즘 (점수화)
-│   │   ├── notification/         # 알림 트리거 규칙
-│   │   ├── validation/           # zod 스키마
-│   │   └── format/               # 날짜/금액 포맷
+│   │   ├── dashboard/            # 담당자 대시보드 (calendar-events, queries, transitions, types) ✅ SPEC-DASHBOARD-001
+│   │   ├── instructor/           # 강사 도메인 (queries, me-queries, types, link-user, resume-mask, pii-encrypt, settlement-summary, ...) ✅ SPEC-INSTRUCTOR-001
+│   │   ├── projects/             # 프로젝트 CRUD (list-query, list-queries, status-machine, errors) ✅ SPEC-PROJECT-001
+│   │   ├── recommend/            # AI 추천 엔진 (engine, score, index, types) ✅ SPEC-PROJECT-001
+│   │   ├── ai/                   # AI 클라이언트 (anthropic-client, claude, instructor-summary) ✅ SPEC-INSTRUCTOR-001
+│   │   ├── validation/           # zod 스키마 (auth, instructor, project)
 │   │
 │   ├── db/                       # Drizzle ORM
 │   │   ├── schema/
@@ -82,10 +83,11 @@ algolink/
 │   │
 │   ├── components/               # 공유 UI 컴포넌트
 │   │   ├── ui/                   # shadcn 자동 생성
-│   │   ├── forms/                # 도메인 폼 (ResumeForm 등)
-│   │   ├── tables/               # 데이터 테이블
-│   │   ├── calendar/             # FullCalendar 래퍼
-│   │   └── layout/               # Nav, Sidebar
+│   │   ├── app/                  # 앱 레이아웃 (Nav, Sidebar)
+│   │   ├── dashboard/            # 담당자 대시보드 컴포넌트 ✅ SPEC-DASHBOARD-001
+│   │   ├── instructor/           # 강사 관리 컴포넌트 ✅ SPEC-INSTRUCTOR-001
+│   │   ├── projects/             # 프로젝트 관리 컴포넌트 ✅ SPEC-PROJECT-001
+│   │   └── resume/               # 이력서 관련 컴포넌트 ✅ SPEC-ME-001
 │   │
 │   └── styles/
 │
@@ -224,5 +226,5 @@ NODE_ENV=development|production
 
 ---
 
-Version: 0.1.0
-Last Updated: 2026-04-27
+Version: 1.1.0
+Last Updated: 2026-04-28

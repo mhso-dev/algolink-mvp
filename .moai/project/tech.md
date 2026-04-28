@@ -22,7 +22,10 @@ MVP 단계의 절대 우선순위:
 | 폼 | **react-hook-form + zod** | latest | 검증 + 타입 추론 |
 | 데이터 페칭 | **TanStack Query** | v5 | 서버 상태 캐시, 낙관적 업데이트 |
 | 차트 | **Recharts** | latest | 매출/매입 대시보드 |
-| 캘린더 | **FullCalendar** | latest | 월/주 뷰, 드래그 편집 |
+| 캘린더 | **FullCalendar** | v6.1.20 | 월/주 뷰, 드래그 편집 (daygrid/timegrid/interaction/react 패키지) |
+| DnD | **@dnd-kit** | core^6.3.1, sortable^10.0.0 | 드래그 앤 드롭 (Kanban 컬럼 등) |
+| 날짜 | **date-fns** + **date-fns-tz** | ^4.1.0 / ^3.2.0 | 날짜 포맷·연산, Asia/Seoul 타임존 처리 |
+| 날짜 피커 | **react-day-picker** | ^9.14.0 | 날짜 범위 선택 UI |
 | 아이콘 | **lucide-react** | latest | shadcn 표준 |
 
 ### 2.2 Database / Auth / Storage (BaaS)
@@ -44,8 +47,8 @@ MVP 단계의 절대 우선순위:
 |---|---|---|
 | LLM | **Anthropic Claude** | 한글 품질, 긴 컨텍스트, prompt caching |
 | 모델 | `claude-sonnet-4-6` (기본), `claude-haiku-4-5` (분류/요약) | 작업별 효율 |
-| SDK | **@anthropic-ai/sdk** (Node) | 공식 SDK |
-| 캐싱 | **Prompt Caching** 활성 | 이력서 양식/시스템 프롬프트 캐시 |
+| SDK | **@anthropic-ai/sdk** ^0.91.1 (Node) | 공식 SDK, Prompt Caching 지원 |
+| 캐싱 | **Prompt Caching** 활성 (`cache_control: {type: "ephemeral"}`) | 이력서 양식/시스템 프롬프트 캐시 |
 | Fallback | OpenAI gpt-4o-mini (옵션) | API 장애 대응 (env 토글) |
 
 ### 2.4 외부 서비스 (스텁 우선, 추후 연동)
@@ -129,10 +132,13 @@ pnpm lint && pnpm typecheck
 | ADR-003 | Drizzle ORM | Prisma | RSC 친화, 가벼움 |
 | ADR-004 | Claude API 단일 | OpenAI 병행 | 한글 품질 + caching |
 | ADR-005 | 이메일 발송 스텁 | Resend 즉시 통합 | MVP 단계 도메인/SPF 불필요 |
+| ADR-006 | FullCalendar v6 | react-big-calendar | 월/주/일 뷰 동시 지원, 드래그 편집 즉시 사용 가능 |
+| ADR-007 | @dnd-kit | react-beautiful-dnd | React 19 호환, accessibility API 내장 |
+| ADR-008 | date-fns-tz | moment-timezone | 번들 크기, tree-shaking 지원 |
 
 > 사용자가 다른 스택을 선호할 경우 변경 가능. 합리적 디폴트로 진행.
 
 ---
 
-Version: 0.1.0
-Last Updated: 2026-04-27
+Version: 1.1.0
+Last Updated: 2026-04-28

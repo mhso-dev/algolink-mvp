@@ -1,9 +1,9 @@
 ---
 id: SPEC-DASHBOARD-001
-version: 1.0.0
-status: draft
+version: 1.1.0
+status: completed
 created: 2026-04-27
-updated: 2026-04-27
+updated: 2026-04-28
 author: 철
 priority: high
 issue_number: null
@@ -604,5 +604,42 @@ instructor 토큰이 본 페이지에 도달하지 않도록 SPEC-AUTH-001의 `(
   - https://date-fns.org/docs/Time-Zones
 
 ---
+
+---
+
+## Implementation Notes
+
+> 2026-04-28 backfill — main 브랜치에 머지 완료된 구현 기록.
+
+### 머지된 커밋
+
+| 해시 | 메시지 |
+|------|--------|
+| `05e1221` | feat(dashboard): SPEC-DASHBOARD-001 — 운영자 메인 대시보드 + 강사 일정 캘린더 |
+| `7eaa802` | merge: SPEC-DASHBOARD-001 — 담당자 메인 대시보드 (KPI + 칸반 + 캘린더) |
+
+### 구현 완료된 마일스톤
+
+- **M1**: 도메인 타입 + STATUS_COLUMN_MAP + INSTRUCTOR_COLOR_PALETTE (`src/lib/dashboard/types.ts`)
+- **M2**: KPI 쿼리 + 칸반 쿼리 + 알림 placeholder + format 헬퍼 (`src/lib/dashboard/queries.ts`, `format.ts`)
+- **M3**: 상태 전환 도메인 규칙 (`src/lib/dashboard/transitions.ts`)
+- **M4**: UI 컴포넌트 전체 — `KpiGrid`, `KpiCard`, `StatusFilter`, `KanbanBoard`, `KanbanColumn`, `ProjectCard`, `StatusTransitionButton`, `NotificationPreview`, `EmptyState`, `ErrorState`
+- **M5**: Server Action `transitionProjectStatusAction` + `revalidatePath` (`src/app/(app)/(operator)/dashboard/actions.ts`)
+- **M6**: 캘린더 페이지 + `OperatorCalendar` (FullCalendar 선택), `calendar-events.ts` KST 유틸
+
+### Divergence 분석
+
+| 카테고리 | 내용 |
+|---------|------|
+| **unplanned_additions** | SPEC에서는 react-big-calendar 또는 FullCalendar를 spike 결정으로 위임했으나, 구현 시 `@fullcalendar/react` v6로 즉시 채택 (tech.md 명시 디폴트). |
+| **structural_changes** | 컴포넌트 파일명이 PascalCase(`KanbanBoard.tsx`) + kebab-case(`kanban-board.tsx`) 혼재. SPEC §4.2는 kebab-case 기술. 기능 동일, 네이밍 불일치 advisory only. |
+| **scope_within** | `src/lib/dashboard/calendar-events.ts` 추가 (SPEC §4.3 미명시). 캘린더 그룹핑 유틸로 scope-내 추가. |
+
+### 통합 검증 결과
+
+- `pnpm typecheck`: PASS (0 errors)
+- `pnpm lint`: PASS (0 critical)
+- `pnpm test:unit`: PASS (273 tests)
+- `pnpm build`: PASS (0 errors)
 
 _End of SPEC-DASHBOARD-001 spec.md_
