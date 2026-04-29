@@ -6,7 +6,7 @@ created: 2026-04-29
 updated: 2026-04-29
 author: 철
 priority: medium
-issue_number: null
+issue_number: 17
 ---
 
 # SPEC-PROPOSAL-001: 제안서 도메인 + 사전 강사 문의 (Proposal Domain + Pre-Contract Instructor Inquiry)
