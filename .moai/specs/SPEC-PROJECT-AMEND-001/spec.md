@@ -1,7 +1,7 @@
 ---
 id: SPEC-PROJECT-AMEND-001
-version: 0.1.0
-status: draft
+version: 0.1.1
+status: completed
 created: 2026-04-29
 updated: 2026-04-29
 author: 철
@@ -13,6 +13,7 @@ issue_number: 22
 
 ## HISTORY
 
+- **2026-04-29 (v0.1.1)**: 구현 완료. `src/lib/projects/status-machine.ts` `ALLOWED_TRANSITIONS.assignment_confirmed` 배열에 `'assignment_review'` 추가됨 (4번째 항목). 시나리오 B 채택 — `__bypassValidateTransitionForResponseDowngrade` 함수는 코드베이스에 작성되지 않았으며, SPEC-CONFIRM-001 v0.2.1 implementation도 처음부터 정식 `validateTransition` 경로 사용. 신규 단위 테스트 9개 추가(`src/lib/projects/__tests__/status-machine.test.ts`): A/B/C/D 4종 + 회귀 가드 5종 (forward edges 보존, exhaustiveness 14 keys). `grep -rn "__bypassValidateTransitionForResponseDowngrade" src/ tests/` 결과 0행 검증. typecheck PASS, build PASS, 전체 단위 테스트 회귀 0건. 동일 PR `feature/SPEC-CONFIRM-001` 머지로 audit trail 자동 기록(SPEC-DB-001 `project_status_history` 트리거).
 - **2026-04-29 (v0.1.0)**: 초기 작성. SPEC-CONFIRM-001 v0.2.0 §HIGH-2 (REQ-CONFIRM-EFFECTS-008 reverse compensation transaction)이 도입한 임시 bypass 함수 `__bypassValidateTransitionForResponseDowngrade` (in `src/lib/projects/status-machine.ts`)를 정식 그래프 엣지 추가로 대체하는 follow-up amendment SPEC. (1) `ALLOWED_TRANSITIONS.assignment_confirmed`에 `'assignment_review'` 정식 backward edge 추가 — 1시간 변경 윈도 내 강사 accept→decline/conditional 전환 시 `validateTransition('assignment_confirmed', 'assignment_review')` 가 `{ ok: true }`를 반환하도록 정식 표현; (2) 임시 bypass 함수 정의/호출 모두 제거하고 모든 호출 사이트가 정식 `validateTransition` 경로 사용; (3) `project_status_history` 트리거(SPEC-DB-001)가 backward edge UPDATE 행도 자동 INSERT하므로 audit trail 보존; (4) 단위 테스트 신규 케이스 (`null → assignment_confirmed → assignment_review` 전환) + SPEC-CONFIRM-001 §M6 통합 테스트(accept→decline 1시간 윈도 보상)가 bypass 미사용으로 정상 PASS; (5) `ALLOWED_TRANSITIONS` 키 누락 없음 + TypeScript exhaustiveness 검증 보존; (6) 코드 변경 범위는 `src/lib/projects/status-machine.ts` 1파일 + 단위 테스트 1파일에 한정 (마이그레이션 / RLS / UI / Server Actions 변경 없음). SPEC-CONFIRM-001 §4.8 amendment 노트는 본 SPEC 머지 후 동일 PR(`feature/SPEC-CONFIRM-001`)에서 함께 반영. SPEC-PROJECT-001 spec.md 자체는 frozen 상태로 변경하지 않으며, 본 SPEC이 그 ALLOWED_TRANSITIONS 그래프 정의를 amendment 형태로 확장한다.
 
 ---
