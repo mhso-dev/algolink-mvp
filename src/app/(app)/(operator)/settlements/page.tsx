@@ -1,9 +1,10 @@
 // SPEC-PAYOUT-001 §2.1, §2.6 — 정산 리스트 + 필터 + 매입매출 위젯.
+// @MX:NOTE: SPEC-MOBILE-001 §M4 — <md 카드 list, >=md 기존 테이블.
 
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Receipt, Send } from "lucide-react";
+import { ChevronRight, Receipt, Send } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
 import { requireRole } from "@/auth/guards";
 import {
@@ -152,71 +153,144 @@ export default async function SettlementsListPage({ searchParams }: PageProps) {
               표시할 정산 내역이 없어요. 필터를 변경하거나 다른 기간을 선택하세요.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>프로젝트</TableHead>
-                  <TableHead>강사</TableHead>
-                  <TableHead>흐름</TableHead>
-                  <TableHead className="text-right">사업비</TableHead>
-                  <TableHead className="text-right">강사비</TableHead>
-                  <TableHead className="text-right">수익</TableHead>
-                  <TableHead className="text-right">원천세</TableHead>
-                  <TableHead>상태</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* 모바일(<md) 카드 list — 프로젝트명/강사/흐름/금액/상태 */}
+              <ul
+                className="md:hidden grid grid-cols-1 gap-3 px-3 pb-3"
+                role="list"
+                aria-label="정산 내역"
+              >
                 {listResult.items.map((s) => {
-                  const ratePercent = Number(s.withholding_tax_rate ?? 0);
+                  const projectTitle = projectMap.get(s.project_id) ?? "—";
+                  const instructorName = instructorMap.get(s.instructor_id) ?? "—";
                   return (
-                    <TableRow
-                      key={s.id}
-                      className="cursor-pointer hover:bg-[var(--color-bg-muted)]"
-                    >
-                      <TableCell className="text-sm font-medium line-clamp-1">
-                        <Link
-                          href={`/settlements/${s.id}`}
-                          className="hover:underline"
-                        >
-                          {projectMap.get(s.project_id) ?? "—"}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {instructorMap.get(s.instructor_id) ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            s.settlement_flow === "corporate"
-                              ? "info"
-                              : "proposed"
-                          }
-                        >
-                          {SETTLEMENT_FLOW_LABEL[s.settlement_flow]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-tabular text-sm">
-                        {formatKRW(s.business_amount_krw)}
-                      </TableCell>
-                      <TableCell className="text-right font-tabular text-sm">
-                        {formatKRW(s.instructor_fee_krw)}
-                      </TableCell>
-                      <TableCell className="text-right font-tabular text-sm font-medium">
-                        {formatKRW(s.profit_krw ?? 0)}
-                      </TableCell>
-                      <TableCell className="text-right font-tabular text-sm text-[var(--color-text-muted)]">
-                        {ratePercent > 0 ? `${ratePercent.toFixed(2)}%` : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={settlementStatusBadgeVariant(s.status)}>
-                          {SETTLEMENT_STATUS_LABEL[s.status]}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
+                    <li key={s.id}>
+                      <Card className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <Link
+                              href={`/settlements/${s.id}`}
+                              className="block font-medium truncate hover:underline"
+                            >
+                              {projectTitle}
+                            </Link>
+                            <p className="mt-1 text-sm text-[var(--color-text-muted)] truncate">
+                              {instructorName}
+                            </p>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <Badge
+                                variant={
+                                  s.settlement_flow === "corporate"
+                                    ? "info"
+                                    : "proposed"
+                                }
+                              >
+                                {SETTLEMENT_FLOW_LABEL[s.settlement_flow]}
+                              </Badge>
+                              <Badge variant={settlementStatusBadgeVariant(s.status)}>
+                                {SETTLEMENT_STATUS_LABEL[s.status]}
+                              </Badge>
+                            </div>
+                            <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                              <dt className="text-[var(--color-text-muted)]">강사비</dt>
+                              <dd className="text-right font-tabular">
+                                {formatKRW(s.instructor_fee_krw)}
+                              </dd>
+                              <dt className="text-[var(--color-text-muted)]">수익</dt>
+                              <dd className="text-right font-tabular font-medium">
+                                {formatKRW(s.profit_krw ?? 0)}
+                              </dd>
+                            </dl>
+                          </div>
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="icon"
+                            className="min-h-touch min-w-touch shrink-0"
+                          >
+                            <Link
+                              href={`/settlements/${s.id}`}
+                              aria-label={`${projectTitle} 정산 상세보기`}
+                            >
+                              <ChevronRight className="size-4" />
+                            </Link>
+                          </Button>
+                        </div>
+                      </Card>
+                    </li>
                   );
                 })}
-              </TableBody>
-            </Table>
+              </ul>
+
+              {/* 데스크탑(>=md) 테이블 */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>프로젝트</TableHead>
+                      <TableHead>강사</TableHead>
+                      <TableHead>흐름</TableHead>
+                      <TableHead className="text-right">사업비</TableHead>
+                      <TableHead className="text-right">강사비</TableHead>
+                      <TableHead className="text-right">수익</TableHead>
+                      <TableHead className="text-right">원천세</TableHead>
+                      <TableHead>상태</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {listResult.items.map((s) => {
+                      const ratePercent = Number(s.withholding_tax_rate ?? 0);
+                      return (
+                        <TableRow
+                          key={s.id}
+                          className="cursor-pointer hover:bg-[var(--color-bg-muted)]"
+                        >
+                          <TableCell className="text-sm font-medium line-clamp-1">
+                            <Link
+                              href={`/settlements/${s.id}`}
+                              className="hover:underline"
+                            >
+                              {projectMap.get(s.project_id) ?? "—"}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {instructorMap.get(s.instructor_id) ?? "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                s.settlement_flow === "corporate"
+                                  ? "info"
+                                  : "proposed"
+                              }
+                            >
+                              {SETTLEMENT_FLOW_LABEL[s.settlement_flow]}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-tabular text-sm">
+                            {formatKRW(s.business_amount_krw)}
+                          </TableCell>
+                          <TableCell className="text-right font-tabular text-sm">
+                            {formatKRW(s.instructor_fee_krw)}
+                          </TableCell>
+                          <TableCell className="text-right font-tabular text-sm font-medium">
+                            {formatKRW(s.profit_krw ?? 0)}
+                          </TableCell>
+                          <TableCell className="text-right font-tabular text-sm text-[var(--color-text-muted)]">
+                            {ratePercent > 0 ? `${ratePercent.toFixed(2)}%` : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={settlementStatusBadgeVariant(s.status)}>
+                              {SETTLEMENT_STATUS_LABEL[s.status]}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

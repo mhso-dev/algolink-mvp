@@ -1,9 +1,10 @@
 // SPEC-CLIENT-001 §2.2 — 고객사 리스트 (회사명 ILIKE 검색 + 페이지네이션 + soft-delete 제외).
+// @MX:NOTE: SPEC-MOBILE-001 §M4 — <md 카드 list, >=md 기존 테이블.
 
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Building2, Plus, Search } from "lucide-react";
+import { Building2, ChevronRight, Plus, Search } from "lucide-react";
 import { createClient as createSupabaseClient } from "@/utils/supabase/server";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,8 +91,8 @@ export default async function ClientsPage({ searchParams }: PageProps) {
         </form>
       </Card>
 
-      <Card className="overflow-hidden">
-        {rows.length === 0 ? (
+      {rows.length === 0 ? (
+        <Card className="overflow-hidden">
           <div className="py-16 text-center">
             <p className="text-sm font-medium mb-2">
               {query.q ? "검색 결과가 없습니다" : "아직 등록된 고객사가 없어요"}
@@ -107,43 +108,95 @@ export default async function ClientsPage({ searchParams }: PageProps) {
               </Link>
             </Button>
           </div>
-        ) : (
-          <Table>
-            <TableCaption className="sr-only">
-              고객사 목록 — 총 {total}건 중 {meta.rangeStart}-{meta.rangeEnd}건 표시 (페이지{" "}
-              {meta.page}/{meta.totalPages})
-            </TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead scope="col">회사명</TableHead>
-                <TableHead scope="col">주소</TableHead>
-                <TableHead scope="col">사업자등록증</TableHead>
-                <TableHead scope="col">등록일</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((c) => (
-                <TableRow key={c.id} className="cursor-pointer">
-                  <TableCell className="font-medium">
-                    <Link href={`/clients/${c.id}`} className="hover:underline">
-                      {c.company_name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-sm text-[var(--color-text-muted)] line-clamp-1">
-                    {c.address ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {c.business_license_file_id ? "첨부됨" : "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-[var(--color-text-muted)]">
-                    {formatKstDate(c.created_at)}
-                  </TableCell>
+        </Card>
+      ) : (
+        <>
+          {/* 모바일(<md) 카드 list — 회사명/주소/사업자등록증 첨부 여부/등록일 */}
+          <ul
+            className="md:hidden grid grid-cols-1 gap-3"
+            role="list"
+            aria-label="고객사 목록"
+          >
+            {rows.map((c) => (
+              <li key={c.id}>
+                <Card className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        href={`/clients/${c.id}`}
+                        className="block font-medium truncate hover:underline"
+                      >
+                        {c.company_name}
+                      </Link>
+                      <p className="mt-1 text-sm text-[var(--color-text-muted)] truncate">
+                        {c.address ?? "—"}
+                      </p>
+                      <div className="mt-2 flex items-center gap-3 text-xs text-[var(--color-text-muted)]">
+                        <span>
+                          사업자등록증{" "}
+                          {c.business_license_file_id ? "첨부" : "미첨부"}
+                        </span>
+                        <span>등록 {formatKstDate(c.created_at)}</span>
+                      </div>
+                    </div>
+                    <Button
+                      asChild
+                      variant="ghost"
+                      size="icon"
+                      className="min-h-touch min-w-touch shrink-0"
+                    >
+                      <Link
+                        href={`/clients/${c.id}`}
+                        aria-label={`${c.company_name} 상세보기`}
+                      >
+                        <ChevronRight className="size-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                </Card>
+              </li>
+            ))}
+          </ul>
+
+          {/* 데스크탑(>=md) 테이블 */}
+          <Card className="hidden md:block overflow-hidden">
+            <Table>
+              <TableCaption className="sr-only">
+                고객사 목록 — 총 {total}건 중 {meta.rangeStart}-{meta.rangeEnd}건 표시 (페이지{" "}
+                {meta.page}/{meta.totalPages})
+              </TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col">회사명</TableHead>
+                  <TableHead scope="col">주소</TableHead>
+                  <TableHead scope="col">사업자등록증</TableHead>
+                  <TableHead scope="col">등록일</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {rows.map((c) => (
+                  <TableRow key={c.id} className="cursor-pointer">
+                    <TableCell className="font-medium">
+                      <Link href={`/clients/${c.id}`} className="hover:underline">
+                        {c.company_name}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-sm text-[var(--color-text-muted)] line-clamp-1">
+                      {c.address ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {c.business_license_file_id ? "첨부됨" : "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-[var(--color-text-muted)]">
+                      {formatKstDate(c.created_at)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </>
+      )}
 
       {rows.length > 0 ? (
         <div className="flex items-center justify-between">

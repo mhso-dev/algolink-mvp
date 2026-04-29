@@ -102,17 +102,42 @@ export function OperatorCalendar({
       </div>
 
       <div className="relative grid grid-cols-7 gap-px overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-border)]">
+        {/* @MX:NOTE: SPEC-MOBILE-001 §M4 — <md 셀 축소(min-h-60 p-1) + 도트, >=md 기존 텍스트 미리보기 */}
         {cells.map((c, i) => (
           <div
             key={i}
-            className="min-h-[88px] bg-[var(--color-bg)] p-1.5 align-top"
+            className="min-h-[60px] md:min-h-[88px] bg-[var(--color-bg)] p-1 md:p-1.5 align-top"
           >
             {c.day !== null && (
               <>
                 <div className="text-xs font-semibold text-[var(--color-text-muted)]">
                   {c.day}
                 </div>
-                <div className="mt-1 flex flex-col gap-0.5">
+                {/* 모바일(<md): 도트 인디케이터만 */}
+                <div
+                  className="mt-1 flex flex-wrap gap-0.5 md:hidden"
+                  aria-label={
+                    c.events.length > 0
+                      ? `${c.events.length}건의 일정`
+                      : undefined
+                  }
+                >
+                  {c.events.slice(0, 3).map((ev) => (
+                    <span
+                      key={ev.id}
+                      aria-hidden="true"
+                      className="size-1.5 rounded-full"
+                      style={{ backgroundColor: colorForInstructor(ev.instructorId) }}
+                    />
+                  ))}
+                  {c.events.length > 3 && (
+                    <span className="text-[9px] leading-none text-[var(--color-text-muted)]">
+                      +{c.events.length - 3}
+                    </span>
+                  )}
+                </div>
+                {/* 데스크탑(>=md): 일정 텍스트 미리보기 */}
+                <div className="mt-1 hidden md:flex md:flex-col md:gap-0.5">
                   {c.events.slice(0, 3).map((ev) => {
                     const color = colorForInstructor(ev.instructorId);
                     return (

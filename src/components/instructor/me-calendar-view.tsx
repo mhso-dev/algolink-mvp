@@ -3,11 +3,13 @@
 // SPEC-ME-001 §2.5 REQ-ME-CAL-001 ~ -010 — 강사 본인 캘린더 (FullCalendar v6).
 // @MX:WARN: FullCalendar는 client-only. mounted 가드로 hydration mismatch 방지.
 
+// @MX:NOTE: SPEC-MOBILE-001 §M4 — <md listWeek view + simplified headerToolbar
 import * as React from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
+import listPlugin from "@fullcalendar/list";
 import koLocale from "@fullcalendar/core/locales/ko";
 import type { EventClickArg, DateSelectArg } from "@fullcalendar/core";
 import { Button } from "@/components/ui/button";
@@ -54,6 +56,17 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
     () => true,
     () => false,
   );
+
+  // @MX:NOTE: SPEC-MOBILE-001 §M4 — <md(767px)에서 listWeek + 단순 toolbar 분기.
+  const [isMobile, setIsMobile] = React.useState(false);
+  React.useEffect(() => {
+    const mql = window.matchMedia("(max-width: 767px)");
+    const handler = (e: MediaQueryListEvent | MediaQueryList) =>
+      setIsMobile(e.matches);
+    handler(mql);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
 
   const fcEvents = React.useMemo(
     () =>
@@ -130,21 +143,30 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
       {mounted ? (
         <div className="rounded-md border border-[var(--color-border)] p-2 bg-[var(--color-surface)]">
           <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
+            initialView={isMobile ? "listWeek" : "dayGridMonth"}
             locale={koLocale}
             timeZone="Asia/Seoul"
             firstDay={1}
-            headerToolbar={{
-              left: "prev,next today",
-              center: "title",
-              right: "dayGridMonth,timeGridWeek,timeGridDay",
-            }}
+            headerToolbar={
+              isMobile
+                ? {
+                    left: "prev,next",
+                    center: "title",
+                    right: "today",
+                  }
+                : {
+                    left: "prev,next today",
+                    center: "title",
+                    right: "dayGridMonth,timeGridWeek,timeGridDay",
+                  }
+            }
             buttonText={{
               today: "오늘",
               month: "월",
               week: "주",
               day: "일",
+              list: "목록",
             }}
             height="auto"
             selectable
