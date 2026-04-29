@@ -1,6 +1,6 @@
 ---
 id: SPEC-PROPOSAL-001
-version: 0.2.0
+version: 0.2.1
 status: draft
 created: 2026-04-29
 updated: 2026-04-29
@@ -12,6 +12,8 @@ issue_number: 17
 # SPEC-PROPOSAL-001: 제안서 도메인 + 사전 강사 문의 (Proposal Domain + Pre-Contract Instructor Inquiry)
 
 ## HISTORY
+
+- **2026-04-29 (v0.2.1) — Cross-SPEC schema refresh (CONFIRM-001 v0.2.0 Pattern A 반영)**: SPEC-CONFIRM-001 v0.2.0 §HIGH-1 amendment 결과(폐기된 `(source_kind text, source_id uuid)` polymorphic discriminator → 두 nullable FK Pattern A `(project_id uuid NULL + proposal_inquiry_id uuid NULL + CHECK XOR + 두 partial UNIQUE)`)를 본 SPEC의 cross-reference 6건에 반영. 정정 위치: spec.md REQ-PROPOSAL-INQUIRY-009 + L227 cross-SPEC contract 표 + L794 sibling reference, spec-compact.md L56 + L201, acceptance.md L583 시뮬레이션 INSERT statement. 콘텐츠 변경 없음 — Pattern A schema 표기 동기화만. SPEC-CONFIRM-001 `status: completed` 머지 완료(PR #23, 2026-04-29) 사실 반영해 "선행 머지 의존" → "선행 머지 완료" 표기 갱신. P4 implementation 진입 직전 v0.2.1로 freeze.
 
 - **2026-04-29 (v0.2.0)**: plan-auditor FAIL 결과(HIGH×2 + MEDIUM×2 + LOW×2) 반영. 주요 변경: (1) **HIGH-1** Won→Project 변환 트랜잭션 race-condition 방어 — `SELECT ... FOR UPDATE` 행 잠금 + 멱등 early-return 의사코드를 REQ-PROPOSAL-CONVERT-003 / §5.4 / spec-compact.md에 unify, (2) **HIGH-2** 트랜잭션 격리 수준 명시 — 신규 REQ-PROPOSAL-CONVERT-007 (READ COMMITTED) 추가, (3) **MEDIUM-3** acceptance.md에 Scenario 9~16 추가 (REQ-ENTITY-002/003, LIST-001/002/003, DETAIL-001/002/004, INQUIRY-002/006, CONVERT-002/006, SIGNAL-001/002/004, RLS-003 traceability 충당), (4) **MEDIUM-4** SPEC-CONFIRM-001 contract surface 명시 — 신규 REQ-PROPOSAL-INQUIRY-009 (`instructor_responses` 테이블은 CONFIRM-001 소유, 본 SPEC은 `proposal_inquiries.status` 컨트랙트만 노출) 추가 + plan.md prerequisites cross-ref, (5) **LOW-5** convert step 순서 일관화 — REQ-CONVERT-001 prose / §5.4 SQL / spec-compact.md 모두 §5.4 canonical 6-step 순서(SELECT FOR UPDATE → 멱등 → projects INSERT → junction → ai_recommendations → proposals UPDATE)로 통일, (6) **LOW-6** advisory lock 모호 cross-ref 제거 — DB unique 제약이 race를 직렬화하므로 §5.3에서 advisory lock 권장 문구 삭제 + R-1 보강. v0.1.0 Frozen invariants(SPEC-PROJECT-001 13단계 enum, SPEC-RECOMMEND-001 가중치) 보존.
 
@@ -217,14 +219,14 @@ The system **shall** introduce the value `inquiry_request` into the existing `no
 The response side (instructor receives notification → opens `/me/inquiries` → posts accept/decline/conditional) **shall** be implemented by SPEC-CONFIRM-001 (sibling SPEC); the contract this SPEC exposes is **only** the `proposal_inquiries.status` column transitions `pending → accepted | declined | conditional` and the timestamp columns `responded_at`, `responded_by_user_id`. The system **shall not** restrict which user_id may transition `pending → *` at the DB level beyond RLS — SPEC-CONFIRM-001 enforces "only the inquired instructor can respond" via Server Action validation.
 
 **REQ-PROPOSAL-INQUIRY-009 (Ubiquitous — Contract Surface with SPEC-CONFIRM-001)**
-The dispatch ↔ response handoff between SPEC-PROPOSAL-001 (this SPEC) and SPEC-CONFIRM-001 follows a unified-table pattern. SPEC-CONFIRM-001 introduces a discriminator-keyed table `instructor_responses (source_kind text, source_id uuid, ...)` that captures responses from multiple inquiry sources; for proposal inquiries it uses `source_kind = 'proposal_inquiry'` and `source_id = proposal_inquiries.id`.
+The dispatch ↔ response handoff between SPEC-PROPOSAL-001 (this SPEC) and SPEC-CONFIRM-001 follows a **two-FK Pattern A** schema (CONFIRM-001 v0.2.0 §HIGH-1 amendment, merged in PR #23). SPEC-CONFIRM-001 owns the unified table `instructor_responses` with two nullable foreign keys (`project_id uuid NULL REFERENCES projects(id) ON DELETE CASCADE` + `proposal_inquiry_id uuid NULL REFERENCES proposal_inquiries(id) ON DELETE CASCADE`), one CHECK XOR constraint that guarantees exactly one source FK is non-null, and two partial UNIQUE indexes for per-source idempotency. For proposal inquiries the row is keyed as `(project_id = NULL, proposal_inquiry_id = proposal_inquiries.id)`.
 
 The contract surface between the two SPECs is exactly:
 
 | Concern | Owner | Notes |
 |---------|-------|-------|
 | `proposals` table + `proposal_inquiries` table schema and dispatch initiation (`dispatchInquiries`) | SPEC-PROPOSAL-001 (this SPEC) | Defines tables, RLS, dispatch INSERT |
-| `instructor_responses` table schema + response capture UI (`/me/inquiries` accept/decline/conditional) | SPEC-CONFIRM-001 | Defines unified response table keyed by `(source_kind, source_id)` |
+| `instructor_responses` table schema + response capture UI (`/me/inquiries` accept/decline/conditional) | SPEC-CONFIRM-001 | Defines unified response table with Pattern A (`project_id uuid NULL` + `proposal_inquiry_id uuid NULL` + CHECK XOR + two partial UNIQUE) |
 | Write-back to `proposal_inquiries.status` (`pending → accepted | declined | conditional`), `responded_at`, `responded_by_user_id` on response receipt | SPEC-CONFIRM-001 | CONFIRM-001 atomically inserts `instructor_responses` row AND updates `proposal_inquiries.status` in one transaction |
 | Read of `proposal_inquiries.status` for the response board (`InquiryResponseBoard.tsx`) | SPEC-PROPOSAL-001 (this SPEC) | RSC reads the `proposal_inquiries` table; agnostic to `instructor_responses` |
 
@@ -791,7 +793,7 @@ LIMIT 20 OFFSET ($6 - 1) * 20;
 - `.moai/specs/SPEC-RECOMMEND-001/spec.md`: 가중치 FROZEN, source 유니언 `claude | fallback`, model 컬럼 free-text 패턴 (호환 보존)
 - `.moai/specs/SPEC-AUTH-001/spec.md`: `requireRole(['operator', 'admin'])`, `getCurrentUser()`
 - `.moai/specs/SPEC-NOTIFY-001/spec.md`: `notifications` 테이블 + `console.log` 스텁 패턴
-- (sibling) `.moai/specs/SPEC-CONFIRM-001/spec.md`: 강사 응답 측 처리 (병행 작성 중) — **계약 표면(REQ-PROPOSAL-INQUIRY-009 참조)**: CONFIRM-001은 `instructor_responses(source_kind='proposal_inquiry', source_id=proposal_inquiries.id)` 통합 테이블 + `/me/inquiries` 응답 화면을 소유하고, 응답 수신 시 `proposal_inquiries.status` (`pending → accepted | declined | conditional`) + `responded_at` + `responded_by_user_id`를 동일 트랜잭션 내에서 갱신한다. 본 SPEC은 `instructor_responses` 테이블을 정의/조회/INSERT하지 않으며 `proposal_inquiries.status` 컬럼만 읽어 응답 보드를 렌더링한다. **머지 순서 의존성**: SPEC-CONFIRM-001이 본 SPEC implementation 완료 전 머지되어야 한다(plan.md prerequisites + §8 R-7 참조).
+- (sibling, **머지 완료** PR #23) `.moai/specs/SPEC-CONFIRM-001/spec.md` v0.2.1 (status: completed): 강사 응답 측 처리 — **계약 표면(REQ-PROPOSAL-INQUIRY-009 참조)**: CONFIRM-001은 `instructor_responses` 두 nullable FK Pattern A 테이블(`project_id` + `proposal_inquiry_id` + CHECK XOR + 두 partial UNIQUE) + `/me/inquiries` 응답 화면을 소유하고, 응답 수신 시 `proposal_inquiries.status` (`pending → accepted | declined | conditional`) + `responded_at` + `responded_by_user_id`를 동일 트랜잭션 내에서 갱신한다. proposal inquiry 응답은 `(project_id = NULL, proposal_inquiry_id = proposal_inquiries.id)` 행으로 INSERT된다. 본 SPEC은 `instructor_responses` 테이블을 정의/조회/INSERT하지 않으며 `proposal_inquiries.status` 컬럼만 읽어 응답 보드를 렌더링한다. **머지 순서 의존성**: SPEC-CONFIRM-001이 본 SPEC P4 implementation 시작 전 main에 머지되었음(2026-04-29).
 - [`acceptance.md`](./acceptance.md): Given/When/Then 시나리오
 - [`plan.md`](./plan.md): 마일스톤 분해
 - [`spec-compact.md`](./spec-compact.md): EARS 요약본

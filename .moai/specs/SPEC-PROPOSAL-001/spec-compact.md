@@ -3,9 +3,9 @@
 ## Identity
 
 - ID: SPEC-PROPOSAL-001
-- Version: 0.2.0
+- Version: 0.2.1
 - Status: draft
-- Created: 2026-04-29 / Updated: 2026-04-29
+- Created: 2026-04-29 / Updated: 2026-04-29 (v0.2.1 cross-ref refresh)
 - Author: 철
 - Priority: medium
 
@@ -53,7 +53,7 @@
 - **REQ-PROPOSAL-INQUIRY-006 (Optional)**: WHERE 추천 후보만 보기 토글, instructor_skills × proposal_required_skills 매칭으로 필터.
 - **REQ-PROPOSAL-INQUIRY-007 (Ubiquitous)**: `notification_type` enum에 `inquiry_request` 추가 (`ALTER TYPE ... ADD VALUE IF NOT EXISTS`).
 - **REQ-PROPOSAL-INQUIRY-008 (Ubiquitous)**: 강사 응답 처리는 SPEC-CONFIRM-001 책임. 본 SPEC은 `proposal_inquiries.status` pending → accepted/declined/conditional 컬럼 계약만 노출.
-- **REQ-PROPOSAL-INQUIRY-009 (Ubiquitous — Contract Surface with CONFIRM-001)**: SPEC-CONFIRM-001은 통합 테이블 `instructor_responses(source_kind='proposal_inquiry', source_id=proposal_inquiries.id)` + `/me/inquiries` 응답 화면 + `proposal_inquiries.status` 갱신 트랜잭션을 소유한다. 본 SPEC은 `instructor_responses` 테이블을 정의/조회/INSERT 하지 않으며, 응답 보드는 `proposal_inquiries.status` 컬럼만 read한다. 머지 순서 의존: CONFIRM-001 선행 머지 → 본 SPEC implementation 완료. (plan.md prerequisites + §8 R-7 참조)
+- **REQ-PROPOSAL-INQUIRY-009 (Ubiquitous — Contract Surface with CONFIRM-001)**: SPEC-CONFIRM-001은 두 nullable FK Pattern A 테이블 `instructor_responses (project_id uuid NULL + proposal_inquiry_id uuid NULL + CHECK XOR + 두 partial UNIQUE)` + `/me/inquiries` 응답 화면 + `proposal_inquiries.status` 갱신 트랜잭션을 소유한다. proposal inquiry 응답은 `(project_id=NULL, proposal_inquiry_id=PI.id)` 행으로 INSERT. 본 SPEC은 `instructor_responses` 테이블을 정의/조회/INSERT 하지 않으며, 응답 보드는 `proposal_inquiries.status` 컬럼만 read한다. 머지 순서 의존: CONFIRM-001 선행 머지 완료(PR #23, 2026-04-29). (plan.md prerequisites + §8 R-7 참조)
 
 ### REQ-PROPOSAL-CONVERT (Won → Project 변환)
 
@@ -198,7 +198,7 @@
 - 📝 SPEC-RECOMMEND-001 (draft) — source 유니언 호환, model 컬럼 free-text
 - ✅ SPEC-AUTH-001 (completed) — requireRole, getCurrentUser
 - 📝 SPEC-NOTIFY-001 — notifications + 콘솔 로그 스텁 패턴
-- 🔀 **SPEC-CONFIRM-001 (sibling, 머지 선행 조건)** — 강사 응답 측 처리. `instructor_responses(source_kind, source_id)` 통합 테이블 + `/me/inquiries` 응답 화면 + `proposal_inquiries.status` 갱신 트랜잭션 소유. **본 SPEC implementation 완료 전 머지 필수** (REQ-PROPOSAL-INQUIRY-009 + plan.md prerequisites + §8 R-7).
+- ✅ **SPEC-CONFIRM-001 (sibling, 머지 완료 PR #23)** — 강사 응답 측 처리. 두 nullable FK Pattern A `instructor_responses (project_id, proposal_inquiry_id, CHECK XOR, 두 partial UNIQUE)` 통합 테이블 + `/me/inquiries` 응답 화면 + `proposal_inquiries.status` 갱신 트랜잭션 소유. **본 SPEC P4 implementation 시작 전 머지 완료(2026-04-29)** (REQ-PROPOSAL-INQUIRY-009 + plan.md prerequisites + §8 R-7).
 
 ## Quality Gate
 
