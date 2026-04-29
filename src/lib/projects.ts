@@ -16,7 +16,10 @@ export type ProjectStatus =
   | "in_progress"
   | "education_done"
   | "settlement_in_progress"
-  | "task_done";
+  | "task_done"
+  // SPEC-PAYOUT-002 §M1 — 강사 중도 하차 (REQ-PAYOUT002-EXCEPT-007).
+  // userStepFromEnum에서 '강사매칭' 단계로 매핑되어 재배정 대기 상태로 표현됨.
+  | "instructor_withdrawn";
 
 export type KanbanColumnKey =
   | "request"
@@ -39,6 +42,8 @@ export const STATUS_LABELS: Record<ProjectStatus, string> = {
   education_done: "교육종료",
   settlement_in_progress: "정산진행",
   task_done: "과업종료",
+  // SPEC-PAYOUT-002 §M6 REQ-EXCEPT-007 — 강사매칭 단계로 회귀
+  instructor_withdrawn: "강사 중도 하차",
 };
 
 export const COLUMN_LABELS: Record<KanbanColumnKey, string> = {
@@ -71,6 +76,8 @@ const STATUS_TO_COLUMN: Record<ProjectStatus, KanbanColumnKey> = {
   education_done: "completed",
   settlement_in_progress: "completed",
   task_done: "completed",
+  // SPEC-PAYOUT-002 §M6 — 강사 중도 하차는 강사 재배정 대기 → 'proposed' 컬럼 (강사매칭 단계)
+  instructor_withdrawn: "proposed",
 };
 
 export function statusToColumn(status: ProjectStatus): KanbanColumnKey {
