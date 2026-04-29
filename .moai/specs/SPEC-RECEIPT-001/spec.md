@@ -1,7 +1,7 @@
 ---
 id: SPEC-RECEIPT-001
-version: 0.2.1
-status: draft
+version: 0.2.2
+status: completed
 created: 2026-04-29
 updated: 2026-04-29
 author: 철
@@ -12,6 +12,8 @@ issue_number: 15
 # SPEC-RECEIPT-001: 고객 직접 정산 + 자동 영수증 발급 (Client-Direct Settlement Flow + Automated Receipt Issuance)
 
 ## HISTORY
+
+- **2026-04-29 (v0.2.2) — 구현 완료**: manager-tdd 8 atomic commits (a40955a → 15c0785) 완료. 71 신규 unit tests + 10 통합 시나리오 모두 PASS. db:verify 30/30 PASS (6개 신규 검증 포함). SPEC-PAYOUT-002 `generate.ts` cross-SPEC contract (Option A) 통합 적용 — `client_direct` 정산 행 생성 시 `instructor_remittance_amount_krw = profit_krw` populate. Storage path bucket-relative invariant (REQ-RECEIPT-COLUMNS-007) 준수. RLS `app.current_user_role()` helper 전면 적용. `receipt_counters` per-year atomic counter 정상 동작 검증. typecheck 0 errors / lint NO REGRESSION / pnpm build PASS. status: draft → **completed**.
 
 - **2026-04-29 (v0.2.1) — PAYOUT-RECEIPT ownership 결정 formalize**: SPEC-PAYOUT-002가 `status: completed`로 main에 머지된 후(PR #18, fff7778) v0.2.0 §HIGH-8에서 잠정 결정한 Option A를 본 amendment로 정식 확정. SPEC-PAYOUT-002 v0.1.3 amendment HISTORY에 동일 cross-SPEC contract 명시(`generate.ts`가 `flow='client_direct'` 정산 행을 생성할 때 `instructor_remittance_amount_krw` 컬럼을 함께 populate, derive 식 `business_amount_krw - instructor_fee_krw = profit_krw`). RECEIPT-001 M1 마이그레이션(`20260429000010_settlement_flow_client_direct`)이 컬럼을 추가한 후 본 SPEC M5(운영자 수취 확인) 단계 또는 별도 PAYOUT-002 amendment branch에서 generate.ts 확장 코드 변경 통합 적용 예정. 본 SPEC은 컬럼을 read-only로 소비하며 자체 산출 책임 없음. minor sweep(PR #19) 카운트 정합성 정정 이후 적용.
 

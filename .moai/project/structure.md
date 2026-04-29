@@ -46,11 +46,17 @@ algolink/
 │   │   │   ├── payout-queries.ts # instructors PII 컬럼 UPDATE + pii_access_log
 │   │   │   ├── payout-bank-bundle.ts   # 계좌 번호 묶음 직렬화 helper
 │   │   │   └── ...               # (me-queries, resume-mask, settlement-summary 등 기존 모듈)
-│   │   ├── payouts/              # 정산 도메인 ✅ SPEC-PAYOUT-002
+│   │   ├── payouts/              # 정산 도메인 ✅ SPEC-PAYOUT-002 + SPEC-RECEIPT-001
 │   │   │   ├── calculator.ts     # 정수 산술 정산 산식 순수 함수 (ANCHOR: 모든 INSERT 경로 source-of-truth)
-│   │   │   ├── generate.ts       # 배치 정산 생성 로직 (UNIQUE INDEX race 방지)
+│   │   │   ├── generate.ts       # 배치 정산 생성 로직 (UNIQUE INDEX race 방지; client_direct populate PAYOUT-002 amendment)
+│   │   │   ├── receipt-number.ts # 영수증 번호 atomic 발급 — app.next_receipt_number() RPC 래퍼 (ANCHOR, fan_in 3)
+│   │   │   ├── receipt-pdf.ts    # 영수증 PDF 렌더 — @react-pdf/renderer + NotoSansKR (WARN: PII bizno → Buffer만)
+│   │   │   ├── organization-info.ts # 알고링크 사업자 정보 조회 (DB 우선 → env fallback)
+│   │   │   ├── operator-confirmation.ts # 운영자 수취 확인 사전 검증 (ANCHOR, fan_in 3)
+│   │   │   ├── client-direct-validation.ts # client_direct 흐름 전용 zod 스키마
+│   │   │   ├── instructor-remittance.ts # 강사 송금 등록 도메인 로직
 │   │   │   ├── errors.ts         # PAYOUT_ERRORS 상수
-│   │   │   └── types.ts          # SettlementFlow 등 타입
+│   │   │   └── types.ts          # SettlementFlow (client_direct 포함) 등 타입
 │   │   ├── sessions/             # lecture_sessions 도메인 ✅ SPEC-PAYOUT-002
 │   │   │   ├── queries.ts        # cancelSession / rescheduleSession / bulkCancelFutureSessions
 │   │   │   ├── status-machine.ts # 세션 상태 전환 검증 (ANCHOR: completed/canceled/rescheduled freeze)

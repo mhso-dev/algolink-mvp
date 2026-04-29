@@ -108,6 +108,17 @@
     - `/settlements/generate` 운영자 트리거 배치 정산 생성 ✅
     - 예외 처리 3종: 결강(canceled) / 일정 변경(rescheduled + original_session_id) / 강사 중도 하차(instructor_withdrawn) ✅
     - `settlement_sessions` junction + UNIQUE INDEX 이중 청구 방지 ✅
+  - **고객 직접 정산 + 영수증 자동 발급 (6-2 흐름)** — **✅ 완료** (SPEC-RECEIPT-001 M1~M7 완료, 2026-04-29)
+    - `settlement_flow=client_direct` enum 확장 + CHECK 제약 (3.30/8.80%만 허용) ✅
+    - `settlements` 6개 nullable 컬럼 (`instructor_remittance_amount_krw`, `receipt_number` 등) + UNIQUE ✅
+    - `receipt_counters` + `app.next_receipt_number()` — 연도별 reset, 동시성 안전 ✅
+    - `organization_info` singleton 테이블 + env fallback ✅
+    - `payout-receipts` Storage 버킷 + RLS (`app.current_user_role()` helper) ✅
+    - 영수증 PDF A4 portrait 한국어 (@react-pdf/renderer + NotoSansKR 절대 경로 등록) ✅
+    - 강사 송금 등록 → pending → requested 전환 + 첨부 파일 업로드 ✅
+    - 운영자 수취 확인 atomic 8-step + compensating cleanup + PII GUC + pii_access_log ✅
+    - 영수증 발급 완료 알림 (`receipt_issued`) + 콘솔 로그 hook 식별자 ✅
+    - 영수증 다운로드 signed URL (1시간 만료, 강사 본인만 허용) ✅
 - [F-206] 알림 트리거
   - 강사 배정 지연(요청 후 N시간 미응답)
   - 일정 충돌 감지

@@ -1,6 +1,6 @@
 // @MX:ANCHOR: SPEC-RECEIPT-001 §M5 REQ-RECEIPT-OPERATOR-003 — 운영자 수취 확인 검증.
 // @MX:REASON: confirmRemittanceAndIssueReceipt Server Action의 사전 검증 로직 분리.
-//             fan_in 1 (UI). paid-freeze + receipt_number UNIQUE 위반 방어.
+//             fan_in 3 (Server Action + 통합 테스트 + 단위 테스트). paid-freeze + receipt_number UNIQUE 위반 방어.
 
 import { PAYOUT_ERRORS } from "./errors";
 import type { SettlementFlow, SettlementStatus } from "./types";
