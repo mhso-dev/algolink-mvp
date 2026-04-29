@@ -254,7 +254,7 @@ async function main() {
   });
 
   // ===== Section 8: Notifications enum =====
-  await check("AC-DB001-NOTIF-01: notification_type enum 검증 (SPEC-DB-001 5종 + SPEC-PROJECT-001 assignment_request + SPEC-RECEIPT-001 receipt_issued)", async () => {
+  await check("AC-DB001-NOTIF-01: notification_type enum 검증 (SPEC-DB-001 5종 + SPEC-PROJECT-001 assignment_request + SPEC-RECEIPT-001 receipt_issued + SPEC-CONFIRM-001 5종)", async () => {
     const rows = await sql<{ enumlabel: string }[]>`
       SELECT enumlabel FROM pg_enum e
       JOIN pg_type t ON e.enumtypid = t.oid
@@ -264,13 +264,74 @@ async function main() {
     const names = rows.map((r) => r.enumlabel).sort();
     // SPEC-PROJECT-001 마이그레이션이 assignment_request를 추가.
     // SPEC-RECEIPT-001 §M1 마이그레이션이 receipt_issued를 추가.
+    // SPEC-CONFIRM-001 §M1 마이그레이션이 5종(assignment_accepted/declined, inquiry_accepted/declined/conditional)을 추가.
     const expected = [
-      "assignment_overdue", "assignment_request", "dday_unprocessed",
-      "low_satisfaction_assignment", "receipt_issued", "schedule_conflict",
-      "settlement_requested",
+      "assignment_accepted", "assignment_declined", "assignment_overdue",
+      "assignment_request", "dday_unprocessed", "inquiry_accepted",
+      "inquiry_conditional", "inquiry_declined", "low_satisfaction_assignment",
+      "receipt_issued", "schedule_conflict", "settlement_requested",
     ];
     assert(JSON.stringify(names) === JSON.stringify(expected),
       `notification_type ${JSON.stringify(names)} ≠ ${JSON.stringify(expected)}`);
+  });
+
+  // ===== SPEC-CONFIRM-001 §M1 verify =====
+  await check("AC-CONFIRM-001-RESPONSES: instructor_responses 테이블 + CHECK XOR + partial UNIQUE 인덱스 정합", async () => {
+    const cols = await sql<{ column_name: string; data_type: string; is_nullable: string }[]>`
+      SELECT column_name, data_type, is_nullable
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'instructor_responses'
+      ORDER BY ordinal_position
+    `;
+    assert(cols.length === 10, `instructor_responses columns ${cols.length} ≠ 10`);
+    const colNames = cols.map((c) => c.column_name).sort();
+    const expectedCols = [
+      "conditional_note", "created_at", "id", "instructor_id", "project_id",
+      "proposal_inquiry_id", "responded_at", "source_kind", "status", "updated_at",
+    ];
+    assert(JSON.stringify(colNames) === JSON.stringify(expectedCols),
+      `cols ${JSON.stringify(colNames)} ≠ ${JSON.stringify(expectedCols)}`);
+
+    // CHECK XOR 제약 존재
+    const checks = await sql<{ conname: string }[]>`
+      SELECT conname FROM pg_constraint
+      WHERE conrelid = 'instructor_responses'::regclass AND contype = 'c'
+    `;
+    const checkNames = checks.map((c) => c.conname);
+    assert(checkNames.includes("instructor_responses_source_xor"),
+      `CHECK XOR 제약 부재: ${JSON.stringify(checkNames)}`);
+
+    // partial UNIQUE 인덱스 2개
+    const indexes = await sql<{ indexname: string }[]>`
+      SELECT indexname FROM pg_indexes
+      WHERE schemaname = 'public' AND tablename = 'instructor_responses'
+    `;
+    const idxNames = indexes.map((i) => i.indexname);
+    assert(idxNames.includes("uniq_instructor_responses_assignment"),
+      `partial UNIQUE assignment 부재`);
+    assert(idxNames.includes("uniq_instructor_responses_inquiry"),
+      `partial UNIQUE inquiry 부재`);
+    assert(idxNames.includes("idx_instructor_responses_by_instructor"),
+      `instructor index 부재`);
+  });
+
+  await check("AC-CONFIRM-001-NOTIF-IDEMPOTENCY: notifications 테이블 source_kind/source_id + partial UNIQUE 인덱스", async () => {
+    const cols = await sql<{ column_name: string }[]>`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'notifications'
+      ORDER BY column_name
+    `;
+    const colNames = cols.map((c) => c.column_name);
+    assert(colNames.includes("source_kind"), "notifications.source_kind 부재");
+    assert(colNames.includes("source_id"), "notifications.source_id 부재");
+
+    const indexes = await sql<{ indexname: string }[]>`
+      SELECT indexname FROM pg_indexes
+      WHERE schemaname = 'public' AND tablename = 'notifications'
+    `;
+    const idxNames = indexes.map((i) => i.indexname);
+    assert(idxNames.includes("idx_notifications_idempotency"),
+      `idx_notifications_idempotency 부재: ${JSON.stringify(idxNames)}`);
   });
 
   // ===== SPEC-RECEIPT-001 §M1 verify =====

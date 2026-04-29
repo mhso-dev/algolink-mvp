@@ -4,6 +4,23 @@
 
 ## [Unreleased]
 
+### Added (SPEC-CONFIRM-001 — 강사 응답 시스템, Issue #16 / SPEC-PROJECT-AMEND-001, Issue #22)
+
+- **M1**: 마이그레이션 3건 — `instructor_responses` 테이블 신설 (`CHECK XOR` + 두 partial UNIQUE 인덱스: `(project_id, instructor_id) WHERE project_id IS NOT NULL`, `(proposal_inquiry_id, instructor_id) WHERE proposal_inquiry_id IS NOT NULL`), `notification_type` enum 5개 신규 값 추가 (`assignment_accepted`, `assignment_declined`, `inquiry_accepted`, `inquiry_declined`, `inquiry_conditional`), `notifications` 테이블에 `source_kind`/`source_id` 컬럼 + partial UNIQUE 인덱스 (`idx_notifications_idempotency`) 추가 — 알림 idempotency 정확히-1행 보장. db:verify 32/32 PASS
+- **M2**: 도메인 모듈 `src/lib/responses/` 신설 — `state-machine.ts` (`validateStatusTransition`, `isWithinChangeWindow`, `CHANGE_WINDOW_HOURS=1`), `side-effects.ts` (순수 부수효과 산출 함수 3종: `computeAssignmentAcceptanceEffects`, `computeInquiryAcceptanceEffects`, `computeAssignmentDowngradeEffects`), `notification-mapping.ts` (6 매핑 케이스 × 2 source_kind × 3 status), `errors.ts` (한국어 에러 상수 12종+)
+- **M3/M4**: Server Actions 2종 (`respondToAssignment`, `respondToInquiry`) + UI 라우트 2종 (`/me/assignments`, `/me/inquiries`) — 응답 패널 3-state (accept/decline/conditional) + `conditional_note` + 1시간 카운트다운 타이머 (REQ-CONFIRM-RESPONSE-WINDOW-006) + `response-panel.tsx` UI 컴포넌트
+- 56 신규 단위 테스트 + 14 통합 시나리오 PASS. typecheck 0 error, build PASS
+
+### Changed (SPEC-CONFIRM-001 + SPEC-PROJECT-AMEND-001)
+
+- **SPEC-PROJECT-AMEND-001 통합**: `src/lib/projects/status-machine.ts` `ALLOWED_TRANSITIONS.assignment_confirmed` 배열에 `'assignment_review'` backward edge 추가 — SPEC-CONFIRM-001 REQ-CONFIRM-EFFECTS-008 1시간 윈도 강사 응답 다운그레이드 보상 트랜잭션 정식 경로. `__bypassValidateTransitionForResponseDowngrade` 함수 잔존 0건 (시나리오 B 채택). 신규 단위 테스트 9건 추가 (A/B/C/D 케이스 + 회귀 가드 5종)
+
+### Notes (SPEC-CONFIRM-001 + SPEC-PROJECT-AMEND-001)
+
+- 56 신규 단위 테스트 + 14 통합 시나리오 PASS / typecheck 0 error / pnpm build PASS / db:verify 32/32 PASS
+- SPEC-PROJECT-AMEND-001 v0.1.1: grep `__bypassValidateTransitionForResponseDowngrade` src/ tests/ → 0건 검증
+- Closes Issue #16 (SPEC-CONFIRM-001), Issue #22 (SPEC-PROJECT-AMEND-001)
+
 ### Added (SPEC-RECEIPT-001 — 고객 직접 정산 + 자동 영수증 발급, Issue #15)
 - **M1**: 마이그레이션 7건 (`app.current_user_role` helper, `settlement_flow=client_direct` enum 확장, `settlements` 6개 nullable 컬럼, `organization_info` singleton 테이블, `payout-receipts` Storage 버킷, `notification_type=receipt_issued`, `receipt_counters` + `app.next_receipt_number()` 연도별 reset). db:verify 30/30 PASS
 - **M2**: 도메인 순수 함수 3종 — `receipt-number.ts` (RPC 래퍼), `organization-info.ts` (DB 우선 → env fallback), `client-direct-validation.ts` (zod refinement)

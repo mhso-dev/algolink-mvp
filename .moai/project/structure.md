@@ -12,7 +12,9 @@ algolink/
 │   │   ├── dashboard/
 │   │   ├── resume/
 │   │   ├── schedule/
-│   │   └── settlements/
+│   │   ├── settlements/
+│   │   ├── me/assignments/       # 정식 배정 요청 inbox ✅ SPEC-CONFIRM-001
+│   │   └── me/inquiries/         # 사전 가용성 문의 inbox ✅ SPEC-CONFIRM-001
 │   ├── (operator)/               # 담당자 + 관리자 영역
 │   │   ├── dashboard/
 │   │   ├── projects/
@@ -63,7 +65,14 @@ algolink/
 │   │   │   ├── validation.ts     # zod 스키마 (rescheduleInputSchema, withdrawInstructorInputSchema)
 │   │   │   ├── errors.ts         # SESSION_ERRORS 상수
 │   │   │   └── types.ts          # LectureSession, LectureSessionStatus 타입
-│   │   ├── projects/             # 프로젝트 CRUD (list-query, list-queries, status-machine, errors) ✅ SPEC-PROJECT-001
+│   │   ├── responses/            # 강사 응답 도메인 ✅ SPEC-CONFIRM-001
+│   │   │   ├── state-machine.ts  # validateStatusTransition + isWithinChangeWindow (ANCHOR, 모든 응답 전환 통과)
+│   │   │   ├── side-effects.ts   # computeAssignmentAcceptanceEffects / computeInquiryAcceptanceEffects / computeAssignmentDowngradeEffects (pure)
+│   │   │   ├── notification-mapping.ts  # mapResponseToNotificationType (6 케이스)
+│   │   │   ├── errors.ts         # RESPONSE_ERRORS 상수 (한국어 12종+)
+│   │   │   ├── types.ts          # ResponseSourceKind, ResponseStatus, InstructorResponse 등
+│   │   │   └── index.ts          # public re-export
+│   │   ├── projects/             # 프로젝트 CRUD (list-query, list-queries, status-machine, errors) ✅ SPEC-PROJECT-001 / SPEC-PROJECT-AMEND-001
 │   │   ├── recommend/            # AI 추천 엔진 ✅ SPEC-PROJECT-001
 │   │   │   ├── engine.ts         # 추천 실행 오케스트레이터
 │   │   │   ├── score.ts          # 점수 계산 순수 함수
@@ -116,7 +125,11 @@ algolink/
 │   │   ├── ui/                   # shadcn 자동 생성
 │   │   ├── app/                  # 앱 레이아웃 (Nav, Sidebar)
 │   │   ├── dashboard/            # 담당자 대시보드 컴포넌트 ✅ SPEC-DASHBOARD-001
-│   │   ├── instructor/           # 강사 관리 + 개인영역 컴포넌트 ✅ SPEC-INSTRUCTOR-001 + SPEC-ME-001
+│   │   ├── instructor/           # 강사 관리 + 개인영역 컴포넌트 ✅ SPEC-INSTRUCTOR-001 + SPEC-ME-001 + SPEC-CONFIRM-001
+│   │   │   ├── response-panel.tsx         # 3-state 응답 패널 (accept/decline/conditional + countdown) ✅ SPEC-CONFIRM-001
+│   │   │   ├── inquiry-card.tsx           # 사전 문의 카드 ✅ SPEC-CONFIRM-001
+│   │   │   ├── assignment-card.tsx        # 배정 요청 카드 ✅ SPEC-CONFIRM-001
+│   │   │   ├── response-history-badge.tsx # final lock 배지 ✅ SPEC-CONFIRM-001
 │   │   │   ├── skills-picker.tsx          # 3-tier SkillsPicker (M3, 2026-04-28)
 │   │   │   ├── settlement-list.tsx        # 월별 그룹 정산 리스트 (M5, 2026-04-28)
 │   │   │   ├── settlement-summary-widget.tsx  # 합계 위젯 (M5, 2026-04-28)
@@ -271,5 +284,5 @@ NODE_ENV=development|production
 
 ---
 
-Version: 1.2.0
-Last Updated: 2026-04-28
+Version: 1.3.0
+Last Updated: 2026-04-29

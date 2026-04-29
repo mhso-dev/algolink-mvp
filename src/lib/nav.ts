@@ -2,6 +2,8 @@ import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   ClipboardList,
+  ClipboardCheck,
+  Inbox,
   Users,
   Building2,
   Receipt,
@@ -55,6 +57,14 @@ const instructorNav: NavSection[] = [
     items: [
       { href: "/me", label: "내 대시보드", icon: LayoutDashboard, description: "일정·정산 요약" },
       { href: "/notifications", label: "알림", icon: Bell, description: "배정 요청·정산" },
+    ],
+  },
+  {
+    title: "응답",
+    items: [
+      // SPEC-CONFIRM-001 §M4 — 강사 응답 inbox 진입점
+      { href: "/me/assignments", label: "배정 요청", icon: ClipboardCheck, description: "정식 배정 요청 응답" },
+      { href: "/me/inquiries", label: "사전 문의", icon: Inbox, description: "사전 가용성 문의 응답" },
     ],
   },
   {
