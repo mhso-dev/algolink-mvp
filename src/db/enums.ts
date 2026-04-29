@@ -69,6 +69,7 @@ export const entityType = pgEnum("entity_type", ["project", "instructor", "clien
 // 인앱 알림 종류 (SPEC §2.10 REQ-DB001-NOTIFICATIONS-TYPE).
 // SPEC-PROJECT-001 §5: assignment_request 추가 (ADD VALUE IF NOT EXISTS).
 // SPEC-RECEIPT-001 §M1: receipt_issued 추가.
+// SPEC-CONFIRM-001 §M1 REQ-CONFIRM-NOTIFY-001: 5종 강사 응답 알림 추가.
 export const notificationType = pgEnum("notification_type", [
   "assignment_overdue",
   "schedule_conflict",
@@ -77,6 +78,11 @@ export const notificationType = pgEnum("notification_type", [
   "settlement_requested",
   "assignment_request",
   "receipt_issued",
+  "assignment_accepted",
+  "assignment_declined",
+  "inquiry_accepted",
+  "inquiry_declined",
+  "inquiry_conditional",
 ]);
 
 // SPEC-SKILL-ABSTRACT-001: 강사 기술 분류 enum 제거 (3-tier 분류, 숙련도).
