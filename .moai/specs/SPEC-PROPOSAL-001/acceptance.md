@@ -580,7 +580,7 @@
 
 **When (b) — 핸드오프 흐름 검증 (REQ-PROPOSAL-INQUIRY-009)**:
 - `instr_A` 사용자가 SPEC-CONFIRM-001 `/me/inquiries`에서 PI1에 대해 "수락" 응답 입력
-- (CONFIRM-001 트랜잭션 내부): INSERT INTO `instructor_responses (source_kind='proposal_inquiry', source_id=PI1.id, response_kind='accepted', ...)` + UPDATE `proposal_inquiries SET status='accepted', responded_at=now(), responded_by_user_id=instr_A.user_id WHERE id=PI1.id`
+- (CONFIRM-001 트랜잭션 내부): INSERT INTO `instructor_responses (instructor_id=instr_A.id, project_id=NULL, proposal_inquiry_id=PI1.id, status='accepted', responded_at=now(), ...)` + UPDATE `proposal_inquiries SET status='accepted', responded_at=now(), responded_by_user_id=instr_A.user_id WHERE id=PI1.id` (Pattern A: 두 nullable FK + CHECK XOR — proposal inquiry는 project_id=NULL)
 
 **Then (b)**:
 - 본 SPEC의 `/proposals/P1` 응답 보드는 revalidate 후 `instr_A`를 `수락` 컬럼에 표시
