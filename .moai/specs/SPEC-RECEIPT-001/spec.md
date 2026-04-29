@@ -1,6 +1,6 @@
 ---
 id: SPEC-RECEIPT-001
-version: 0.1.0
+version: 0.2.0
 status: draft
 created: 2026-04-29
 updated: 2026-04-29
@@ -13,7 +13,19 @@ issue_number: null
 
 ## HISTORY
 
-- **2026-04-29 (v0.1.0)**: 초기 작성. Algolink MVP §6-2 「고객-강사 직접 정산 + 알고링크 영수증 발급」 흐름을 SPEC화. 기존 §6-1(SPEC-PAYOUT-001 — 알고링크 → 강사 직접 송금, 원천세 차감)과는 자금 흐름이 반대 방향이다: (1) 고객사가 강사에게 강의비 전액 직접 송금하되 원천세(3.30% 또는 8.80%)를 차감, (2) 강사는 차감 후 수령액 중 알고링크 마진 분(`instructor_remittance_amount_krw`)을 알고링크 계좌로 역송금, (3) 알고링크가 입금 확인 시 영수증 PDF(번호+발행일+사업자정보+금액)를 자동 생성하여 강사에게 인앱 알림 + 다운로드 링크로 회신. 본 SPEC은 사이블링 SPEC-PAYOUT-002(6-1 + sessions 보강)와 평행하게 작성되며, 기존 `settlements` 테이블을 (a) `settlement_flow` enum에 `client_direct` 값 추가 + (b) 6개 컬럼 nullable 추가(`instructor_remittance_amount_krw`, `instructor_remittance_received_at`, `client_payout_amount_krw`, `receipt_file_id`, `receipt_issued_at`, `receipt_number`) + (c) CHECK 제약 확장(`client_direct AND withholding_tax_rate IN (3.30, 8.80)`) 형태로 확장한다. 상태 머신은 SPEC-PAYOUT-001의 4-state(pending → requested → paid + held)를 그대로 유지하되 `client_direct` 흐름에서는 의미를 재해석(`pending`=강사 송금 미등록, `requested`=강사 송금 등록 완료/알고링크 확인 대기, `paid`=알고링크 입금 확인 + 영수증 발급 완료, `held`=금액 불일치 보류). [HARD] paid-freeze 인배리언트(SPEC-PAYOUT-001 §2.3)는 그대로 존중되며, 영수증 발급은 정확히 `requested → paid` 전환 시점에 단일 트랜잭션으로 (status UPDATE + receipt_number 발급 + receipt_file_id 연결 + receipt_issued_at 기록 + notifications INSERT) 원자적으로 수행된다. 영수증 PDF는 @react-pdf/renderer + NotoSansKR(SPEC-ME-001 M8 산출물 재사용) 기반 A4 단일 페이지로 생성되어 신규 Storage 버킷 `payout-receipts`에 저장되며, 알고링크 사업자 정보는 신규 singleton 테이블 `organization_info`(MVP는 1행만 존재) 또는 환경변수 fallback에서 로드한다. 알림은 신규 `notification_type` enum 값 `receipt_issued`로 INSERT되고, 콘솔 로그(`[notif] receipt_issued → instructor_id=<uuid> settlement_id=<uuid> receipt_number=<text>`)가 SPEC-NOTIFY-001 후속 hook의 식별자로 기록된다. 본 SPEC은 페인 포인트 「영수증을 시스템 외부에서 수기 발행하여 금액·번호 불일치가 잦다」를 자동화로 해소하는 것을 목적으로 한다. 실제 이메일/SMS 발송, 국세청 세금계산서 API 연동, 영수증 일괄 재발급, 영수증 취소/대체 발급, 알고링크 사업자 정보 admin UI 편집 화면, 강사 송금 자동 매칭(은행 OpenAPI), 카카오페이/토스 등 PG 연동은 명시적 제외이며 후속 SPEC으로 위임한다. SPEC-PAYOUT-002(sibling)는 6-1 + sessions 추가 분만 다루므로 본 SPEC과 컬럼/마이그레이션 충돌 없음을 §4.6에서 확인한다.
+- **2026-04-29 (v0.2.0)**: plan-auditor FAIL 판정에 따른 8건 결함(CRITICAL 2건 + HIGH 6건) 및 MEDIUM/LOW 항목 수정 amendment. 핵심 변경:
+  1. **CRITICAL-1/2 (영수증 번호 형식)**: `RCP-YYYY-NNN`(3자리) → `RCP-YYYY-NNNN`(4자리)로 확장하고 단순 SEQUENCE 대신 `receipt_counters(year integer PRIMARY KEY, counter bigint)` 테이블 + `app.next_receipt_number()` 함수로 **연도별 카운터 reset**을 적용. 1000번째 발급에서 regex 위반하던 문제와 연도 경계 break 모두 해소. UNIQUE 인덱스는 그대로 유지.
+  2. **HIGH-3 (atomic 트랜잭션 prose 정정)**: REQ-RECEIPT-OPERATOR-003 문구를 truth에 맞게 재작성. "단일 atomic DB 트랜잭션이 PDF 렌더+Storage 업로드까지 감싼다"는 잘못된 prose를 "DB-side 변경(settlements UPDATE + receipt_number 부여 + files INSERT + notifications INSERT)이 단일 atomic 트랜잭션이며, PDF 생성과 Storage 업로드는 DB 트랜잭션 commit 직전에 수행되고, DB 트랜잭션 실패 시 best-effort Storage object DELETE compensating cleanup이 수행된다. Storage 고아 파일은 일일 reconciliation job(REQ-RECEIPT-CLEANUP-001)으로 정리한다"로 정정. 단계 수는 8 atomic + 1 compensating으로 통일.
+  3. **HIGH-4 (PII GUC + pii_access_log)**: REQ-RECEIPT-PII-001 신설. `decrypt_payout_field` 호출은 DB 트랜잭션 안에서 수행되며, 호출 전 `SET LOCAL app.pii_purpose = 'receipt_pdf_generation'`, 직후 `pii_access_log` 1행 INSERT를 명시. PDF 렌더링 순서를 재구성: tx 내부에서 (instructor SELECT + bizno decrypt + pii_access_log INSERT) → tx commit 직전 PDF 렌더(in-memory) + Storage 업로드 → tx 커밋 (settlements/files/notifications). decrypt된 bizno는 PDF Buffer와 pii_access_log 외에 어디에도 영속되지 않음. SPEC-ME-001/LESSON-004 invariant 준수.
+  4. **HIGH-5 (storage_path 컨벤션 통일)**: Convention A 채택 — `files.storage_path`는 **bucket-relative**(bucket prefix 없음, `storage.objects.name`과 1:1 매칭). bucket 식별은 `files.kind='payout_receipt'`(또는 'receipt')로 암묵 처리. 이전 §5.3의 `payout-receipts/<settlement_id>/<receipt_number>.pdf`(bucket prefix 포함)는 모두 `<settlement_id>/<receipt_number>.pdf`로 정정. RLS predicate는 `WHERE storage_path = name`이 직접 매칭되도록 단순화. REQ-RECEIPT-COLUMNS-007 신설(invariant 명시).
+  5. **HIGH-6 (RLS role 검증 메커니즘)**: `auth.jwt()->>'role'` 의존을 제거하고 프로젝트 표준 helper `app.current_user_role() RETURNS text`(`SELECT role FROM users WHERE id = auth.uid()`)를 도입. organization_info, payout-receipts bucket 모두 본 helper를 사용. 마이그레이션에 helper 정의 포함.
+  6. **HIGH-7 (SPEC-PAYOUT-002 dependency)**: SPEC-PAYOUT-002를 sibling이 아닌 **prerequisite**로 명시적 재분류. plan.md §1.1에 prerequisite 추가, acceptance.md test setup에 SPEC-PAYOUT-002 baseline 적용 가드 추가.
+  7. **HIGH-8 (instructor_remittance_amount_krw 소유권)**: Option A 채택 — SPEC-PAYOUT-002의 GENERATE Server Action이 `flow='client_direct'` 정산 행 생성 시 PAYOUT-002의 `instructor_fee_krw` 계산 결과(GENERATED column)에서 derive하여 `instructor_remittance_amount_krw`를 함께 채운다. REQ-RECEIPT-COLUMNS-001에 cross-reference 명시. SPEC-RECEIPT-001은 본 컬럼을 read-only로 소비.
+  8. **MEDIUM/LOW 정리**: COLUMNS-003 split, COLUMNS-008 generic UPDATE 차단 acceptance 추가, PDF-005 KST + NOTIFY-005 no-email 명시 acceptance 추가, react-pdf Font 절대 경로(`path.join(process.cwd(), 'public/fonts/...')`) 명시, client_direct 상태 머신 불변(SPEC-PAYOUT-001 그래프 그대로 상속) one-liner 추가, RLS-006 service-role 검색 검증 acceptance 추가.
+  
+  버전 0.1.0 → 0.2.0. 기존 0.1.0 amendment entry는 그대로 보존.
+
+- **2026-04-29 (v0.1.0)**: 초기 작성. Algolink MVP §6-2 「고객-강사 직접 정산 + 알고링크 영수증 발급」 흐름을 SPEC화. 기존 §6-1(SPEC-PAYOUT-001 — 알고링크 → 강사 직접 송금, 원천세 차감)과는 자금 흐름이 반대 방향이다: (1) 고객사가 강사에게 강의비 전액 직접 송금하되 원천세(3.30% 또는 8.80%)를 차감, (2) 강사는 차감 후 수령액 중 알고링크 마진 분(`instructor_remittance_amount_krw`)을 알고링크 계좌로 역송금, (3) 알고링크가 입금 확인 시 영수증 PDF(번호+발행일+사업자정보+금액)를 자동 생성하여 강사에게 인앱 알림 + 다운로드 링크로 회신. SPEC-PAYOUT-002(6-1 + sessions 보강)는 본 SPEC의 prerequisite이며 — 본 SPEC의 `instructor_remittance_amount_krw` 컬럼은 SPEC-PAYOUT-002의 GENERATE Server Action이 `flow='client_direct'` 정산 행을 생성할 때 함께 채워준다(SPEC-PAYOUT-002 ownership). 본 SPEC은 기존 `settlements` 테이블을 (a) `settlement_flow` enum에 `client_direct` 값 추가 + (b) 6개 컬럼 nullable 추가(`instructor_remittance_amount_krw`, `instructor_remittance_received_at`, `client_payout_amount_krw`, `receipt_file_id`, `receipt_issued_at`, `receipt_number`) + (c) CHECK 제약 확장(`client_direct AND withholding_tax_rate IN (3.30, 8.80)`) 형태로 확장한다. 상태 머신은 SPEC-PAYOUT-001의 4-state(pending → requested → paid + held)를 그대로 유지하되 `client_direct` 흐름에서는 의미를 재해석(`pending`=강사 송금 미등록, `requested`=강사 송금 등록 완료/알고링크 확인 대기, `paid`=알고링크 입금 확인 + 영수증 발급 완료, `held`=금액 불일치 보류). [HARD] paid-freeze 인배리언트(SPEC-PAYOUT-001 §2.3)는 그대로 존중되며, 영수증 발급은 정확히 `requested → paid` 전환 시점에 단일 atomic DB 트랜잭션으로 (settlements UPDATE + receipt_number 부여 + files INSERT + notifications INSERT) 원자적으로 수행된다. 영수증 PDF는 @react-pdf/renderer + NotoSansKR(SPEC-ME-001 M8 산출물 재사용) 기반 A4 단일 페이지로 생성되어 신규 Storage 버킷 `payout-receipts`에 저장되며, 알고링크 사업자 정보는 신규 singleton 테이블 `organization_info`(MVP는 1행만 존재) 또는 환경변수 fallback에서 로드한다. 알림은 신규 `notification_type` enum 값 `receipt_issued`로 INSERT되고, 콘솔 로그(`[notif] receipt_issued → instructor_id=<uuid> settlement_id=<uuid> receipt_number=<text>`)가 SPEC-NOTIFY-001 후속 hook의 식별자로 기록된다. 본 SPEC은 페인 포인트 「영수증을 시스템 외부에서 수기 발행하여 금액·번호 불일치가 잦다」를 자동화로 해소하는 것을 목적으로 한다. 실제 이메일/SMS 발송, 국세청 세금계산서 API 연동, 영수증 일괄 재발급, 영수증 취소/대체 발급, 알고링크 사업자 정보 admin UI 편집 화면, 강사 송금 자동 매칭(은행 OpenAPI), 카카오페이/토스 등 PG 연동은 명시적 제외이며 후속 SPEC으로 위임한다.
 
 ---
 
@@ -26,12 +38,12 @@ Algolink AI Agentic Platform MVP의 [F-205] 정산 관리 영역에 **「고객 
 (a) **`settlement_flow` enum 확장** — 기존 `corporate`(0%) / `government`(3.30/8.80%)에 `client_direct`(3.30/8.80%)를 추가. CHECK 제약을 `(settlement_flow = 'client_direct' AND withholding_tax_rate IN (3.30, 8.80))` 항을 OR 결합으로 확장. 마이그레이션 1건.
 
 (b) **`settlements` 6개 컬럼 추가 (모두 nullable)** —
-  - `instructor_remittance_amount_krw bigint` — 강사가 알고링크에 역송금해야 할 금액 (운영자가 정산 행 생성 시 산정, 통상 알고링크 마진 = `business_amount_krw - instructor_fee_krw` = `profit_krw`)
+  - `instructor_remittance_amount_krw bigint` — 강사가 알고링크에 역송금해야 할 금액. **소유권: SPEC-PAYOUT-002**가 `flow='client_direct'` 정산 행을 GENERATE할 때 PAYOUT-002의 `instructor_fee_krw`(GENERATED column) 계산 결과로부터 derive하여 함께 채운다(통상 알고링크 마진 = `business_amount_krw - instructor_fee_krw` = `profit_krw`). SPEC-RECEIPT-001은 본 컬럼을 read-only로 소비.
   - `instructor_remittance_received_at timestamptz` — 운영자가 강사 입금을 확인한 시각
   - `client_payout_amount_krw bigint` — 고객사가 강사에게 송금한 금액(원천세 차감 후, 정보용)
   - `receipt_file_id uuid FK→files` — 자동 생성된 영수증 PDF 파일 식별자
   - `receipt_issued_at timestamptz` — 영수증 발급 시각
-  - `receipt_number text UNIQUE` — `RCP-YYYY-NNN` 형식의 월별 시퀀셜 번호 (동시성 안전 발급)
+  - `receipt_number text UNIQUE` — `RCP-YYYY-NNNN` 형식의 **연도별 reset** 시퀀셜 번호 (예: `RCP-2026-0001`, 동시성 안전 발급, 4자리 zero-pad → 9999/년 지원)
 
 (c) **상태 머신 재해석 (백엔드 enum 미변경)** — `client_direct` 흐름 한정으로 4-state의 의미를 재해석:
   - `pending` = 강사 송금 등록 전 (UI 라벨: "수취 대기")
@@ -43,13 +55,18 @@ Algolink AI Agentic Platform MVP의 [F-205] 정산 관리 영역에 **「고객 
 
 (d) **강사 송금 등록 흐름** (`(instructor)/me/payouts/[id]/remit/`) — SPEC-ME-001 M5 정산 상세를 확장: `client_direct` 흐름 + status=`pending` 정산 행에 "송금 완료 등록" CTA 노출. 강사가 송금 일자 + 송금 금액(서버측 expected = `instructor_remittance_amount_krw` 일치 검증) + 선택적 송금 영수증 첨부(`files` 행 + Storage 업로드) 입력 → Server Action이 status `pending → requested` 전환 + `instructor_remittance_amount_krw`/`client_payout_amount_krw` UPDATE.
 
-(e) **운영자 수취 확인 + 영수증 발급 atomic Server Action** (`(operator)/settlements/[id]/confirm-remittance/`) — `client_direct` + status=`requested` 정산 행 상세 페이지에 "수취 확인 + 영수증 발급" 패널 노출. 운영자가 입금 확인 일자 + 실제 입금 금액(서버측 expected = `instructor_remittance_amount_krw` 일치 검증) + 선택적 메모 입력 → 단일 트랜잭션 안에서 6개 작업이 원자적으로 수행:
-  1. `validateTransition(currentStatus, 'paid')`
-  2. 영수증 번호 발급 (PostgreSQL SEQUENCE `receipt_number_seq` + `RCP-YYYY-NNN` 포맷팅, 동시성 안전)
-  3. 영수증 PDF 생성 (@react-pdf/renderer, NotoSansKR 폰트, A4 portrait, 단일 페이지)
-  4. PDF Storage 업로드 (`payout-receipts/<settlement_id>/<receipt_number>.pdf`) + `files` 행 INSERT
-  5. `UPDATE settlements SET status='paid', instructor_remittance_received_at=now(), receipt_file_id=$file, receipt_number=$num, receipt_issued_at=now() WHERE id=$1 AND status='requested'`
-  6. `INSERT INTO notifications (recipient_id, type='receipt_issued', title, body, link_url)` + 콘솔 로그
+(e) **운영자 수취 확인 + 영수증 발급 (DB-atomic + Storage compensating)** (`(operator)/settlements/[id]/confirm-remittance/`) — `client_direct` + status=`requested` 정산 행 상세 페이지에 "수취 확인 + 영수증 발급" 패널 노출. 운영자가 입금 확인 일자 + 실제 입금 금액(서버측 expected = `instructor_remittance_amount_krw` 일치 검증) + 선택적 메모 입력. 실행 모델은 **DB-side는 단일 atomic 트랜잭션, Storage는 트랜잭션 외부에서 compensating cleanup**:
+  1. (pre-tx) validation: `validateTransition(currentStatus, 'paid')` + `receivedAmountKrw === instructor_remittance_amount_krw`
+  2. (pre-tx) `getOrganizationInfo()` — DB 우선 → env fallback → 미설정 시 `ORGANIZATION_INFO_MISSING`
+  3. (pre-tx) 영수증 번호 acquire: `SELECT app.next_receipt_number()` (연도별 카운터 reset, atomic)
+  4. **DB tx 진입** + `SET LOCAL app.pii_purpose = 'receipt_pdf_generation'`
+  5. (in-tx) instructor row SELECT + `decrypt_payout_field` RPC로 사업자등록번호 decrypt + `pii_access_log` INSERT (1행)
+  6. (in-tx → buffer) PDF 렌더 in-memory (`@react-pdf/renderer`, NotoSansKR, A4 portrait, 단일 페이지) — decrypted bizno는 PDF Buffer + pii_access_log 외에 영속되지 않음
+  7. (외부 — tx 안에서 호출하지만 commit 전 — Storage I/O) PDF Storage 업로드 (bucket=`payout-receipts`, name=`<settlement_id>/<receipt_number>.pdf`)
+  8. (in-tx) `INSERT INTO files (kind='payout_receipt', storage_path='<settlement_id>/<receipt_number>.pdf', owner_id=<강사 user_id>, ...)` + `UPDATE settlements SET status='paid', instructor_remittance_received_at, receipt_file_id, receipt_number, receipt_issued_at, notes WHERE id=$1 AND status='requested' AND settlement_flow='client_direct'` + `INSERT INTO notifications (recipient_id, type='receipt_issued', ...)` + `COMMIT`
+  9. (post-commit, non-rollback) `console.log("[notif] receipt_issued → ...")`
+  
+  **Compensating step (DB tx 실패 시)**: best-effort `supabase.storage.from('payout-receipts').remove([name])` + 로그. 잔여 고아 파일은 일일 reconciliation job(REQ-RECEIPT-CLEANUP-001)으로 정리.
 
 (f) **영수증 PDF 컨텐츠** — A4 portrait, 단일 페이지, 한국어. 포함 항목: 상단 "영수증" 타이틀 + 영수증 번호 + 발행일 / 강사 정보(이름·사업자등록번호 nullable) / 알고링크 정보(상호·사업자등록번호·대표자명·주소·연락처) / 거래 정보(송금일·입금 금액 KRW·사유) / 하단 발행처 표기. 알고링크 사업자 정보 source는 신규 singleton 테이블 `organization_info`(1행 enforce CHECK) 또는 환경변수 fallback. 본 SPEC에서는 organization_info 테이블 + 환경변수 fallback 둘 다 지원하되 우선순위는 (1) organization_info 행 → (2) 환경변수.
 
@@ -58,7 +75,7 @@ Algolink AI Agentic Platform MVP의 [F-205] 정산 관리 영역에 **「고객 
   - `payout_receipts_operator_all`: `operator/admin` role full RW
   - `payout_receipts_anon_deny`: 미인증 거부 (default deny)
   
-  `files` 테이블에는 `kind='receipt'` 새 행 추가. `files.kind` enum 또는 text 컬럼이 이미 존재한다고 가정 (없으면 마이그레이션에서 추가).
+  `files` 테이블에는 `kind='payout_receipt'` 새 행 추가, `storage_path = '<settlement_id>/<receipt_number>.pdf'` (bucket-relative, REQ-RECEIPT-COLUMNS-007). `files.kind` enum 또는 text 컬럼이 이미 존재한다고 가정 (없으면 마이그레이션에서 추가).
 
 (h) **`notification_type='receipt_issued'` enum 값 추가 + 알림 흐름** — 마이그레이션 1건 (`ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'receipt_issued';`). 알림 INSERT: `recipient_id = (강사의 user_id)`, `title="영수증 발급 완료"`, `body=<receipt_number> (<formatted amount> KRW)`, `link_url = '/me/payouts/<settlement_id>'`. 이메일은 SPEC-NOTIFY-001 후속이며 본 SPEC은 콘솔 로그 1줄(`[notif] receipt_issued → instructor_id=<uuid> settlement_id=<uuid> receipt_number=<text>`)로 hook 식별자만 남긴다.
 
@@ -96,10 +113,12 @@ Algolink AI Agentic Platform MVP의 [F-205] 정산 관리 영역에 **「고객 
 - **상태 변경 트리거**: SPEC-DB-001 `trg_settlements_status_history`가 `settlement_status_history` 자동 INSERT.
 - **`notifications` 테이블 + RLS**: SPEC-DB-001 §2.10. `notification_type` enum에 `receipt_issued` 값 추가만.
 - **`files` 테이블**: SPEC-DB-001 §2.12. `kind` 컬럼이 이미 존재한다고 가정(SPEC-ME-001 M7/M8 활용 패턴). 없으면 마이그레이션에서 `kind text` 추가 + CHECK 제약.
-- **`@react-pdf/renderer` + NotoSansKR 폰트**: SPEC-ME-001 M8 (이력서 PDF 다운로드)에서 정착. `public/fonts/NotoSansKR-{Regular,Bold}.ttf` 그대로 재사용.
-- **PII 암호화 패턴**: SPEC-ME-001 M7 (pgcrypto RPC `encrypt_payout_field`/`decrypt_payout_field`). 본 SPEC의 영수증 PDF 렌더링에서 강사 사업자등록번호가 PII에 해당하면 동일 RPC 경유.
+- **`@react-pdf/renderer` + NotoSansKR 폰트**: SPEC-ME-001 M8 (이력서 PDF 다운로드)에서 정착. `public/fonts/NotoSansKR-{Regular,Bold}.ttf` 그대로 재사용. Server-side render 시 `Font.register({ src: path.join(process.cwd(), 'public/fonts/NotoSansKR-Regular.ttf') })` 형태의 **절대 경로**로 등록 (react-pdf 서버측 요구).
+- **PII 암호화 패턴 + GUC + access log**: SPEC-ME-001 M7 (pgcrypto RPC `encrypt_payout_field`/`decrypt_payout_field`) + LESSON-004 invariant. 본 SPEC의 영수증 PDF 렌더링에서 강사 사업자등록번호 decrypt 호출은 동일 트랜잭션 안에서 `SET LOCAL app.pii_purpose` + `pii_access_log` INSERT를 수반한다(REQ-RECEIPT-PII-001 참조).
 - **SPEC-AUTH-001 가드**: `(operator)/layout.tsx` `requireRole(['operator', 'admin'])` + `(instructor)/layout.tsx` `requireRole(['instructor'])` 그대로 사용.
-- **SPEC-PAYOUT-001 `validateTransition`**: 4-state 전환 검증 함수. 본 SPEC의 영수증 발급 Server Action에서 재사용.
+- **SPEC-PAYOUT-001 `validateTransition` + 상태 머신 그래프**: 4-state 전환 검증 함수 + `pending → requested → paid` + `held` 분기. **`client_direct` 흐름은 SPEC-PAYOUT-001 전환 그래프를 그대로 상속하며 변경하지 않는다**; 본 SPEC은 `requested → paid` 전환 시점에 atomic side-effects(영수증 발급, 알림)만 추가한다.
+- **`app.current_user_role()` helper**: 본 SPEC에서 신규 도입하는 프로젝트 표준 헬퍼. `SELECT role FROM users WHERE id = auth.uid()`를 SECURITY DEFINER로 감싸서 RLS predicate에서 `app.current_user_role() = 'operator'` 형태로 사용. `auth.jwt()->>'role'` 의존을 제거(JWT 커스텀 hook 미설정 환경에서 안전).
+- **SPEC-PAYOUT-002 (prerequisite, 선행 SPEC)**: 6-1 + sessions 보강. 본 SPEC의 `instructor_remittance_amount_krw` 컬럼은 PAYOUT-002의 GENERATE Server Action이 `flow='client_direct'` 정산 행 생성 시 함께 채워준다. PAYOUT-002가 main에 머지된 이후 본 SPEC이 시작된다.
 
 #### `client_direct` 흐름의 상태 머신 의미 (재해석 표)
 
@@ -129,30 +148,64 @@ UI 라벨은 흐름별로 다르게 표시 (`SettlementStatusBadge`가 `settleme
 
 DB CHECK 제약 이름은 `settlements_withholding_rate_check`(SPEC-DB-001) 그대로 유지하되, DROP + RECREATE 패턴으로 마이그레이션. zod 사전 차단 규칙도 동일하게 확장 (`src/lib/payouts/validation.ts`).
 
-#### 영수증 번호 동시성 안전 발급
+#### 영수증 번호 동시성 안전 발급 (연도별 카운터 reset)
 
-영수증 번호는 `RCP-YYYY-NNN` 형식 (예: `RCP-2026-001`). 동시 발급 충돌을 방지하기 위해 PostgreSQL SEQUENCE 사용:
+영수증 번호는 `RCP-YYYY-NNNN` 형식 (예: `RCP-2026-0001`, 4자리 zero-pad → 9999/년 지원). regex: `^RCP-\d{4}-\d{4}$`. 연도 경계에서 카운터가 자동 reset되도록 단순 SEQUENCE가 아닌 **per-year 카운터 테이블** 패턴 사용:
 
 ```sql
-CREATE SEQUENCE receipt_number_seq START 1;
--- 발급 시: SELECT 'RCP-' || EXTRACT(YEAR FROM now()) || '-' || LPAD(nextval('receipt_number_seq')::text, 3, '0')
+-- 20260429000060_receipt_number_counter.sql
+CREATE TABLE app.receipt_counters (
+  year integer PRIMARY KEY,
+  counter bigint NOT NULL DEFAULT 0
+);
+
+CREATE OR REPLACE FUNCTION app.next_receipt_number()
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = app, public
+AS $$
+DECLARE
+  cur_year integer;
+  cur_counter bigint;
+BEGIN
+  cur_year := EXTRACT(YEAR FROM now() AT TIME ZONE 'Asia/Seoul')::integer;
+
+  -- atomic upsert: 신규 연도면 1, 기존 연도면 +1, RETURNING으로 새 값 획득
+  INSERT INTO app.receipt_counters(year, counter)
+  VALUES (cur_year, 1)
+  ON CONFLICT (year)
+  DO UPDATE SET counter = app.receipt_counters.counter + 1
+  RETURNING counter INTO cur_counter;
+
+  RETURN 'RCP-' || cur_year::text || '-' || LPAD(cur_counter::text, 4, '0');
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION app.next_receipt_number() TO authenticated;
 ```
 
-연도 경계 시 시퀀스 reset은 본 SPEC에서 미구현 (단순 카운터 형식). 연도별 reset이 필요하면 후속 SPEC에서 처리. 단순 시퀀스 + 연도 prefix 조합으로 MVP 충분.
+원자성: `INSERT ... ON CONFLICT DO UPDATE ... RETURNING`은 단일 행 락을 획득하고 RETURNING 값을 atomically 반환한다. 병렬 호출 시 (year, counter) 행에 대한 row-level lock이 직렬화하므로 중복 없음. UNIQUE 인덱스 (`receipt_number`)가 추가 방어선.
 
-대안 검토 (행 락 + COUNT 방식): 동시성 처리 위해 advisory lock 필요 → SEQUENCE 채택이 더 단순하고 안전.
+연도 전환 (예: 2026-12-31 23:59:59 KST → 2027-01-01 00:00:00 KST): 새 연도의 첫 호출이 `INSERT INTO receipt_counters(year=2027, counter=1)`을 수행하여 counter=1로 자동 reset. 따라서 `RCP-2026-9999` 다음은 `RCP-2027-0001`이 된다.
+
+대안 검토:
+- 단순 `CREATE SEQUENCE` + 연도 prefix(이전 v0.1.0 설계): 1000번째 발급 시 자릿수 4자리로 확장되어 regex `\d{3}` 위반 + 연도 경계에서 reset 안 됨 → CRITICAL-1/2 결함. **본 amendment(v0.2.0)에서 폐기**.
+- 행 락 + COUNT 방식: phantom read 위험, deadlock 가능 → 채택 안 함.
+- 연도별 SEQUENCE 다중 생성(`receipt_seq_2026`, `receipt_seq_2027`, ...): SEQUENCE는 자동 생성되지 않으므로 매년 마이그레이션 필요 → 운영 부담 증가, 채택 안 함.
 
 ### 1.3 범위 (Scope)
 
 **In Scope:**
 
 - **마이그레이션** (`supabase/migrations/`):
+  - `20260429000005_app_current_user_role.sql` — 프로젝트 표준 helper `app.current_user_role() RETURNS text` (SECURITY DEFINER) 신설. 본 SPEC의 모든 RLS predicate가 사용.
   - `20260429000010_settlement_flow_client_direct.sql` — `settlement_flow` enum에 `client_direct` 값 추가 + CHECK 제약 확장 (DROP + RECREATE)
   - `20260429000020_settlements_remittance_columns.sql` — 6개 nullable 컬럼 추가 (`instructor_remittance_amount_krw`, `instructor_remittance_received_at`, `client_payout_amount_krw`, `receipt_file_id`, `receipt_issued_at`, `receipt_number`) + UNIQUE 제약 (`receipt_number`) + FK (`receipt_file_id` → `files(id)`)
-  - `20260429000030_organization_info.sql` — 신규 singleton 테이블 + CHECK 제약 (1행 enforce, `id = 1`) + RLS (admin RW, operator R)
-  - `20260429000040_payout_receipts_bucket.sql` — Storage 버킷 + 3개 RLS 정책 (instructor self-read, operator/admin all, anon deny)
+  - `20260429000030_organization_info.sql` — 신규 singleton 테이블 + CHECK 제약 (1행 enforce, `id = 1`) + RLS using `app.current_user_role()` (admin RW, operator R)
+  - `20260429000040_payout_receipts_bucket.sql` — Storage 버킷 + RLS 정책 using `app.current_user_role()` (instructor self-read, operator/admin all, anon deny)
   - `20260429000050_notification_type_receipt_issued.sql` — `notification_type` enum 값 추가
-  - `20260429000060_receipt_number_seq.sql` — SEQUENCE 생성 + 발급 SQL 함수 (`app.next_receipt_number()`)
+  - `20260429000060_receipt_number_counter.sql` — `app.receipt_counters(year, counter)` 테이블 + 발급 SQL 함수 (`app.next_receipt_number()`, 연도별 reset)
 
 - **도메인 로직** (`src/lib/payouts/`):
   - `receipt-pdf.ts` (planned) — `renderReceiptPdf({ settlement, instructor, organization }) → Buffer` (@react-pdf/renderer + NotoSansKR)
@@ -209,13 +262,16 @@ CREATE SEQUENCE receipt_number_seq START 1;
 ### 1.4 성공 지표 (Success Criteria)
 
 - ✅ 빌드 무오류: `pnpm build` 0 에러, 0 type 에러
-- ✅ 마이그레이션 6건 모두 `supabase db reset` 후 정상 적용 (CHECK 제약, RLS, 시퀀스, 버킷 생성 확인)
+- ✅ 마이그레이션 7건 모두 `supabase db reset` 후 정상 적용 (helper 함수, CHECK 제약, RLS, 카운터 테이블, 버킷 생성 확인)
 - ✅ `client_direct` enum 값 추가 후 SPEC-PAYOUT-001 기존 `corporate`/`government` 흐름 회귀 없음 (16개 상태 전환 단위 테스트 그대로 PASS)
 - ✅ CHECK 제약 확장 후 `client_direct + rate=5` INSERT 시 DB 거부 + zod 사전 거부 (이중 방어선)
 - ✅ 강사 송금 등록 → status `pending → requested` + 6개 컬럼 중 3개(`instructor_remittance_amount_krw`, `client_payout_amount_krw`, 송금 영수증 첨부 시 `files` 신규 행) UPDATE/INSERT
 - ✅ 운영자 수취 확인 atomic 트랜잭션 단일 호출로 (a) status `requested → paid`, (b) `instructor_remittance_received_at = now()`, (c) `receipt_file_id` 연결, (d) `receipt_number` 신규 발급 (UNIQUE), (e) `receipt_issued_at = now()`, (f) `notifications` 1행 INSERT, (g) 콘솔 로그 1줄 출력 모두 성공
-- ✅ 영수증 PDF 한국어 정상 렌더 (NotoSansKR), A4 portrait, 단일 페이지, 알고링크 사업자 정보 정확 임베드
-- ✅ 영수증 번호 동시성: 병렬 5개 발급 시 모두 unique (시퀀스 보장)
+- ✅ 영수증 PDF 한국어 정상 렌더 (NotoSansKR, server-side 절대 경로 등록), A4 portrait, 단일 페이지, 알고링크 사업자 정보 정확 임베드
+- ✅ 영수증 번호 형식: `RCP-YYYY-NNNN` (4자리 zero-pad), regex `^RCP-\d{4}-\d{4}$`
+- ✅ 영수증 번호 동시성: 병렬 5개 발급 시 모두 unique (`receipt_counters` 행 락 + UNIQUE 인덱스 보장)
+- ✅ 영수증 번호 연도 reset: 2027년 첫 발급 시 `RCP-2027-0001` (counter reset)
+- ✅ PII GUC + access log: decrypt_payout_field 호출이 `app.pii_purpose='receipt_pdf_generation'` 컨텍스트 안에서 일어나고 `pii_access_log`에 1행 기록
 - ✅ paid 동결 검증: status=`paid`인 client_direct 정산에 운영자가 다시 confirm-remittance 호출 시 `RECEIPT_ALREADY_ISSUED` 또는 `STATUS_PAID_FROZEN` 한국어 에러 + DB 변경 없음
 - ✅ 송금 금액 불일치: 강사가 입력한 금액 ≠ `instructor_remittance_amount_krw` → `REMITTANCE_AMOUNT_MISMATCH` form 에러 + status 변경 없음
 - ✅ 운영자 수취 확인 시 입력한 실제 금액 ≠ `instructor_remittance_amount_krw` → `REMITTANCE_AMOUNT_MISMATCH` 에러 + 트랜잭션 롤백
@@ -258,18 +314,21 @@ The zod schema in `src/lib/payouts/validation.ts` **shall** extend its `superRef
 
 **REQ-RECEIPT-COLUMNS-001 (Ubiquitous)**
 The system **shall** add 6 nullable columns to `settlements` via migration `20260429000020_settlements_remittance_columns.sql`:
-- `instructor_remittance_amount_krw bigint` (강사가 알고링크에 송금해야 할 금액)
+- `instructor_remittance_amount_krw bigint` — 강사가 알고링크에 송금해야 할 금액. **Owner: SPEC-PAYOUT-002**: PAYOUT-002의 GENERATE Server Action이 `flow='client_direct'` 정산 행 생성 시 PAYOUT-002의 `instructor_fee_krw`(GENERATED column)에서 derive하여 함께 채운다 (`instructor_remittance_amount_krw = business_amount_krw - instructor_fee_krw = profit_krw`). SPEC-RECEIPT-001은 본 컬럼을 **read-only**로 소비하며 직접 INSERT/UPDATE 경로를 노출하지 않는다.
 - `instructor_remittance_received_at timestamptz` (운영자가 입금 확인한 시각)
 - `client_payout_amount_krw bigint` (고객사가 강사에게 송금한 금액, 정보용)
 - `receipt_file_id uuid REFERENCES files(id) ON DELETE SET NULL` (영수증 PDF 파일)
 - `receipt_issued_at timestamptz` (영수증 발급 시각)
-- `receipt_number text UNIQUE` (RCP-YYYY-NNN)
+- `receipt_number text UNIQUE` — `RCP-YYYY-NNNN` 형식 (4-digit zero-pad, 연도별 reset)
 
 **REQ-RECEIPT-COLUMNS-002 (Ubiquitous)**
-The `receipt_number` column **shall** carry a UNIQUE index `idx_settlements_receipt_number` to enforce no two settlements share the same receipt number.
+The `receipt_number` column **shall** carry a UNIQUE index `idx_settlements_receipt_number` to enforce no two settlements share the same receipt number; the format **shall** match regex `^RCP-\d{4}-\d{4}$`.
 
 **REQ-RECEIPT-COLUMNS-003 (State-Driven)**
-**WHILE** a settlement row has `status = 'paid'` and `settlement_flow = 'client_direct'`, the system **shall** require `receipt_file_id`, `receipt_number`, and `receipt_issued_at` to be non-null; this consistency is enforced at the application layer (Server Action transaction atomicity) and not via DB trigger.
+**WHILE** a settlement row has `status = 'paid'` and `settlement_flow = 'client_direct'`, the system **shall** require `receipt_file_id`, `receipt_number`, and `receipt_issued_at` to be non-null. This invariant is **established** at the application layer by the atomic transaction in `confirmRemittanceAndIssueReceipt`.
+
+**REQ-RECEIPT-COLUMNS-003a (Ubiquitous)**
+The system **shall** enforce REQ-RECEIPT-COLUMNS-003's three-column non-null invariant via Server Action transaction atomicity (UPDATE WHERE clause requires `status='requested'` and uses RETURNING to confirm `receipt_*` columns are set in the same statement). No DB trigger or CHECK constraint is required at the schema level (deferred to a future hardening SPEC).
 
 **REQ-RECEIPT-COLUMNS-004 (Ubiquitous)**
 The Drizzle schema **shall** treat all 6 new columns as nullable in TypeScript types; the application code **shall** narrow type via `if (settlement.receipt_file_id !== null)` before accessing.
@@ -279,6 +338,12 @@ The Drizzle schema **shall** treat all 6 new columns as nullable in TypeScript t
 
 **REQ-RECEIPT-COLUMNS-006 (Ubiquitous)**
 The system **shall** include the 6 new columns in the SELECT projection of `getSettlementById` (`src/lib/payouts/queries.ts`), but **shall** explicitly exclude them from the default UPDATABLE column whitelist; only the dedicated atomic transaction (`confirmRemittanceAndIssueReceipt`) and the instructor remittance registration action (`registerInstructorRemittance`) are permitted to set them.
+
+**REQ-RECEIPT-COLUMNS-007 (Ubiquitous — storage_path invariant)**
+The `files.storage_path` column **shall** store the **bucket-relative** key matching `storage.objects.name` exactly; bucket name **shall not** be embedded in `storage_path`. For payout receipts the convention is: `storage_path = '<settlement_id>/<receipt_number>.pdf'` and the bucket is encoded by `files.kind = 'payout_receipt'`. For remittance evidence the convention is `storage_path = '<settlement_id>/<uuid>.<ext>'` with bucket `payout-evidence` encoded by `files.kind = 'remittance_evidence'`.
+
+**REQ-RECEIPT-COLUMNS-008 (Unwanted Behavior — generic UPDATE block)**
+**IF** any Server Action other than `confirmRemittanceAndIssueReceipt` attempts to UPDATE `settlements.receipt_number`, **THEN** the call site **shall** be rejected at the type level (via UPDATABLE_COLUMNS whitelist exclusion in `queries.ts`) and at runtime by `getSettlementById` consumers ignoring writes to receipt_number; an integration test **shall** verify that the generic settlement UPDATE Server Action returns `STATUS_INVALID_TRANSITION` or no-op without touching `receipt_number`.
 
 ### 2.3 REQ-RECEIPT-INSTRUCTOR — 강사 송금 등록 흐름
 
@@ -294,7 +359,7 @@ The system **shall** extend the instructor settlement detail page `(app)/(instru
 **REQ-RECEIPT-INSTRUCTOR-004 (Event-Driven)**
 **WHEN** the instructor submits a valid remittance registration form, the system **shall** invoke Server Action `registerInstructorRemittance({ settlementId, remittanceDate, remittanceAmountKrw, evidenceFile? })` which performs in a single DB transaction:
 1. `validateTransition(currentStatus, 'requested')` (must be `pending → requested`)
-2. If `evidenceFile` provided: upload to Storage path `payout-evidence/<settlement_id>/<uuid>.<ext>` + INSERT `files` row with `kind='remittance_evidence'`, `owner_id=instructor's user_id`
+2. If `evidenceFile` provided: upload to Storage bucket `payout-evidence`, name `<settlement_id>/<uuid>.<ext>` (bucket-relative per REQ-RECEIPT-COLUMNS-007) + INSERT `files` row with `kind='remittance_evidence'`, `storage_path='<settlement_id>/<uuid>.<ext>'` (bucket-relative, NO bucket prefix), `owner_id=instructor's user_id`
 3. `UPDATE settlements SET status='requested', client_payout_amount_krw=$expectedClientPayout (계산 = instructor_fee_krw - withholding_tax_amount_krw), updated_at=now() WHERE id=$1 AND status='pending' AND settlement_flow='client_direct'`
 4. (트리거 자동) `settlement_status_history` 자동 INSERT
 
@@ -304,7 +369,7 @@ The system **shall** extend the instructor settlement detail page `(app)/(instru
 **REQ-RECEIPT-INSTRUCTOR-006 (Optional Feature)**
 **WHERE** the settlement reaches `status = 'paid'`, the instructor detail page **shall** display the receipt download link (file from `receipt_file_id`) prominently; the link target **shall** be a signed Supabase Storage URL with 1-hour expiry generated server-side.
 
-### 2.4 REQ-RECEIPT-OPERATOR — 운영자 수취 확인 + 영수증 발급 atomic
+### 2.4 REQ-RECEIPT-OPERATOR — 운영자 수취 확인 + 영수증 발급 (DB-atomic + Storage compensating)
 
 **REQ-RECEIPT-OPERATOR-001 (Ubiquitous)**
 The system **shall** extend the operator settlement detail page `(app)/(operator)/settlements/[id]/page.tsx` (SPEC-PAYOUT-001 산출물) to display a "수취 확인 + 영수증 발급" panel when `settlement_flow = 'client_direct' AND status = 'requested'`.
@@ -312,20 +377,23 @@ The system **shall** extend the operator settlement detail page `(app)/(operator
 **REQ-RECEIPT-OPERATOR-002 (Event-Driven)**
 **WHEN** an operator opens the confirmation panel, the system **shall** display read-only details (registered 송금 일자, 송금 금액, 첨부 파일) and an input form: (a) 입금 확인 일자 (date input, default today), (b) 실제 입금 금액 KRW (must equal `instructor_remittance_amount_krw`), (c) 선택적 메모 (textarea, max 2000).
 
-**REQ-RECEIPT-OPERATOR-003 (Event-Driven)**
-**WHEN** an operator submits the confirmation form, the system **shall** invoke Server Action `confirmRemittanceAndIssueReceipt({ settlementId, receivedDate, receivedAmountKrw, memo? })` which performs the following 6 steps in a **single atomic DB transaction wrapping in-memory PDF generation and Storage upload**:
+**REQ-RECEIPT-OPERATOR-003 (Event-Driven — DB-atomic + Storage compensating)**
+**WHEN** an operator submits the confirmation form, the system **shall** invoke Server Action `confirmRemittanceAndIssueReceipt({ settlementId, receivedDate, receivedAmountKrw, memo? })`. The execution model is: **the DB-side mutation (settlements UPDATE + receipt_number assignment + files INSERT + notifications INSERT) is executed in a single atomic DB transaction; PDF generation and Storage upload are performed adjacent to the DB transaction (between BEGIN and COMMIT), with compensating cleanup (best-effort Storage object DELETE) if the DB transaction fails.** Concretely, the action **shall** execute the following 8 atomic steps + 1 compensating step:
 
-1. `validateTransition(currentStatus, 'paid')` (must be `requested → paid`)
-2. Verify `receivedAmountKrw === instructor_remittance_amount_krw`; reject with `REMITTANCE_AMOUNT_MISMATCH` otherwise
-3. Acquire `receipt_number` via `SELECT app.next_receipt_number()` (calls `nextval('receipt_number_seq')` + format `RCP-YYYY-NNN`)
-4. Render PDF in memory via `renderReceiptPdf({ settlement, instructor, organization })`
-5. Upload PDF to Storage path `payout-receipts/<settlement_id>/<receipt_number>.pdf` + INSERT `files` row with `kind='receipt'`, `owner_id=instructor's user_id`
-6. `UPDATE settlements SET status='paid', instructor_remittance_received_at=$receivedDate, receipt_file_id=$fileId, receipt_number=$receiptNumber, receipt_issued_at=now(), notes = COALESCE(notes, '') || $memo, updated_at=now() WHERE id=$1 AND status='requested' AND settlement_flow='client_direct'`
-7. INSERT `notifications (recipient_id, type='receipt_issued', title, body, link_url)` row
-8. `console.log("[notif] receipt_issued → instructor_id=<uuid> settlement_id=<uuid> receipt_number=<text>")`
+1. **(pre-tx)** `validateTransition(currentStatus, 'paid')` (must be `requested → paid`); reject with `STATUS_INVALID_TRANSITION` otherwise
+2. **(pre-tx)** Verify `receivedAmountKrw === instructor_remittance_amount_krw`; reject with `REMITTANCE_AMOUNT_MISMATCH` otherwise
+3. **(pre-tx)** `getOrganizationInfo()` resolves Algolink info (DB → env → throw `ORGANIZATION_INFO_MISSING`); acquire `receipt_number` via `SELECT app.next_receipt_number()` RPC (per-year counter, atomic UPSERT)
+4. **(BEGIN)** Open DB transaction; execute `SET LOCAL app.pii_purpose = 'receipt_pdf_generation'` (REQ-RECEIPT-PII-001)
+5. **(in-tx)** SELECT instructor row + decrypt `business_number_enc` via `decrypt_payout_field` RPC + INSERT `pii_access_log` row (one row per receipt)
+6. **(in-tx, in-memory)** Render PDF Buffer via `renderReceiptPdf({ settlement, instructor (with decrypted bizno), organization, receiptNumber, issuedAt })`. Decrypted bizno **shall** flow only into the PDF Buffer and the pii_access_log row; no other persistence
+7. **(in-tx, Storage I/O)** Upload PDF Buffer to bucket `payout-receipts`, name `<settlement_id>/<receipt_number>.pdf` (bucket-relative; REQ-RECEIPT-COLUMNS-007). On Storage upload failure, roll back the tx and return `STORAGE_UPLOAD_FAILED`
+8. **(in-tx)** Within the same DB transaction: (a) INSERT `files (kind='payout_receipt', storage_path='<settlement_id>/<receipt_number>.pdf', owner_id, ...)`; (b) `UPDATE settlements SET status='paid', instructor_remittance_received_at=$receivedDate, receipt_file_id=$fileId, receipt_number=$receiptNumber, receipt_issued_at=now(), notes = ..., updated_at=now() WHERE id=$1 AND status='requested' AND settlement_flow='client_direct'` (RETURNING enforces zero-row → STALE_TRANSITION); (c) INSERT `notifications (recipient_id, type='receipt_issued', title, body, link_url)`; (d) `COMMIT`
+9. **(post-commit, non-rollback)** Emit `console.log("[notif] receipt_issued → instructor_id=<uuid> settlement_id=<uuid> receipt_number=<text>")` and `revalidatePath`
+
+**Compensating step (DB tx failure)**: If the DB transaction rolls back after Step 7 succeeded, the Server Action **shall** execute `supabase.storage.from('payout-receipts').remove([name])` as best-effort (errors logged, never thrown). Residual Storage orphans are reconciled by REQ-RECEIPT-CLEANUP-001.
 
 **REQ-RECEIPT-OPERATOR-004 (Unwanted Behavior)**
-**IF** any of steps 3-7 in REQ-RECEIPT-OPERATOR-003 fail (DB error, Storage error, RLS rejection), **THEN** the system **shall** roll back the entire transaction (DB rollback + best-effort Storage delete of uploaded PDF) and return the appropriate Korean error (`RECEIPT_GENERATION_FAILED`, `STORAGE_UPLOAD_FAILED`, `ORGANIZATION_INFO_MISSING`); the settlement status **shall** remain `requested`.
+**IF** any of Steps 3-8 fail (DB error, Storage error, RLS rejection, RPC failure, decrypt failure), **THEN** the system **shall** roll back the DB transaction; the compensating Storage cleanup **shall** run if Step 7 had succeeded; the action **shall** return the appropriate Korean error (`RECEIPT_GENERATION_FAILED`, `STORAGE_UPLOAD_FAILED`, `ORGANIZATION_INFO_MISSING`, `STATUS_INVALID_TRANSITION`); the settlement status **shall** remain `requested` and `receipt_number` **shall not** be set.
 
 **REQ-RECEIPT-OPERATOR-005 (Unwanted Behavior)**
 **IF** the operator submits confirmation for a settlement that already has `receipt_number IS NOT NULL` (e.g., race condition or stale browser tab), **THEN** the WHERE clause `status='requested'` in the UPDATE **shall** match zero rows, and the action **shall** return `RECEIPT_ALREADY_ISSUED` ("이미 영수증이 발급된 정산입니다.") with no DB change.
@@ -339,11 +407,11 @@ The system **shall** display a flow indicator on the operator detail page for `c
 ### 2.5 REQ-RECEIPT-PDF — 영수증 PDF 생성
 
 **REQ-RECEIPT-PDF-001 (Ubiquitous)**
-The system **shall** generate the receipt PDF using `@react-pdf/renderer` (already declared in package.json per SPEC-ME-001 M8) with NotoSansKR fonts loaded from `public/fonts/NotoSansKR-Regular.ttf` and `public/fonts/NotoSansKR-Bold.ttf`.
+The system **shall** generate the receipt PDF using `@react-pdf/renderer` (already declared in package.json per SPEC-ME-001 M8) with NotoSansKR fonts. Server-side rendering requires absolute paths or HTTP URLs in `Font.register({ src: ... })`; therefore the implementation **shall** resolve font paths via `path.join(process.cwd(), 'public/fonts/NotoSansKR-Regular.ttf')` and `path.join(process.cwd(), 'public/fonts/NotoSansKR-Bold.ttf')` (NOT bare `/fonts/...` paths which only work in browser context).
 
 **REQ-RECEIPT-PDF-002 (Ubiquitous)**
 The receipt PDF layout **shall** be A4 portrait, single page, with the following sections in order:
-1. Header: "영수증" 타이틀 (bold, 24pt) + 영수증 번호 (right-aligned, e.g., `RCP-2026-001`) + 발행일 (KST, `YYYY-MM-DD`)
+1. Header: "영수증" 타이틀 (bold, 24pt) + 영수증 번호 (right-aligned, e.g., `RCP-2026-0001`, 4-digit) + 발행일 (KST, `YYYY-MM-DD`)
 2. 강사 정보: 강사명, 사업자등록번호 (있을 경우; PII 복호화 RPC 경유), 주소 (선택)
 3. 알고링크 정보: 상호 ("주식회사 알고링크" 등), 사업자등록번호, 대표자명, 사업장 주소, 연락처
 4. 거래 정보 (테이블): 송금일, 입금 금액 (KRW), 사유 ("강의 사업비 정산")
@@ -363,7 +431,29 @@ The system **shall** load Algolink organization information via `getOrganization
 The PDF **shall** display all dates in Asia/Seoul timezone using `formatKstDate()` from `src/lib/format/datetime.ts`; all amounts **shall** be formatted via `formatKRW()` (e.g., `1,234,567 원`).
 
 **REQ-RECEIPT-PDF-006 (Optional Feature)**
-**WHERE** the instructor's `business_number` (사업자등록번호) is stored encrypted in `instructors.business_number_enc`, the system **shall** decrypt it via the existing `decrypt_payout_field` RPC (SPEC-ME-001 M7) inside the same transaction, and embed the decrypted value into the PDF; if decryption fails or the field is null, the field **shall** be omitted from the PDF (not blocked).
+**WHERE** the instructor's `business_number` (사업자등록번호) is stored encrypted in `instructors.business_number_enc`, the system **shall** decrypt it via the existing `decrypt_payout_field` RPC (SPEC-ME-001 M7) inside the SAME DB transaction as the settlements UPDATE (Step 5 of REQ-RECEIPT-OPERATOR-003), and embed the decrypted value into the PDF Buffer; if decryption fails or the field is null, the field **shall** be omitted from the PDF (not blocked). The decrypt call **shall** be preceded by `SET LOCAL app.pii_purpose = 'receipt_pdf_generation'` and followed by a `pii_access_log` INSERT (REQ-RECEIPT-PII-001).
+
+### 2.5a REQ-RECEIPT-PII — PII GUC + access log invariant
+
+**REQ-RECEIPT-PII-001 (Ubiquitous — PII transactional invariant)**
+The system **shall** enforce SPEC-ME-001 / LESSON-004 PII invariant for receipt generation: before any `decrypt_payout_field` RPC call, the Server Action **shall** execute `SET LOCAL app.pii_purpose = 'receipt_pdf_generation'` within the same DB transaction; immediately after a successful decrypt, the action **shall** INSERT exactly one row into `pii_access_log(actor_user_id, target_table, target_column, target_id, purpose, accessed_at)` where:
+- `actor_user_id = auth.uid()` (the operator's user_id)
+- `target_table = 'instructors'`
+- `target_column = 'business_number_enc'`
+- `target_id = instructors.id` (the instructor's row id)
+- `purpose = 'receipt_pdf_generation'`
+- `accessed_at = now()`
+
+**REQ-RECEIPT-PII-002 (Unwanted Behavior)**
+**IF** the decrypt RPC fails or `pii_access_log` INSERT fails, **THEN** the entire DB transaction **shall** roll back with `RECEIPT_GENERATION_FAILED`; the Storage compensating cleanup **shall** run if PDF was already uploaded; the receipt **shall not** be issued.
+
+**REQ-RECEIPT-PII-003 (Ubiquitous — no leakage)**
+The decrypted business_number string **shall** flow only into (a) the PDF Buffer (which is uploaded to Storage and not logged), and (b) the `pii_access_log` row (purpose-only, value is NOT stored). The Server Action **shall not** include the decrypted bizno in `console.log`, error messages, or returned response objects.
+
+### 2.5b REQ-RECEIPT-CLEANUP — Storage orphan reconciliation
+
+**REQ-RECEIPT-CLEANUP-001 (Ubiquitous — out-of-scope acknowledgement)**
+The system **acknowledges** that Storage orphans (PDF objects in `payout-receipts` bucket whose `storage_path` is not referenced by any `files` row) are possible when the DB transaction in REQ-RECEIPT-OPERATOR-003 fails after Step 7 succeeded. A daily reconciliation job that scans `storage.objects` in `payout-receipts` and deletes objects with no matching `files.storage_path` is **out of scope** for SPEC-RECEIPT-001 and **shall be delegated** to a future SPEC (SPEC-PAYOUT-CLEANUP-XXX). Best-effort compensating delete in REQ-RECEIPT-OPERATOR-003 mitigates the orphan risk in the common failure path; documented residual risk: rare partial failures where compensating delete also fails (network partition, RLS revocation), which the daily job will catch.
 
 ### 2.6 REQ-RECEIPT-NOTIFY — receipt_issued 알림 + 콘솔 로그
 
@@ -371,36 +461,36 @@ The PDF **shall** display all dates in Asia/Seoul timezone using `formatKstDate(
 The system **shall** add a new value `receipt_issued` to the existing `notification_type` enum via migration `20260429000050_notification_type_receipt_issued.sql` using `ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'receipt_issued';`.
 
 **REQ-RECEIPT-NOTIFY-002 (Event-Driven)**
-**WHEN** the atomic transaction in REQ-RECEIPT-OPERATOR-003 reaches step 7, the system **shall** INSERT a row into `notifications` with:
+**WHEN** the atomic DB transaction in REQ-RECEIPT-OPERATOR-003 reaches Step 8 (notifications INSERT inside the same tx as settlements UPDATE), the system **shall** INSERT a row into `notifications` with:
 - `recipient_id = (SELECT user_id FROM instructors WHERE id = settlements.instructor_id)`
 - `type = 'receipt_issued'`
 - `title = "영수증 발급 완료"`
-- `body = "${receipt_number} (${formatKRW(amount)})"` (e.g., `"RCP-2026-001 (2,000,000 원)"`)
+- `body = "${receipt_number} (${formatKRW(amount)})"` (e.g., `"RCP-2026-0001 (2,000,000 원)"`)
 - `link_url = '/me/payouts/<settlement_id>'`
 - `read_at = NULL`
 
 **REQ-RECEIPT-NOTIFY-003 (Event-Driven)**
-**WHEN** the atomic transaction reaches step 8, the system **shall** emit exactly one stdout line in the format `[notif] receipt_issued → instructor_id=<uuid> settlement_id=<uuid> receipt_number=<text>` (regex: `^\[notif\] receipt_issued → instructor_id=[\w-]{36} settlement_id=[\w-]{36} receipt_number=RCP-\d{4}-\d{3}$`); this serves as the SPEC-NOTIFY-001 hook identifier.
+**WHEN** the DB transaction commits (Step 9, post-commit), the system **shall** emit exactly one stdout line in the format `[notif] receipt_issued → instructor_id=<uuid> settlement_id=<uuid> receipt_number=<text>` (regex: `^\[notif\] receipt_issued → instructor_id=[\w-]{36} settlement_id=[\w-]{36} receipt_number=RCP-\d{4}-\d{4}$`); this serves as the SPEC-NOTIFY-001 hook identifier.
 
 **REQ-RECEIPT-NOTIFY-004 (Unwanted Behavior)**
-**IF** the `notifications` INSERT fails (DB error, RLS rejection), **THEN** the entire transaction (including status update, file row, Storage upload) **shall** roll back; the user **shall** see `RECEIPT_GENERATION_FAILED`; no console.log is emitted.
+**IF** the `notifications` INSERT fails (DB error, RLS rejection) inside the DB transaction, **THEN** the entire DB transaction **shall** roll back (settlements UPDATE + files INSERT + notifications INSERT + pii_access_log INSERT all reverted); the compensating Storage cleanup **shall** run for the uploaded PDF; the user **shall** see `RECEIPT_GENERATION_FAILED`; no console.log line is emitted.
 
-**REQ-RECEIPT-NOTIFY-005 (Ubiquitous)**
-The system **shall not** send actual email/SMS in this SPEC; email integration is delegated to SPEC-NOTIFY-001 which **shall** consume the console.log identifier line via stdout hook or file tail.
+**REQ-RECEIPT-NOTIFY-005 (Ubiquitous — no email/SMS)**
+The system **shall not** send actual email or SMS notifications within SPEC-RECEIPT-001. The only outbound notification channels in scope are: (a) the `notifications` table INSERT (in-app notification consumed by SPEC-LAYOUT-001 notification dropdown), and (b) the `console.log` stdout line (identifier hook for SPEC-NOTIFY-001 future adapter). Email/SMS integration (Resend, SES, KakaoTalk Alimtalk, etc.) is explicitly delegated to SPEC-NOTIFY-001 which **shall** consume the stdout identifier line via stdout hook or file tail. An acceptance scenario **shall** verify that no outbound HTTP request to email/SMS providers occurs during receipt issuance.
 
 ### 2.7 REQ-RECEIPT-RLS — Storage 버킷 + 영수증 접근 제어
 
 **REQ-RECEIPT-RLS-001 (Ubiquitous)**
 The system **shall** create a new Supabase Storage bucket `payout-receipts` via migration `20260429000040_payout_receipts_bucket.sql` with `public = false` and standard 50MB file size limit.
 
-**REQ-RECEIPT-RLS-002 (Ubiquitous)**
-The system **shall** define 3 RLS policies on `storage.objects` for the `payout-receipts` bucket:
-- `payout_receipts_self_select` (SELECT, role: instructor): allow when `auth.uid() = (SELECT i.user_id FROM instructors i JOIN settlements s ON s.instructor_id = i.id WHERE s.receipt_file_id IN (SELECT id FROM files WHERE storage_path = name))` — instructor can read only their own receipts
-- `payout_receipts_operator_all` (ALL, role: operator/admin): allow full RW
+**REQ-RECEIPT-RLS-002 (Ubiquitous — RLS policies using app.current_user_role())**
+The system **shall** define RLS policies on `storage.objects` for the `payout-receipts` bucket. All policies use the project-standard helper `app.current_user_role()` (introduced by migration `20260429000005_app_current_user_role.sql`, defined as `SELECT role FROM users WHERE id = auth.uid()`, SECURITY DEFINER):
+- `payout_receipts_self_select` (SELECT): allow when `bucket_id = 'payout-receipts' AND app.current_user_role() = 'instructor' AND auth.uid() = (SELECT i.user_id FROM instructors i JOIN settlements s ON s.instructor_id = i.id WHERE s.receipt_file_id = (SELECT id FROM files WHERE storage_path = storage.objects.name))`. The `name` column of `storage.objects` is bucket-relative (REQ-RECEIPT-COLUMNS-007), so `WHERE storage_path = name` is a direct equality match (no bucket prefix concatenation needed).
+- `payout_receipts_operator_all` (ALL): allow when `bucket_id = 'payout-receipts' AND app.current_user_role() IN ('operator', 'admin')`
 - (default deny on all other roles via lack of policy)
 
 **REQ-RECEIPT-RLS-003 (Ubiquitous)**
-The `files` table **shall** receive new rows with `kind = 'receipt'` for each issued receipt; the `owner_id` **shall** be set to the instructor's user_id; `storage_path` **shall** follow the convention `payout-receipts/<settlement_id>/<receipt_number>.pdf`.
+The `files` table **shall** receive new rows with `kind = 'payout_receipt'` for each issued receipt; the `owner_id` **shall** be set to the instructor's user_id; `storage_path` **shall** follow the bucket-relative convention `<settlement_id>/<receipt_number>.pdf` (no bucket prefix; see REQ-RECEIPT-COLUMNS-007).
 
 **REQ-RECEIPT-RLS-004 (Unwanted Behavior)**
 **IF** an instructor (role=instructor) attempts to fetch a receipt PDF whose `owner_id` differs from their `auth.uid()`, **THEN** Supabase Storage **shall** return 401/403; the application **shall not** expose unsigned URLs of receipts.
@@ -408,8 +498,8 @@ The `files` table **shall** receive new rows with `kind = 'receipt'` for each is
 **REQ-RECEIPT-RLS-005 (Ubiquitous)**
 The system **shall** generate signed URLs for receipt PDF download with 1-hour expiry using `supabase.storage.from('payout-receipts').createSignedUrl(path, 3600)` from server-side code only; the unsigned `storage_path` **shall not** be exposed to the client.
 
-**REQ-RECEIPT-RLS-006 (Ubiquitous)**
-The system **shall not** introduce any service-role Supabase client in this SPEC; all DB and Storage operations during the atomic Server Action transaction **shall** use the operator's user-scoped session client to keep RLS as the authoritative authorization layer.
+**REQ-RECEIPT-RLS-006 (Ubiquitous — no service-role)**
+The system **shall not** introduce any service-role Supabase client in this SPEC; all DB and Storage operations during the atomic Server Action transaction **shall** use the operator's user-scoped session client to keep RLS as the authoritative authorization layer. **Verification method**: an acceptance scenario **shall** include a code-search check via `grep -r "createServiceRoleClient\|SUPABASE_SERVICE_ROLE_KEY" src/app/(app)/(operator)/settlements/ src/app/(app)/(instructor)/me/payouts/ src/lib/payouts/ | wc -l` returning 0.
 
 ---
 
@@ -446,12 +536,13 @@ The system **shall not** introduce any service-role Supabase client in this SPEC
 
 ### 4.1 신규 마이그레이션 (`supabase/migrations/`)
 
+- `20260429000005_app_current_user_role.sql` — RLS helper `app.current_user_role()` (NEW v0.2.0)
 - `20260429000010_settlement_flow_client_direct.sql` — `settlement_flow` enum value 추가 + CHECK 제약 RECREATE
 - `20260429000020_settlements_remittance_columns.sql` — 6개 nullable 컬럼 + UNIQUE + FK
-- `20260429000030_organization_info.sql` — singleton 테이블 + CHECK (id=1) + RLS
-- `20260429000040_payout_receipts_bucket.sql` — Storage 버킷 + 3개 RLS 정책
+- `20260429000030_organization_info.sql` — singleton 테이블 + CHECK (id=1) + RLS using `app.current_user_role()`
+- `20260429000040_payout_receipts_bucket.sql` — Storage 버킷 + RLS 정책 using `app.current_user_role()`
 - `20260429000050_notification_type_receipt_issued.sql` — `notification_type` enum value 추가
-- `20260429000060_receipt_number_seq.sql` — SEQUENCE + `app.next_receipt_number()` 함수
+- `20260429000060_receipt_number_counter.sql` — `app.receipt_counters(year, counter)` 테이블 + `app.next_receipt_number()` 함수 (per-year reset, v0.2.0)
 
 ### 4.2 신규 도메인 모듈 (`src/lib/payouts/`)
 
@@ -492,12 +583,16 @@ The system **shall not** introduce any service-role Supabase client in this SPEC
 - `src/app/(app)/(operator)/settlements/page.tsx` — flow 필터에 `client_direct` 옵션 추가
 - `src/components/payouts/SettlementStatusBadge.tsx` — flow별 라벨 분기
 
-### 4.6 변경 없음 (충돌 검증)
+### 4.6 의존성 분류 + 충돌 검증
 
-- **SPEC-PAYOUT-002 (sibling)**: 6-1 + sessions 보강 SPEC. 본 SPEC과 (a) `settlements.settlement_flow` enum 확장은 순서 무관 (둘 다 `ALTER TYPE ADD VALUE IF NOT EXISTS`), (b) 본 SPEC의 6개 컬럼 추가 vs SPEC-PAYOUT-002의 sessions 테이블 추가는 별도 테이블 작업으로 충돌 없음, (c) CHECK 제약 RECREATE 시 한 SPEC이 먼저 적용되면 다른 SPEC은 추가 disjunct만 합치면 됨 (마이그레이션 timestamp 순서 의존). 본 SPEC의 timestamp는 `20260429000010~060`이므로 SPEC-PAYOUT-002와 timestamp 충돌 회피 필요.
-- **SPEC-PAYOUT-001**: 변경 없음. 본 SPEC은 `client_direct` 흐름만 추가하고 `corporate`/`government` 흐름 회귀 없음.
-- **SPEC-DB-001**: 변경 없음. 본 SPEC은 SPEC-DB-001 산출물 위에 마이그레이션 6건 추가.
-- **SPEC-ME-001 M5/M7/M8**: 영수증 PDF 렌더링은 SPEC-ME-001 M8 폰트 + RLS 패턴 재사용. M5 정산 상세 페이지를 본 SPEC이 확장.
+- **SPEC-PAYOUT-002 (PREREQUISITE — 선행 SPEC)**: 6-1 + sessions 보강 SPEC. **본 SPEC의 hard prerequisite**이다. 이유:
+  - SPEC-RECEIPT-001의 `instructor_remittance_amount_krw` 컬럼은 SPEC-PAYOUT-002의 GENERATE Server Action이 `flow='client_direct'` 정산 행 생성 시 함께 채워준다 (REQ-RECEIPT-COLUMNS-001 참조)
+  - PAYOUT-002가 main 브랜치에 머지된 이후 본 SPEC 작업 시작
+  - 마이그레이션 timestamp는 PAYOUT-002 이후로 오는 `20260429000005~060` 사용 (PAYOUT-002의 timestamp가 더 이른 경우 timestamp 충돌 회피 필요. 권장: PAYOUT-002 `20260428xxx`, RECEIPT-001 `20260429xxx`)
+  - acceptance.md test setup은 PAYOUT-002 baseline 적용을 가드
+- **SPEC-PAYOUT-001**: 변경 없음. 본 SPEC은 `client_direct` 흐름만 추가하고 `corporate`/`government` 흐름 회귀 없음. **`client_direct` 흐름은 SPEC-PAYOUT-001 전환 그래프(`pending → requested → paid` + `held` 분기)를 그대로 상속**하며, 본 SPEC은 `requested → paid` 전환 시점에 atomic side-effects(영수증 발급)만 추가한다.
+- **SPEC-DB-001**: 변경 없음. 본 SPEC은 SPEC-DB-001 산출물 위에 마이그레이션 7건 추가.
+- **SPEC-ME-001 M5/M7/M8**: 영수증 PDF 렌더링은 SPEC-ME-001 M8 폰트 + M7 pgcrypto + LESSON-004 PII GUC invariant 재사용. M5 정산 상세 페이지를 본 SPEC이 확장.
 - **SPEC-AUTH-001**: 변경 없음. 라우트 가드 그대로 사용.
 - **SPEC-NOTIFY-001**: 변경 없음. 본 SPEC이 콘솔 로그 hook 식별자 제공.
 
@@ -528,9 +623,9 @@ The system **shall not** introduce any service-role Supabase client in this SPEC
    │     ATOMIC 트랜잭션:
    │     1. validateTransition('requested', 'paid')
    │     2. amount mismatch 검증
-   │     3. nextval('receipt_number_seq') → 'RCP-2026-001'
+   │     3. app.next_receipt_number() → 'RCP-2026-0001' (per-year counter)
    │     4. renderReceiptPdf() (in-memory Buffer)
-   │     5. Storage upload + files INSERT (kind='receipt')
+   │     5. Storage upload + files INSERT (kind='payout_receipt', storage_path bucket-relative)
    │     6. UPDATE settlements (status='paid', receipt_*, instructor_remittance_received_at)
    │     7. INSERT notifications (type='receipt_issued')
    │     8. console.log("[notif] receipt_issued → ...")
@@ -541,22 +636,52 @@ The system **shall not** introduce any service-role Supabase client in this SPEC
    - signed URL 1시간 만료
 ```
 
-### 5.2 영수증 번호 발급 (동시성 안전)
+### 5.2 영수증 번호 발급 (연도별 reset, 동시성 안전)
 
 ```sql
--- 20260429000060_receipt_number_seq.sql
-CREATE SEQUENCE IF NOT EXISTS receipt_number_seq START 1;
+-- 20260429000005_app_current_user_role.sql
+CREATE SCHEMA IF NOT EXISTS app;
+
+CREATE OR REPLACE FUNCTION app.current_user_role()
+RETURNS text
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT role::text FROM users WHERE id = auth.uid()
+$$;
+
+GRANT EXECUTE ON FUNCTION app.current_user_role() TO authenticated;
+
+-- 20260429000060_receipt_number_counter.sql
+CREATE TABLE IF NOT EXISTS app.receipt_counters (
+  year integer PRIMARY KEY,
+  counter bigint NOT NULL DEFAULT 0
+);
+
+ALTER TABLE app.receipt_counters ENABLE ROW LEVEL SECURITY;
+-- No policies (default deny for direct access; only SECURITY DEFINER function can read/write)
 
 CREATE OR REPLACE FUNCTION app.next_receipt_number()
 RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = app, public
 AS $$
 DECLARE
-  next_num bigint;
+  cur_year integer;
+  cur_counter bigint;
 BEGIN
-  SELECT nextval('receipt_number_seq') INTO next_num;
-  RETURN 'RCP-' || EXTRACT(YEAR FROM now() AT TIME ZONE 'Asia/Seoul')::text || '-' || LPAD(next_num::text, 3, '0');
+  cur_year := EXTRACT(YEAR FROM now() AT TIME ZONE 'Asia/Seoul')::integer;
+
+  INSERT INTO app.receipt_counters(year, counter)
+  VALUES (cur_year, 1)
+  ON CONFLICT (year)
+  DO UPDATE SET counter = app.receipt_counters.counter + 1
+  RETURNING counter INTO cur_counter;
+
+  RETURN 'RCP-' || cur_year::text || '-' || LPAD(cur_counter::text, 4, '0');
 END;
 $$;
 
@@ -566,19 +691,26 @@ GRANT EXECUTE ON FUNCTION app.next_receipt_number() TO authenticated;
 호출:
 ```ts
 const { data, error } = await supabase.rpc('next_receipt_number');
-// data: 'RCP-2026-001'
+// data: 'RCP-2026-0001' (4-digit pad, supports 9999/year)
 ```
 
-동시성: SEQUENCE는 DB 레벨에서 atomic. 병렬 호출 시 1, 2, 3, ... 순으로 발급되며 중복 없음. UNIQUE 인덱스가 추가 방어선.
+동시성: `INSERT ... ON CONFLICT DO UPDATE ... RETURNING`은 (year) 행에 대한 row-level lock을 atomically 획득. 병렬 호출 시 직렬화되어 중복 없음. UNIQUE 인덱스 (`receipt_number`)가 추가 방어선.
 
-### 5.3 atomic 트랜잭션 (TypeScript)
+연도 reset: 신규 연도 첫 호출 시 `INSERT VALUES (year=2027, counter=1)` 자동 실행. 따라서 `RCP-2026-9999` 다음은 `RCP-2027-0001`.
+
+### 5.3 DB-atomic + Storage compensating 트랜잭션 (TypeScript)
+
+핵심 원칙: **DB 트랜잭션은 settlements UPDATE + files INSERT + notifications INSERT + pii_access_log INSERT를 모두 단일 단위로 묶고, decrypt_payout_field RPC도 같은 트랜잭션 안에서 호출한다 (PII GUC + access log 동시 보장). PDF 생성과 Storage 업로드는 트랜잭션 진입 후 commit 직전에 수행되며, 실패 시 best-effort compensating cleanup이 동작한다.**
 
 ```ts
 // src/app/(app)/(operator)/settlements/[id]/confirm-remittance/actions.ts (개념)
+import path from 'node:path';
+
 export async function confirmRemittanceAndIssueReceipt(input: ConfirmInput) {
   const supabase = await createServerClient();
+  const operator = await requireRole(['operator', 'admin']);
 
-  // 1. Pre-transaction validation
+  // === Pre-tx validation ===
   const settlement = await getSettlementById(input.settlementId);
   if (settlement.status !== 'requested' || settlement.settlement_flow !== 'client_direct') {
     return { ok: false, error: ERRORS.STATUS_INVALID_TRANSITION };
@@ -587,39 +719,79 @@ export async function confirmRemittanceAndIssueReceipt(input: ConfirmInput) {
     return { ok: false, error: ERRORS.REMITTANCE_AMOUNT_MISMATCH };
   }
 
-  // 2. Render PDF in memory (outside DB transaction to allow Buffer to be ready)
-  const organization = await getOrganizationInfo();
-  const instructor = await getInstructorWithDecryptedBizNumber(settlement.instructor_id);
-  const receiptNumber = await nextReceiptNumber(); // RPC
-
-  let pdfBuffer: Buffer;
+  // === Pre-tx: organization info + receipt number acquisition ===
+  let organization;
   try {
-    pdfBuffer = await renderReceiptPdf({
-      settlement, instructor, organization, receiptNumber, issuedAt: new Date(),
-    });
+    organization = await getOrganizationInfo(supabase);
   } catch (e) {
-    return { ok: false, error: ERRORS.RECEIPT_GENERATION_FAILED };
+    return { ok: false, error: ERRORS.ORGANIZATION_INFO_MISSING };
   }
+  const { data: receiptNumber, error: rnErr } = await supabase.rpc('next_receipt_number');
+  if (rnErr || !receiptNumber) return { ok: false, error: ERRORS.RECEIPT_GENERATION_FAILED };
 
-  // 3. Upload to Storage
-  const storagePath = `payout-receipts/${input.settlementId}/${receiptNumber}.pdf`;
-  const { error: uploadErr } = await supabase.storage
-    .from('payout-receipts')
-    .upload(storagePath, pdfBuffer, { contentType: 'application/pdf' });
-  if (uploadErr) return { ok: false, error: ERRORS.STORAGE_UPLOAD_FAILED };
+  // === DB transaction (PII GUC + decrypt + access log + PDF render + Storage upload + DB writes) ===
+  // bucket-relative storage_path (REQ-RECEIPT-COLUMNS-007)
+  const storagePath = `${input.settlementId}/${receiptNumber}.pdf`;
+  let storageUploaded = false;
 
-  // 4. DB transaction: files INSERT + settlements UPDATE + notifications INSERT
-  // (Drizzle transaction; rollback rolls back DB only — Storage cleanup is best-effort)
   try {
     await db.transaction(async (tx) => {
+      // Step 4: PII GUC for the duration of this tx
+      await tx.execute(sql`SET LOCAL app.pii_purpose = 'receipt_pdf_generation'`);
+
+      // Step 5: SELECT instructor + decrypt bizno + log
+      const [instructor] = await tx.select({
+        id: instructorsTable.id,
+        user_id: instructorsTable.user_id,
+        name: instructorsTable.name,
+        business_number_enc: instructorsTable.business_number_enc,
+      }).from(instructorsTable).where(eq(instructorsTable.id, settlement.instructor_id));
+
+      let decryptedBizNumber: string | null = null;
+      if (instructor.business_number_enc) {
+        const { data: dec, error: decErr } = await tx.execute(
+          sql`SELECT decrypt_payout_field(${instructor.business_number_enc}) AS plain`
+        );
+        if (decErr) throw new Error(ERRORS.RECEIPT_GENERATION_FAILED);
+        decryptedBizNumber = dec?.plain ?? null;
+
+        // Mandatory pii_access_log INSERT (REQ-RECEIPT-PII-001)
+        await tx.insert(piiAccessLogTable).values({
+          actor_user_id: operator.id,
+          target_table: 'instructors',
+          target_column: 'business_number_enc',
+          target_id: instructor.id,
+          purpose: 'receipt_pdf_generation',
+          accessed_at: new Date(),
+        });
+      }
+
+      // Step 6: Render PDF in-memory (decrypted bizno flows ONLY into Buffer)
+      const pdfBuffer = await renderReceiptPdf({
+        settlement,
+        instructor: { ...instructor, business_number: decryptedBizNumber },
+        organization,
+        receiptNumber,
+        issuedAt: new Date(),
+      });
+
+      // Step 7: Storage upload (bucket-relative path)
+      const { error: uploadErr } = await supabase.storage
+        .from('payout-receipts')
+        .upload(storagePath, pdfBuffer, { contentType: 'application/pdf' });
+      if (uploadErr) throw new Error(ERRORS.STORAGE_UPLOAD_FAILED);
+      storageUploaded = true;
+
+      // Step 8a: files INSERT (storage_path is bucket-relative; REQ-RECEIPT-COLUMNS-007)
       const [file] = await tx.insert(filesTable).values({
-        kind: 'receipt',
+        kind: 'payout_receipt',
         storage_path: storagePath,
         owner_id: instructor.user_id,
         size_bytes: pdfBuffer.length,
         mime_type: 'application/pdf',
       }).returning();
 
+      // Step 8b: settlements UPDATE
       const updated = await tx.update(settlementsTable)
         .set({
           status: 'paid',
@@ -637,10 +809,9 @@ export async function confirmRemittanceAndIssueReceipt(input: ConfirmInput) {
         ))
         .returning();
 
-      if (updated.length === 0) {
-        throw new Error(ERRORS.STALE_TRANSITION);
-      }
+      if (updated.length === 0) throw new Error(ERRORS.STALE_TRANSITION);
 
+      // Step 8c: notifications INSERT
       await tx.insert(notificationsTable).values({
         recipient_id: instructor.user_id,
         type: 'receipt_issued',
@@ -650,13 +821,17 @@ export async function confirmRemittanceAndIssueReceipt(input: ConfirmInput) {
       });
     });
   } catch (e) {
-    // Best-effort Storage cleanup
-    await supabase.storage.from('payout-receipts').remove([storagePath]).catch(() => {});
-    return { ok: false, error: e.message ?? ERRORS.RECEIPT_GENERATION_FAILED };
+    // Compensating step: best-effort Storage cleanup
+    if (storageUploaded) {
+      await supabase.storage.from('payout-receipts').remove([storagePath]).catch((err) => {
+        console.error(`[storage-orphan] failed to clean up ${storagePath}:`, err);
+      });
+    }
+    return { ok: false, error: (e as Error).message ?? ERRORS.RECEIPT_GENERATION_FAILED };
   }
 
-  // 5. Console log (post-commit, non-rollback)
-  console.log(`[notif] receipt_issued → instructor_id=${instructor.id} settlement_id=${input.settlementId} receipt_number=${receiptNumber}`);
+  // Step 9: Post-commit console log (non-rollback)
+  console.log(`[notif] receipt_issued → instructor_id=${settlement.instructor_id} settlement_id=${input.settlementId} receipt_number=${receiptNumber}`);
 
   revalidatePath(`/settlements/${input.settlementId}`);
   revalidatePath('/settlements');
@@ -665,23 +840,26 @@ export async function confirmRemittanceAndIssueReceipt(input: ConfirmInput) {
 ```
 
 원자성 보장:
-- DB 부분은 transaction으로 atomic
-- Storage 업로드는 transaction 밖에서 먼저 수행 (Buffer는 in-memory)
-- DB transaction 실패 시 Storage object 삭제는 best-effort (로그만 남김)
-- Storage 업로드 후 DB 실패 → 고아 파일 발생 가능 (cron job으로 정리 가능, 후속 SPEC)
-- 중복 발급 방지: WHERE `status='requested'` 조건 + UNIQUE 인덱스 (receipt_number)
+- DB 트랜잭션은 settlements UPDATE + files INSERT + notifications INSERT + pii_access_log INSERT + (decrypt_payout_field RPC)을 묶어 원자적 커밋
+- Storage 업로드는 트랜잭션 안에서 호출되지만 외부 I/O이므로 commit 후에도 잔여 가능 → DB 트랜잭션 롤백 시 best-effort `supabase.storage.remove([name])`로 compensating cleanup
+- 잔여 고아 파일은 일일 reconciliation job(REQ-RECEIPT-CLEANUP-001, 후속 SPEC)에서 처리
+- 중복 발급 방지: WHERE `status='requested'` + UNIQUE 인덱스 (receipt_number) + receipt_counters 행 락 3중 방어
+- PII 보호: `SET LOCAL app.pii_purpose` + `pii_access_log` INSERT가 같은 트랜잭션 안에서 atomic하게 일어남 (LESSON-004 invariant 준수)
 
 ### 5.4 영수증 PDF 컴포넌트
 
 ```tsx
 // src/components/payouts/ReceiptDocument.tsx (개념, planned)
+import path from 'node:path';
 import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
 
+// Server-side render: Font.register requires absolute paths or HTTP URLs.
+// Bare '/fonts/...' paths are browser-only and will silently fail in Node runtime.
 Font.register({
   family: 'NotoSansKR',
   fonts: [
-    { src: '/fonts/NotoSansKR-Regular.ttf' },
-    { src: '/fonts/NotoSansKR-Bold.ttf', fontWeight: 'bold' },
+    { src: path.join(process.cwd(), 'public/fonts/NotoSansKR-Regular.ttf') },
+    { src: path.join(process.cwd(), 'public/fonts/NotoSansKR-Bold.ttf'), fontWeight: 'bold' },
   ],
 });
 
@@ -724,12 +902,13 @@ CREATE TABLE organization_info (
 
 ALTER TABLE organization_info ENABLE ROW LEVEL SECURITY;
 
+-- Use project-standard helper app.current_user_role() (no JWT custom hook required)
 CREATE POLICY org_info_admin_all ON organization_info FOR ALL TO authenticated
-USING ((auth.jwt()->>'role')::text = 'admin')
-WITH CHECK ((auth.jwt()->>'role')::text = 'admin');
+USING (app.current_user_role() = 'admin')
+WITH CHECK (app.current_user_role() = 'admin');
 
 CREATE POLICY org_info_operator_select ON organization_info FOR SELECT TO authenticated
-USING ((auth.jwt()->>'role')::text IN ('operator', 'admin'));
+USING (app.current_user_role() IN ('operator', 'admin'));
 
 -- Seed (optional, MVP)
 INSERT INTO organization_info (id, name, business_number, representative, address, contact)
@@ -758,10 +937,15 @@ export async function registerInstructorRemittance(input: RemitInput) {
   await db.transaction(async (tx) => {
     let evidenceFileId: string | null = null;
     if (input.evidenceFile) {
-      const path = `payout-evidence/${input.settlementId}/${crypto.randomUUID()}.${ext}`;
-      // Upload to Storage (best-effort, before DB)
+      // bucket-relative path (REQ-RECEIPT-COLUMNS-007); bucket=payout-evidence encoded by kind
+      const storagePath = `${input.settlementId}/${crypto.randomUUID()}.${ext}`;
+      // Upload to Storage (best-effort, before DB INSERT)
       // ...
-      const [file] = await tx.insert(filesTable).values({ kind: 'remittance_evidence', ... }).returning();
+      const [file] = await tx.insert(filesTable).values({
+        kind: 'remittance_evidence',
+        storage_path: storagePath,
+        // ...
+      }).returning();
       evidenceFileId = file.id;
     }
 
@@ -769,7 +953,7 @@ export async function registerInstructorRemittance(input: RemitInput) {
       .set({
         status: 'requested',
         client_payout_amount_krw: expectedClientPayout,
-        // instructor_remittance_amount_krw는 운영자가 사전 설정한 값 그대로 유지
+        // instructor_remittance_amount_krw는 SPEC-PAYOUT-002 GENERATE가 설정한 값 그대로 유지 (read-only)
         updated_at: new Date(),
       })
       .where(and(eq(settlementsTable.id, input.settlementId), eq(settlementsTable.status, 'pending')));
@@ -909,8 +1093,14 @@ export const settlements = pgTable('settlements', {
 | 영수증 PDF 크기가 너무 커서 Storage 한도 초과 | 업로드 실패 | A4 단일 페이지 + NotoSansKR (4.4MB) 임베드되지 않고 외부 폰트 → PDF 크기 200KB 미만 예상 |
 | `notification_type` enum 추가 후 NOTIFY-001 어댑터가 모든 enum 처리 누락 | 알림 미발송 | 본 SPEC은 콘솔 로그 hook 식별자 제공만. 실제 발송은 SPEC-NOTIFY-001 책임. 콘솔 로그 형식 명세 명시 |
 | 6-1 ↔ 6-2 흐름 변경 (admin이 settlement_flow를 corporate → client_direct로 UPDATE) | 데이터 불일치 (withholding_tax_rate, instructor_remittance_amount_krw 의미 변동) | 본 SPEC은 settlement_flow UPDATE를 admin SQL로만 허용. 운영자 UI에서 settlement_flow 변경 미제공 |
-| 영수증 번호 연도 경계 (12/31 → 1/1) 시 시퀀스 reset 누락 | RCP-2026-999 다음에 RCP-2027-1000 발생 | 본 SPEC은 단순 incrementing 시퀀스 + 연도 prefix만. 연도별 reset은 후속 SPEC. RCP-2027-1000도 unique이므로 기능적 문제 없음 |
-| SPEC-PAYOUT-002 (sibling) 마이그레이션 timestamp 충돌 | 마이그레이션 순서 깨짐 | 본 SPEC timestamp `20260429000010~060` 사용, SPEC-PAYOUT-002와 충돌 회피 (SPEC-PAYOUT-002는 `20260429000100+` 또는 `20260430+` 사용 권장) |
+| 영수증 번호 연도 경계 (12/31 → 1/1) reset | (해소됨) | v0.2.0 amendment: per-year `receipt_counters` 테이블 + `INSERT ... ON CONFLICT DO UPDATE` 패턴으로 신규 연도 첫 호출 시 counter 자동 reset. `RCP-2026-9999` → `RCP-2027-0001` 정상 동작 |
+| 영수증 번호 9999/년 초과 (이론적 폭증) | 4-digit 자릿수 초과 | MVP 소상공인 플랫폼 가정에서 9999/년은 충분. 후속 SPEC에서 5-digit 확장 가능 (`RCP-YYYY-NNNNN`) |
+| Storage 고아 파일 (DB tx 실패 + compensating delete 실패) | 디스크 누수 | best-effort compensating delete 1차 + 일일 reconciliation job (REQ-RECEIPT-CLEANUP-001, 후속 SPEC) 2차 방어 |
+| PII GUC 누락 또는 pii_access_log 누락 | LESSON-004 invariant 위반, audit 불가 | REQ-RECEIPT-PII-001 명시 + acceptance 시나리오로 매 영수증 발급 시 pii_access_log 1행 INSERT 검증 |
+| `app.current_user_role()` helper 미적용 시 RLS 우회 | 권한 검증 실패 | 마이그레이션 `20260429000005`에서 helper 정의 + 본 SPEC의 모든 RLS predicate가 helper 사용. JWT 커스텀 hook 의존 제거 |
+| storage_path bucket-prefix 혼동 (RLS predicate 매칭 실패) | 강사가 본인 영수증 다운로드 불가 | REQ-RECEIPT-COLUMNS-007에서 bucket-relative invariant 명시. acceptance 시나리오 6-B에서 정책 매칭 검증 |
+| SPEC-PAYOUT-002 prerequisite 미머지 상태에서 본 SPEC 시작 | `instructor_remittance_amount_krw` 채워지지 않은 정산 행 → 강사 송금 등록 단계에서 mismatch | plan.md prerequisite 가드 + acceptance test setup 가드 |
+| SPEC-PAYOUT-002 마이그레이션 timestamp 충돌 | 마이그레이션 순서 깨짐 | 본 SPEC timestamp `20260429000005~060` 사용, SPEC-PAYOUT-002는 더 이른 timestamp(`20260428xxx`) 권장 |
 
 ---
 

@@ -5,10 +5,21 @@ Title: 시간당 사업비 기반 자동 정산 산정 (Hourly-Rate-Based Settle
 Status: draft
 Author: 철
 Priority: high
-Created / Updated: 2026-04-29
+Created / Updated: 2026-04-29 (v0.1.1 — plan-auditor 8건 결함 수정)
 
 Extends (does not modify): SPEC-PAYOUT-001 (settlements 4-state machine, withholding tax CHECK, GENERATED columns, revenue widget)
-Depends on: SPEC-DB-001 (settlements / projects / instructors schema + RLS), SPEC-PROJECT-001 (project_status enum + status machine), SPEC-AUTH-001 (`requireRole(['operator', 'admin'])`)
+Depends on: SPEC-DB-001 (settlements / projects / instructors schema + RLS), SPEC-PROJECT-001 (project_status enum + status machine + `userStepFromEnum`), SPEC-AUTH-001 (`requireRole(['operator', 'admin'])`)
+Extends (with addition): SPEC-PROJECT-001 — adds `instructor_withdrawn` enum value + `userStepFromEnum` mapping case → `'강사매칭'` (REQ-EXCEPT-007)
+
+v0.1.1 amendments (2026-04-29):
+- HIGH-1: calculator integer arithmetic (REQ-CALC-001 / -005)
+- HIGH-2: UNIQUE INDEX race-condition guard (REQ-LINK-002 / -006)
+- HIGH-3: §4.2 rollback procedure + M1 acceptance gate
+- MEDIUM-4: hours <= 24 CHECK + zod (REQ-SESSIONS-001 / -008)
+- MEDIUM-5: 8 new acceptance scenarios (10~17)
+- MEDIUM-6: instructor_withdrawn → '강사매칭' mapping (REQ-EXCEPT-007)
+- LOW-7: original_session_id ON DELETE RESTRICT
+- LOW-8: reschedule notes carry-forward (REQ-EXCEPT-002)
 
 ---
 
@@ -16,12 +27,14 @@ Depends on: SPEC-DB-001 (settlements / projects / instructors schema + RLS), SPE
 
 ### REQ-PAYOUT002-SESSIONS — lecture_sessions entity + CRUD + status transitions
 
-- REQ-PAYOUT002-SESSIONS-001 (Ubiquitous): The system shall define a new table `lecture_sessions` with columns `id uuid PK`, `project_id uuid FK→projects RESTRICT`, `instructor_id uuid FK→instructors NULL`, `date date NOT NULL`, `hours numeric(4,1) NOT NULL CHECK (hours > 0)`, `status lecture_session_status NOT NULL DEFAULT 'planned'`, `original_session_id uuid self-FK NULL`, `notes text NULL`, timestamps + soft `deleted_at`.
+- REQ-PAYOUT002-SESSIONS-001 (Ubiquitous): The system shall define a new table `lecture_sessions` with columns `id uuid PK`, `project_id uuid FK→projects RESTRICT`, `instructor_id uuid FK→instructors NULL`, `date date NOT NULL`, **`hours numeric(4,1) NOT NULL CHECK (hours > 0 AND hours <= 24)`** (MEDIUM-4), `status lecture_session_status NOT NULL DEFAULT 'planned'`, **`original_session_id uuid self-FK ON DELETE RESTRICT NULL`** (LOW-7 — 감사 추적 보존), `notes text NULL`, timestamps + soft `deleted_at`.
 - REQ-PAYOUT002-SESSIONS-002 (Ubiquitous): Define enum `lecture_session_status` with values `planned | completed | canceled | rescheduled`. Indexes on `(project_id, date)` and `(instructor_id, date)`.
 - REQ-PAYOUT002-SESSIONS-003 (Ubiquitous): Validate `hours` to be a multiple of 0.5 via zod; non-multiples rejected with Korean error `"강의 시수는 0.5시간 단위로 입력해주세요."`.
 - REQ-PAYOUT002-SESSIONS-004 (Event-Driven): WHEN operator submits the project form with new sessions, the system shall bulk INSERT/UPDATE in a single transaction.
 - REQ-PAYOUT002-SESSIONS-005 (Unwanted Behavior): IF status is `completed`, `canceled`, or `rescheduled`, THEN status changes are rejected with `"종료된 강의 세션은 상태를 변경할 수 없습니다."`. Allowed transitions: `planned → completed/canceled/rescheduled`.
 - REQ-PAYOUT002-SESSIONS-006 (Ubiquitous): Soft-deleted sessions (`deleted_at IS NOT NULL`) are excluded from operator UIs and settlement generation queries.
+- REQ-PAYOUT002-SESSIONS-007 (Ubiquitous): `notes` column persists cancellation / reschedule / withdrawal reasons with timestamp/operator markers prepended.
+- **REQ-PAYOUT002-SESSIONS-008 (Unwanted Behavior)**: IF `hours > 24 OR hours <= 0 OR hours not multiple of 0.5`, THEN zod schema rejects with one of `"강의 시수는 24시간을 초과할 수 없습니다."` / `"강의 시수는 0보다 커야 합니다."` / `"강의 시수는 0.5시간 단위로 입력해주세요."`. Application + DB CHECK defense-in-depth (MEDIUM-4).
 
 ### REQ-PAYOUT002-PROJECT-FIELDS — projects.hourly_rate_krw + instructor_share_pct
 
@@ -33,11 +46,22 @@ Depends on: SPEC-DB-001 (settlements / projects / instructors schema + RLS), SPE
 
 ### REQ-PAYOUT002-CALC — calculation pure functions
 
-- REQ-PAYOUT002-CALC-001 (Ubiquitous): Define `src/lib/payouts/calculator.ts` exporting `calculateInstructorFeePerHour(hourlyRateKrw, sharePct) = floor(hourlyRateKrw × sharePct / 100)`, `calculateTotalBilledHours(sessions) = SUM(hours WHERE status='completed' AND deleted_at IS NULL)`, `calculateBusinessAmount(hourlyRateKrw, totalHours)`, `calculateInstructorFee(feePerHour, totalHours)`.
-- REQ-PAYOUT002-CALC-002 (Ubiquitous): All functions return integer KRW; intermediate FP values floored, never rounded.
+- **REQ-PAYOUT002-CALC-001 (Ubiquitous, HIGH-1 fix)**: Define `src/lib/payouts/calculator.ts` exporting:
+  - `calculateInstructorFeePerHour(hourlyRateKrw, sharePct)` = **`floor((hourlyRateKrw × Math.round(sharePct × 100)) / 10000)`** — **integer arithmetic** to prevent IEEE-754 drift on monetary values (e.g., `(1000, 32.3)` → 322 under FP arithmetic vs 323 under integer arithmetic). `share_pct` is `numeric(5,2)`, so `Math.round(sharePct × 100)` is exact.
+  - `calculateTotalBilledHours(sessions)` = `SUM(hours WHERE status='completed' AND deleted_at IS NULL)`
+  - `calculateBusinessAmount(hourlyRateKrw, totalHours)` = `floor(hourlyRateKrw × totalHours)` (.5 fractional 차단)
+  - `calculateInstructorFee(feePerHour, totalHours)` = `floor(feePerHour × totalHours)` (.5 fractional 차단)
+- REQ-PAYOUT002-CALC-002 (Ubiquitous): All functions return integer KRW; intermediate FP values floored, never rounded (단, share_pct → integer 변환을 위한 `Math.round(× 100)`만 예외).
 - REQ-PAYOUT002-CALC-003 (Ubiquitous): `calculateTotalBilledHours` includes only `completed` sessions; `planned`, `canceled`, `rescheduled` excluded.
 - REQ-PAYOUT002-CALC-004 (Ubiquitous): Generate flow uses calculator output verbatim when INSERTing settlements; SPEC-PAYOUT-001 GENERATED columns auto-compute.
-- REQ-PAYOUT002-CALC-005 (Ubiquitous): Unit tests cover at minimum: `(100000, 70) → 70000`, `(80000, 66.67) → floor(53336)`, sessions filter (`completed:2.0 + completed:1.5 + planned:1.0 + canceled:1.0 = 3.5`), edge cases `share_pct=0`, `hourly_rate=0`.
+- **REQ-PAYOUT002-CALC-005 (Ubiquitous, HIGH-1 fix)**: Unit tests cover at minimum:
+  - (a) `(100000, 70) → 70000`
+  - (b) `(80000, 66.67) → 53336` (정수 산술 결과)
+  - (c) sessions filter (`completed:2.0 + completed:1.5 + planned:1.0 + canceled:1.0 + rescheduled:2.0 = 3.5`)
+  - (d) `(*, 0) → 0`, (e) `(0, *) → 0`
+  - **(f) IEEE-754 drift regression: `(1000, 32.3) → 323`** (정수 산술 게이트키퍼; FP 식은 322)
+  - (g) cascade: `(80000, 66.67, 4.5) → fee=240012` (= floor(53336 × 4.5))
+  - (h) `Math.round(33.33 × 100) === 3333` (numeric(5,2) 정수 변환 정확성)
 
 ### REQ-PAYOUT002-GENERATE — operator-driven batch generation
 
@@ -53,19 +77,21 @@ Depends on: SPEC-DB-001 (settlements / projects / instructors schema + RLS), SPE
 ### REQ-PAYOUT002-LINK — settlement_sessions junction (double-billing prevention)
 
 - REQ-PAYOUT002-LINK-001 (Ubiquitous): Define `settlement_sessions` junction with `settlement_id uuid REFERENCES settlements ON DELETE CASCADE`, `lecture_session_id uuid REFERENCES lecture_sessions ON DELETE RESTRICT`, PK `(settlement_id, lecture_session_id)`, `created_at timestamptz NOT NULL DEFAULT now()`.
-- REQ-PAYOUT002-LINK-002 (Ubiquitous): Index on `lecture_session_id` to support "is this session already billed?" lookup.
-- REQ-PAYOUT002-LINK-003 (Ubiquitous): Generate flow filters out lecture_sessions whose id already exists in `settlement_sessions.lecture_session_id` (excluding soft-deleted settlements).
+- **REQ-PAYOUT002-LINK-002 (Ubiquitous, HIGH-2 fix)**: **UNIQUE INDEX** on `(lecture_session_id)` (single column) — both lookup performance index AND DB-layer race-condition guard.
+- REQ-PAYOUT002-LINK-003 (Ubiquitous): Generate flow filters out lecture_sessions whose id already exists in `settlement_sessions.lecture_session_id` (excluding soft-deleted settlements). UI 미리보기용; 권위 있는 guard는 LINK-006 UNIQUE.
 - REQ-PAYOUT002-LINK-004 (Event-Driven): WHEN settlement is hard-deleted, CASCADE removes settlement_sessions; WHEN soft-deleted (`deleted_at` set), settlement_sessions remain but generate excludes their linked sessions.
 - REQ-PAYOUT002-LINK-005 (Unwanted Behavior): IF lecture_session referenced in junction is hard-deleted, THEN ON DELETE RESTRICT prevents deletion.
+- **REQ-PAYOUT002-LINK-006 (Unwanted Behavior, HIGH-2 fix) [HARD]**: IF two operators concurrently call `generateSettlementsForPeriod` such that the same `lecture_session_id` would be linked into two different settlements (READ COMMITTED race), THEN the UNIQUE constraint on `(lecture_session_id)` rejects the second INSERT (SQLSTATE 23505) and the wrapping transaction ROLLBACK; application surfaces Korean error `"이 강의는 이미 다른 정산에 청구되었습니다. 새로 고침 후 다시 시도해주세요."`. Authoritative DB-layer double-billing guard, replaces app-layer NOT IN as primary defense (NOT IN remains for UI early-reject).
 
 ### REQ-PAYOUT002-EXCEPT — cancel / reschedule / instructor withdrawal
 
 - REQ-PAYOUT002-EXCEPT-001 (Event-Driven, 결강): WHEN operator marks `planned → canceled`, the session is auto-excluded from subsequent settlement generations.
-- REQ-PAYOUT002-EXCEPT-002 (Event-Driven, 일정 변경): WHEN operator clicks "다른 날로 옮김" with new date, transactionally UPDATE original `status='rescheduled'` and INSERT new lecture_sessions row with same `project_id` / `instructor_id` / `hours`, `status='planned'`, `original_session_id = original.id`, new `date`. New session billable when later marked `completed`.
+- **REQ-PAYOUT002-EXCEPT-002 (Event-Driven, 일정 변경, LOW-8 fix)**: WHEN operator clicks "다른 날로 옮김" with new date, transactionally UPDATE original `status='rescheduled'` and INSERT new lecture_sessions row with same `project_id` / `instructor_id` / `hours`, `status='planned'`, `original_session_id = original.id`, new `date`. **The new session inherits the original's `notes` value (carry-forward); operator MAY amend via the reschedule dialog's optional "비고" textarea before saving.** New session billable when later marked `completed`. `original_session_id` chain enforced via `ON DELETE RESTRICT` for audit preservation.
 - REQ-PAYOUT002-EXCEPT-003 (Event-Driven, 강사 중도 하차): WHEN operator clicks "강사 중도 하차" with reason text, transactionally UPDATE all `planned AND date >= CURRENT_DATE` sessions for the project to `canceled` (append reason to `notes`), UPDATE project status to `instructor_withdrawn` (new enum value). `completed` sessions remain billable.
 - REQ-PAYOUT002-EXCEPT-004 (Ubiquitous): Show Korean confirmation dialog `"미래 ${count}건의 강의가 자동 취소됩니다. 계속하시겠습니까?"` before bulk-cancel; action does not proceed without explicit confirmation.
 - REQ-PAYOUT002-EXCEPT-005 (Unwanted Behavior): IF operator attempts to revert `canceled` or `rescheduled` to `planned`/`completed`, THEN reject with `"종료된 강의 세션은 상태를 변경할 수 없습니다."`. To restore, create a new session row.
 - REQ-PAYOUT002-EXCEPT-006 (Optional): WHERE project status is `instructor_withdrawn`, display a banner on the project detail page with reassignment link (handed off to SPEC-PROJECT-001 reassignment flow).
+- **REQ-PAYOUT002-EXCEPT-007 (Ubiquitous, MEDIUM-6 fix — 7-step mapping)**: Extend `src/lib/projects/status-flow.ts` so that `instructor_withdrawn` enum maps to user step `'강사매칭'` in `userStepFromEnum(status)`. Rationale: instructor withdrawal regresses the project workflow to instructor matching pending re-recommendation. `defaultEnumForUserStep('강사매칭')` remains `lecture_requested` (forward-flow default); `instructor_withdrawn` is reachable only via `withdrawInstructorAction`. TypeScript exhaustiveness check (`switch` with `never` default) MUST include `instructor_withdrawn` case — failure causes compile-time error and is a M1 acceptance gate.
 
 ### REQ-PAYOUT002-RLS — role guards + data isolation
 
@@ -108,10 +134,10 @@ Depends on: SPEC-DB-001 (settlements / projects / instructors schema + RLS), SPE
 - When: Operator clicks "강사 중도 하차" with reason text, confirms.
 - Then: 2 past completed sessions unchanged. 3 future planned sessions transitioned to `canceled` with reason in `notes`. Project status = `instructor_withdrawn`. Banner displayed on project detail. Subsequent generate bills only the 2 past completed sessions (4h × 100,000원).
 
-### Scenario 7 — Hourly rate + share_pct calculation correctness
-- Given: calculator.ts module imported.
-- When: Calling `calculateInstructorFeePerHour(100000, 70)`, `(80000, 66.67)`, `(0, 70)`, `(100000, 0)`, `(100000, 100)`; `calculateTotalBilledHours` on mixed-status array; `calculateBusinessAmount(100000, 8.0)`; `calculateInstructorFee(70000, 8.0)`.
-- Then: 70000, 53336, 0, 0, 100000, 3.5 (only completed counted), 800000, 560000. All integer.
+### Scenario 7 — 정수 산술 (Integer Arithmetic) calculation correctness (HIGH-1)
+- Given: calculator.ts module imported. All functions use integer arithmetic: `feePerHour = floor((rate × Math.round(pct × 100)) / 10000)`, `business = floor(rate × hours)`, `fee = floor(feePerHour × hours)`.
+- When: Calling `calculateInstructorFeePerHour(100000, 70)`, `(80000, 66.67)`, `(0, 70)`, `(100000, 0)`, `(100000, 100)`, **`(1000, 32.3)` [IEEE-754 drift regression case]**; `calculateTotalBilledHours` on mixed-status array; `calculateBusinessAmount(100000, 8.0)`; `calculateInstructorFee(70000, 8.0)`; cascade `calculateInstructorFee(53336, 4.5)` and `calculateInstructorFee(16665, 4.5)`.
+- Then: 70000, 53336, 0, 0, 100000, **323 [정수 산술 게이트키퍼 — FP arithmetic would yield 322]**, 3.5 (only completed counted), 800000, 560000, 240012, 74992. All integer; `Math.round(33.33 × 100) === 3333`.
 
 ### Scenario 8 — RLS: instructor cannot read other instructors' sessions
 - Given: 2 lecture_sessions (session-1: instructor-A.id, session-2: instructor-B.id). Logged in as instructor-A.
@@ -123,15 +149,60 @@ Depends on: SPEC-DB-001 (settlements / projects / instructors schema + RLS), SPE
 - When: Operator clicks "정산 요청" then "입금 확인".
 - Then: status `pending → requested → paid`, `payment_received_at` set, settlement_status_history auto-INSERT 2 rows, notifications INSERT 1 row, console log `[notif] settlement_requested → ...`. SPEC-PAYOUT-001's `held → paid` block, revenue widget aggregation all unchanged.
 
+### Scenario 10 — Concurrent generate race prevention (HIGH-2 회귀)
+- Given: Project X has 5 unbilled completed sessions; settlement_sessions empty.
+- When: `Promise.all([generateSettlementsForPeriod(...), generateSettlementsForPeriod(...)])` simulates concurrent operators.
+- Then: First call succeeds with `{ ok: true, createdCount: 1, linkedCount: 5 }`. Second call's transaction ROLLBACK on UNIQUE violation (SQLSTATE 23505); returns `{ ok: false, error: '이 강의는 이미 다른 정산에 청구되었습니다. 새로 고침 후 다시 시도해주세요.' }`. DB has exactly 1 settlement and 5 settlement_sessions rows.
+
+### Scenario 11 — hours validation (MEDIUM-4 + MEDIUM-5)
+- Given: Operator at session matrix.
+- When: Submits `hours=1.3`, `hours=25`, `hours=0`, `hours=-1`.
+- Then: All rejected by zod with respective Korean errors. DB CHECK rejects any bypass with check_violation.
+
+### Scenario 12 — status freeze (MEDIUM-5)
+- Given: Sessions in `completed`, `canceled`, `rescheduled` states.
+- When: Attempts to transition back to `planned`/`completed`.
+- Then: `validateTransition` rejects with `"종료된 강의 세션은 상태를 변경할 수 없습니다."`. Only `planned → completed/canceled/rescheduled` allowed.
+
+### Scenario 13 — share_pct out-of-range rejection (MEDIUM-5)
+- Given: Project form.
+- When: Submits `instructor_share_pct=150`, `-10`, `100.01`, `99.99`.
+- Then: First three rejected with `"강사 분배율은 0~100 사이여야 합니다."`; last accepted.
+
+### Scenario 14 — ON DELETE RESTRICT for linked sessions (MEDIUM-5)
+- Given: Settlement S1 linked to lecture_sessions [s1, s2, s3].
+- When: `DELETE FROM lecture_sessions WHERE id = 's1'`.
+- Then: PostgreSQL FK violation; DELETE rejected. UI surfaces Korean error `"이 세션은 정산에 청구되어 삭제할 수 없습니다."`.
+
+### Scenario 15 — settlement_sessions RLS instructor self-select (MEDIUM-5)
+- Given: 2 settlements (A→instructor-A, B→instructor-B), 6 settlement_sessions rows.
+- When: instructor-A queries `SELECT * FROM settlement_sessions`.
+- Then: Returns 3 rows (only those linked to settlement-A via join with `instructor_id = (SELECT id FROM instructors WHERE user_id = auth.uid())`).
+
+### Scenario 16 — service-role client absence (MEDIUM-5)
+- Given: All new modules introduced by this SPEC.
+- When: `grep -rn "createServiceClient\|service_role\|SUPABASE_SERVICE_ROLE_KEY"` on `src/lib/sessions/`, `src/lib/payouts/{calculator,generate}.ts`, `src/app/(app)/(operator)/settlements/generate/`.
+- Then: 0 matches. All DB calls use user-scoped server client. RLS remains authoritative.
+
+### Scenario 17 — settlement_flow defaulting + override (MEDIUM-5)
+- Given: P1 has `settlement_flow='corporate'` metadata; P2 has none.
+- When: Operator generates for [P1, P2].
+- Then: P1 row pre-fills `corporate`; P2 row requires operator dropdown (`corporate`/`government`). On submit, settlements 2건 INSERT with respective flows + corresponding withholding_tax_rate.
+
+### Scenario 18 — instructor_withdrawn user-step mapping (MEDIUM-6)
+- Given: M1 migration applied; status-flow.ts updated.
+- When: Calling `userStepFromEnum('instructor_withdrawn')`.
+- Then: Returns `'강사매칭'`. TypeScript switch-never exhaustiveness check passes. `defaultEnumForUserStep('강사매칭') === 'lecture_requested'` (forward default unchanged). 14-case mapping matrix all PASS.
+
 ---
 
 ## Affected Files
 
-### New Migrations (3 + 1 optional)
-- `supabase/migrations/20260429xxxxxx_lecture_sessions.sql` — table + enum + indexes + RLS
+### New Migrations (3 + 1 — all required as of v0.1.1)
+- `supabase/migrations/20260429xxxxxx_lecture_sessions.sql` — table + enum + indexes + RLS + **CHECK `hours > 0 AND hours <= 24`** (MEDIUM-4) + **`original_session_id ON DELETE RESTRICT`** (LOW-7)
 - `supabase/migrations/20260429xxxxxx_projects_hourly_rate.sql` — ALTER projects ADD COLUMN
-- `supabase/migrations/20260429xxxxxx_settlement_sessions_link.sql` — junction
-- (optional) `supabase/migrations/20260429xxxxxx_project_status_instructor_withdrawn.sql` — enum value
+- `supabase/migrations/20260429xxxxxx_settlement_sessions_link.sql` — junction + **UNIQUE INDEX on `(lecture_session_id)`** (HIGH-2)
+- **(required, one-way)** `supabase/migrations/20260429xxxxxx_project_status_instructor_withdrawn.sql` — adds enum value. **Non-reversible**: PostgreSQL has no `ALTER TYPE ... DROP VALUE`. Pre-deployment staging dry-run + backup gate required (HIGH-3, spec.md §4.2 + plan.md M1 acceptance).
 
 ### New Domain Modules
 - `src/lib/sessions/{types,queries,status-machine,validation,errors,index}.ts`

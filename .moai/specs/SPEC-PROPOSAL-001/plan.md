@@ -5,6 +5,28 @@
 **Mode**: TDD (Test-Driven Development) — `quality.development_mode: tdd` 디폴트.
 **Reason**: 본 SPEC은 신규 도메인 추가(brownfield enhancement)이며 기존 SPEC-PROJECT-001 / SPEC-RECOMMEND-001 / SPEC-DB-001의 frozen 약속을 보호해야 한다. 순수 함수 도메인(`status-machine`, `inquiry`, `convert`, `signal`)은 RED-GREEN-REFACTOR 사이클로, Server Action 통합은 characterization 테스트로 검증한다.
 
+## Prerequisites & Sibling SPEC Sequencing
+
+**[HARD] SPEC-CONFIRM-001 머지 선행 조건** (REQ-PROPOSAL-INQUIRY-009 참조):
+
+본 SPEC의 디스패치 흐름은 강사가 알림을 받고 응답할 화면(`/me/inquiries`)과 응답 캡처 테이블(`instructor_responses`)이 SPEC-CONFIRM-001에 의해 제공되어야 end-to-end로 동작한다. 본 SPEC implementation이 단독으로 머지되면 강사가 받은 알림이 dead-link 상태가 되어 `proposal_inquiries.status`가 `pending`에 영구 잔존하며, 이는 응답 보드(REQ-PROPOSAL-DETAIL-006) / 변환 액션의 accepted 후보 추출(§5.4 Step 5) / 시그널 view(REQ-PROPOSAL-SIGNAL-001) 모두를 무력화한다.
+
+머지 순서:
+1. **SPEC-CONFIRM-001** 머지 — `instructor_responses` 테이블 + `/me/inquiries` 라우트 + `proposal_inquiries.status` 갱신 트랜잭션 제공.
+2. **SPEC-PROPOSAL-001** (본 SPEC) implementation 완료 + 머지 — CONFIRM-001 컨트랙트에 의존하여 응답 보드 렌더링 + Won 변환 흐름 활성화.
+
+병행 plan 단계 작성은 허용되나, 본 SPEC의 M5(디스패치) 또는 M7(통합 테스트) 종료 게이트 통과는 SPEC-CONFIRM-001의 `proposal_inquiries.status` 갱신 트랜잭션이 머지된 이후에만 의미를 갖는다. 통합 테스트(`integration.test.ts`)는 CONFIRM-001 미머지 환경에서는 SQL 직접 UPDATE로 응답 시뮬레이션을 수행한다(acceptance.md Scenario 6 Note 참조).
+
+대체 제어(R-7 mitigation): 본 SPEC만 단독 머지되어야 하는 운영 사고 발생 시, 디스패치 알림 본문에 임시 안내 문구(`"응답 화면 준비 중 — 운영자에게 직접 회신 부탁드립니다"`)를 삽입하는 옵션이 있으나, 이는 비상 폴백이며 정상 머지 순서가 아니다.
+
+**기타 의존성**:
+- SPEC-DB-001 (completed): `clients`, `instructors`, `users`, `skill_categories`, `notifications`, `files` 테이블 + RLS 패턴
+- SPEC-CLIENT-001 (completed): `clients` 등록 흐름, Storage 버킷 패턴 (`proposal-attachments` 버킷 설계 참조)
+- SPEC-PROJECT-001 (completed): `projects` + `project_required_skills` + `ai_instructor_recommendations` (Won 변환 타깃, **schema 변경 0건** 약속)
+- SPEC-RECOMMEND-001 (draft): 가중치 FROZEN — 본 SPEC은 `instructor_inquiry_history` view만 제공, score.ts 변경 0건
+- SPEC-AUTH-001 (completed): `requireRole(['operator', 'admin'])`, `getCurrentUser()`
+- SPEC-NOTIFY-001 (draft|in-progress): `notifications` 테이블 + 콘솔 로그 스텁 패턴
+
 ## Milestones
 
 본 SPEC은 7개 마일스톤으로 분해한다. 각 마일스톤은 독립적으로 검증 가능하며, 우선순위 기반으로 순차 실행한다.
@@ -134,29 +156,40 @@
 
 **Dependencies**: M1, M2, M4
 
-**Risks**: 동시 디스패치 race → DB unique 제약으로 직렬화 보장. 의도된 배타적 동작.
+**Risks**: 동시 디스패치 race → DB UNIQUE(proposal_id, instructor_id) 제약 자체가 충돌을 직렬 검출하고 자동 거부 — **advisory lock 불필요** (spec.md §5.3 LOW-6 fix 참조). Server Action은 SQLSTATE `23505`(unique violation)를 catch하여 한국어 에러로 변환. 의도된 배타적 동작.
 
 ---
 
 ### M6: Won → Project 변환 (Priority: High)
 
-**Scope**: 변환 Server Action + 단일 트랜잭션 + accepted 강사 ai_instructor_recommendations row + redirect.
+**Scope**: 변환 Server Action + 단일 트랜잭션 + 행 잠금(SELECT FOR UPDATE) + 멱등성 + accepted 강사 ai_instructor_recommendations row + redirect.
 
 **Deliverables**:
-- `src/app/(app)/(operator)/proposals/[id]/convert/actions.ts` — `convertProposalToProject`
-- `src/components/proposals/ConvertToProjectButton.tsx` — 트리거 + 확인 다이얼로그
-- 단일 트랜잭션 (projects + project_required_skills + ai_instructor_recommendations + proposals UPDATE)
-- redirect to `/projects/<new_id>`
+- `src/app/(app)/(operator)/proposals/[id]/convert/actions.ts` — `convertProposalToProject` (canonical 6-step transaction per spec.md §5.4)
+- `src/components/proposals/ConvertToProjectButton.tsx` — 트리거 + 확인 다이얼로그 + 더블클릭 가드(client-side debounce)
+- 단일 트랜잭션 (canonical 순서):
+  1. `SELECT ... FOR UPDATE` proposals row (REQ-PROPOSAL-CONVERT-001 Step 1, REQ-PROPOSAL-CONVERT-007 READ COMMITTED)
+  2. 멱등성/상태 체크 (REQ-PROPOSAL-CONVERT-002/003)
+  3. projects INSERT RETURNING id
+  4. project_required_skills 복사
+  5. ai_instructor_recommendations INSERT (accepted ≥ 1일 때)
+  6. proposals UPDATE (status='won', decided_at, converted_project_id)
+- redirect to `/projects/<converted_project_id>` (idempotent 재호출 시도 동일 redirect)
 
 **Success Criteria**:
 - 변환 성공 → projects 신규 row + skills 복사 + (accepted ≥ 1 시) ai_instructor_recommendations row 1건 + proposals 갱신, 모두 단일 트랜잭션
-- 멱등성: `converted_project_id IS NOT NULL` 재변환 거부
-- status='submitted' 외 상태 변환 거부
+- 멱등성: `converted_project_id IS NOT NULL` 재호출 시 early-return (existing project_id 동일 반환, projects 신규 INSERT 0건)
+- 동시성: 두 호출 race 시 정확히 1 projects row + 둘 다 동일 project_id 반환 (acceptance.md Scenario 4d 통합 테스트로 검증)
+- status='submitted' 외 상태 변환 거부 (한국어 에러 + 트랜잭션 롤백)
 - SPEC-PROJECT-001 detail 페이지에서 신규 project 정상 표시
 
 **Dependencies**: M1, M2, M4, M5
 
-**Risks**: 변환 트랜잭션 부분 성공 → Drizzle `db.transaction` 블록으로 단일 트랜잭션 보장. accepted 강사 0명 케이스 → ai_instructor_recommendations INSERT skip.
+**Risks (HIGH-1/HIGH-2 mitigation)**:
+- **변환 트랜잭션 부분 성공 또는 동시 호출 race로 두 projects row 생성**: §5.4 Step 1의 `SELECT ... FOR UPDATE` + READ COMMITTED 격리 조합으로 race 차단. 두 번째 트랜잭션은 첫 번째 commit/rollback까지 차단되며, 차단 해제 후 멱등 early-return 분기로 진입 — 정확히 1 projects row + 동일 project_id 반환 보장.
+- **부분 INSERT 후 UPDATE 실패**: Drizzle `db.transaction(async (tx) => { ... })` 블록 내부 어떤 step이라도 throw하면 전체 롤백.
+- **accepted 강사 0명 케이스**: ai_instructor_recommendations INSERT skip (Step 5 자체 skip).
+- **FK 순서**: projects INSERT(Step 3)가 proposals UPDATE(Step 6)보다 반드시 선행되어야 함 — `proposals.converted_project_id`가 `projects(id)` FK 참조이므로. canonical 순서 위반 시 FK 위반으로 즉시 롤백 (회귀 테스트로 보호).
 
 ---
 

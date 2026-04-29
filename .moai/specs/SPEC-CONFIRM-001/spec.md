@@ -1,6 +1,6 @@
 ---
 id: SPEC-CONFIRM-001
-version: 0.1.0
+version: 0.2.0
 status: draft
 created: 2026-04-29
 updated: 2026-04-29
@@ -13,6 +13,7 @@ issue_number: null
 
 ## HISTORY
 
+- **2026-04-29 (v0.2.0)**: plan-auditor FAIL 결정에 대응한 8건 결함(HIGH 3 / MEDIUM 3 / LOW 2) 수정. (1) **HIGH-1 polymorphic FK 정합**: `instructor_responses.source_id` 단일 컬럼 모델을 폐기하고 `project_id uuid REFERENCES projects(id) ON DELETE CASCADE` + `proposal_inquiry_id uuid REFERENCES proposal_inquiries(id) ON DELETE CASCADE` 두 nullable FK + `CHECK XOR` 제약 + 두 partial UNIQUE 인덱스(per-source idempotency)로 전환. orphan 응답 위험 제거, Drizzle/PostgREST/Supabase 도구 호환성 확보; (2) **HIGH-2 Accept→Decline 보상 트랜잭션**: 1시간 윈도 내 accepted → declined/conditional 전환 시 `projects.status` reset + `projects.instructor_id` clear + 직전 accept이 INSERT한 `schedule_items` 하드 삭제를 단일 트랜잭션으로 수행하는 REQ-CONFIRM-EFFECTS-008 신설. SPEC-PROJECT-001 `validateTransition` 그래프에 `assignment_confirmed → assignment_review` 역방향 전환이 부재하므로 후속 SPEC-PROJECT-AMEND-001로 보완 위임 + 본 SPEC은 명시적 bypass 경로 + `console.warn` 감사 로그로 처리; (3) **HIGH-3 notification idempotency**: `notifications` 테이블에 `source_kind text`, `source_id uuid` 컬럼 추가 + `UNIQUE (recipient_user_id, source_kind, source_id, type) WHERE source_kind IS NOT NULL AND source_id IS NOT NULL` partial UNIQUE 인덱스로 ON CONFLICT DO NOTHING 시 정확히 1행 보장 (REQ-CONFIRM-NOTIFY-002 갱신, 시나리오 8 "1개 또는 2개" → "정확히 1개"); (4) **MEDIUM-4 validateTransition 호출**: REQ-CONFIRM-EFFECTS-001/003/008 모두 raw UPDATE 직전에 `validateTransition` 호출 의무화, WHERE 절은 TOCTOU concurrency guard로 제한; (5) **MEDIUM-5 pending 상태 제거**: `instructor_responses.status` enum을 `{accepted, declined, conditional}`로 축소, DEFAULT 제거, "pending" 표면은 row 부재로만 표시 (REQ-CONFIRM-RESPONSES-001/003/004 갱신); (6) **MEDIUM-6 acceptance 누락 보강**: REQ-CONFIRM-RESPONSES-002 (인덱스 EXPLAIN), REQ-CONFIRM-RESPONSES-006 (BEFORE UPDATE trigger), REQ-CONFIRM-INQUIRIES-005 (URL filter multi-select), REQ-CONFIRM-INQUIRIES-006 (notFound URL tampering), REQ-CONFIRM-ASSIGNMENTS-006 (?include=history toggle) 5건 시나리오 신설; (7) **LOW-7**: §1.3 / §4.7 "5×4 매핑 테이블" 표기를 "6 매핑 케이스"(2 source_kind × 3 non-pending status)로 정정; (8) **LOW-8**: REQ-CONFIRM-NOTIFY-003 `body` truncation 200자 → 1000자로 확장 (운영자 conditional_note 손실 최소화).
 - **2026-04-29 (v0.1.0)**: 초기 작성. SPEC-PROJECT-001(완료, 2026-04-28 머지)이 §2.7 REQ-PROJECT-ASSIGN에서 placeholder로 deferred한 "SPEC-INSTRUCTOR-CONFIRM-XXX"를 본 SPEC이 정식으로 수임한다. (1) `instructor_responses` 통합 응답 모델 — `source_kind` ∈ `{proposal_inquiry, assignment_request}` discriminator로 (a) SPEC-PROPOSAL-001(병렬 작성)이 발생시키는 사전 가용성 문의와 (b) SPEC-PROJECT-001 `assignInstructor` Server Action이 생성한 `notifications` 배정 요청을 강사 측에서 단일 모델로 통합 응답; (2) 강사 워크스페이스(SPEC-ME-001 `/me/*`) 산하 두 라우트 `/me/inquiries`(사전 문의) + `/me/assignments`(정식 배정 요청) — 각 페이지는 pending/accepted/declined/conditional 4-state 응답 패널 + `conditional_note` 텍스트 필드(conditional 시 필수); (3) Acceptance side-effects — 배정 요청 수락 시 `projects.instructor_id = self`, 상태 `assignment_review → assignment_confirmed` 전환, `lecture_sessions`(SPEC-PAYOUT-002 향후) 또는 SPEC-DB-001 `schedule_items`로 자동 INSERT(`schedule_kind = 'system_lecture'`); 사전 문의 수락 시는 `proposal_inquiries.status = 'accepted'`만 표기하고 `schedule_items` 생성은 보류; (4) Notification + email-stub — 신규 `notification_type` enum 5개(`assignment_accepted`, `assignment_declined`, `inquiry_accepted`, `inquiry_declined`, `inquiry_conditional`)를 마이그레이션으로 추가, 응답 발생 시 운영자에게 in-app `notifications` row 1건 INSERT + 콘솔 로그 `[notif] <type> → operator_id=<uuid> source_id=<uuid>`(ADR-005 이메일 스텁 기조 유지); (5) 1시간 변경 윈도 — `responded_at + 1h` 이내에만 응답 변경 가능, 이후 final lock(운영자 force-reset은 admin only로 본 SPEC 외부); (6) RLS — instructor self-only SELECT/UPDATE, instructor B의 row 노출 0; (7) Idempotency — 더블 클릭/네트워크 재시도 시 동일 status 재INSERT 금지, transactional UPSERT 사용. SPEC-PROJECT-001 `runRecommendationAction`/`assignInstructor` 흐름은 그대로 보존, 본 SPEC은 그 이후 강사가 응답하는 후행 단계. SPEC-PROPOSAL-001과는 sibling parallel 관계로 `proposal_inquiries` 테이블 스키마는 SPEC-PROPOSAL-001이 정의하고 본 SPEC은 그 row를 read+UPDATE만 수행. 실제 이메일 발송, 외부 캘린더 연동, 응답 분석 대시보드, AI 자동 응답, 다강사 팀 응답은 명시적 제외.
 
 ---
@@ -21,7 +22,7 @@ issue_number: null
 
 ### 1.1 목적 (Goal)
 
-알고링크 PM이 직접 설명한 비즈니스 프로세스의 핵심 통점인 **"강사 입장에서 다음 일정 관리가 구두로만 이뤄져 어려움"** 을 시스템 측 단일 응답 흐름으로 해소한다. 본 SPEC의 산출물은 (a) SPEC-PROJECT-001 §2.7이 deferred한 강사 confirm 흐름을 수임하는 `instructor_responses` 통합 응답 모델, (b) `/me/inquiries`(SPEC-PROPOSAL-001 사전 가용성 문의 응답) + `/me/assignments`(SPEC-PROJECT-001 정식 배정 요청 응답) 두 단일-시스템 라우트, (c) 4-state 응답 라이프사이클(`pending → accepted | declined | conditional`) + `conditional_note` 자유 입력 + 1시간 변경 윈도, (d) 수락 시 자동 부수효과(배정 요청은 `projects.instructor_id` 갱신 + 상태 전환 + `schedule_items` 자동 INSERT, 사전 문의는 `proposal_inquiries.status` 표기만), (e) 5종 신규 `notification_type`(`assignment_accepted/declined`, `inquiry_accepted/declined/conditional`) + ADR-005 이메일 스텁 콘솔 로그, (f) instructor self-only RLS 보장 + 트랜잭션 idempotency, (g) 한국어 UI + Asia/Seoul + WCAG 2.1 AA 일관 적용이다.
+알고링크 PM이 직접 설명한 비즈니스 프로세스의 핵심 통점인 **"강사 입장에서 다음 일정 관리가 구두로만 이뤄져 어려움"** 을 시스템 측 단일 응답 흐름으로 해소한다. 본 SPEC의 산출물은 (a) SPEC-PROJECT-001 §2.7이 deferred한 강사 confirm 흐름을 수임하는 `instructor_responses` 통합 응답 모델 — `source_kind` discriminator + 두 명시적 nullable FK(`project_id`, `proposal_inquiry_id`) + `CHECK XOR` + per-source partial UNIQUE 인덱스로 referential integrity 강제, (b) `/me/inquiries`(SPEC-PROPOSAL-001 사전 가용성 문의 응답) + `/me/assignments`(SPEC-PROJECT-001 정식 배정 요청 응답) 두 단일-시스템 라우트, (c) 3-state 응답 라이프사이클(`accepted | declined | conditional`; "pending"은 row 부재로 표현) + `conditional_note` 자유 입력 + 1시간 변경 윈도 + 윈도 내 status 다운그레이드 시 보상 트랜잭션, (d) 수락 시 자동 부수효과(배정 요청은 `validateTransition` 통과 후 `projects.instructor_id` 갱신 + 상태 전환 + `schedule_items` 자동 INSERT, 사전 문의는 `proposal_inquiries.status` 표기만), (e) 5종 신규 `notification_type`(`assignment_accepted/declined`, `inquiry_accepted/declined/conditional`) + `notifications` 테이블에 `source_kind`/`source_id` 컬럼 + partial UNIQUE 인덱스로 정확히 1행 보장 + ADR-005 이메일 스텁 콘솔 로그, (f) instructor self-only RLS 보장 + 트랜잭션 idempotency, (g) 한국어 UI + Asia/Seoul + WCAG 2.1 AA 일관 적용이다.
 
 본 SPEC은 운영자 측 응답 부재 알림 자동화(N시간 미응답), 외부 이메일/SMS/카카오 발송, 응답 분석 대시보드, AI 기반 자동 응답 추천, 동일 프로젝트에 다강사 팀 단위 공동 응답을 빌드하지 않는다.
 
@@ -52,8 +53,9 @@ issue_number: null
 **In Scope:**
 
 - 신규 마이그레이션 (`supabase/migrations/`):
-  - `20260429000010_instructor_responses.sql` — `instructor_responses` 테이블 신설 (id uuid PK, source_kind text, source_id uuid, instructor_id uuid FK, status text, conditional_note text nullable, responded_at timestamptz nullable, created_at timestamptz default now(), updated_at timestamptz default now()) + 인덱스 `(instructor_id, status)`, `(source_kind, source_id)` + RLS policy (instructor self-only) + UPDATE trigger `updated_at = now()`
+  - `20260429000010_instructor_responses.sql` — `instructor_responses` 테이블 신설 (id uuid PK, source_kind text CHECK IN ('proposal_inquiry','assignment_request'), `project_id uuid REFERENCES projects(id) ON DELETE CASCADE` (nullable), `proposal_inquiry_id uuid REFERENCES proposal_inquiries(id) ON DELETE CASCADE` (nullable), instructor_id uuid FK, status text CHECK IN ('accepted','declined','conditional') (NOT NULL, NO DEFAULT), conditional_note text nullable, responded_at timestamptz nullable, created_at timestamptz default now(), updated_at timestamptz default now()) + `CHECK XOR` 제약(source_kind ↔ FK 컬럼 일관) + 인덱스 `(instructor_id, status)` + 두 partial UNIQUE 인덱스(`(project_id, instructor_id) WHERE project_id IS NOT NULL` / `(proposal_inquiry_id, instructor_id) WHERE proposal_inquiry_id IS NOT NULL`) + RLS policy (instructor self-only) + UPDATE trigger `updated_at = now()`
   - `20260429000011_notification_types_confirm.sql` — `ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'assignment_accepted'`, `'assignment_declined'`, `'inquiry_accepted'`, `'inquiry_declined'`, `'inquiry_conditional'` (5 신규 enum 값)
+  - `20260429000012_notifications_idempotency.sql` — `notifications` 테이블에 `source_kind text NULL` + `source_id uuid NULL` 컬럼 추가 + `CREATE UNIQUE INDEX idx_notifications_idempotency ON notifications (recipient_user_id, source_kind, source_id, type) WHERE source_kind IS NOT NULL AND source_id IS NOT NULL` partial UNIQUE 인덱스로 동시 응답 retry 시 정확히 1행 보장 (HIGH-3 fix)
 - 도메인 로직 (`src/lib/responses/`):
   - `types.ts` — `ResponseSourceKind` (`'proposal_inquiry' | 'assignment_request'`), `ResponseStatus` (`'pending' | 'accepted' | 'declined' | 'conditional'`), `InstructorResponse`, `ResponseSideEffectResult`
   - `state-machine.ts` — `validateStatusTransition(from, to): { ok: true } | { ok: false; reason: string }` (전환 그래프 + 1시간 윈도 체크), `isWithinChangeWindow(respondedAt: Date): boolean`
@@ -82,11 +84,11 @@ issue_number: null
 - 사이드바 placeholder 업데이트:
   - `src/components/app/sidebar.tsx` — instructor 메뉴에 "사전 문의" + "배정 요청" 추가 (코드 수정은 다른 SPEC에 위임 가능, 본 SPEC은 placeholder 등록만)
 - 단위 테스트 (`tests/unit/responses/`):
-  - `state-machine.test.ts` — pending → accepted/declined/conditional 전환, 1시간 윈도 boundary
-  - `side-effects.test.ts` — 배정 수락 시 schedule_items 생성 케이스, 사전 문의는 schedule 생성 안 함
-  - `notification-mapping.test.ts` — 5×4 매핑 테이블 전체 커버
+  - `state-machine.test.ts` — null → accepted/declined/conditional 전환 + 윈도 내 양방향 전환, 1시간 윈도 boundary (REQ-CONFIRM-RESPONSES-003 갱신)
+  - `side-effects.test.ts` — 배정 수락 시 schedule_items 생성 케이스, 사전 문의는 schedule 생성 안 함, accept→decline downgrade 보상 효과 (computeAcceptDowngradeEffects 등)
+  - `notification-mapping.test.ts` — 6 매핑 케이스(2 source_kind × 3 status) 전체 커버 (LOW-7 정정)
 - 통합 테스트 (`tests/integration/`):
-  - `responses-flow.test.ts` — 운영자가 배정 요청 → 강사 수락 → schedule_items + notifications + project status 전환 검증
+  - `responses-flow.test.ts` — 운영자가 배정 요청 → 강사 수락 → schedule_items + notifications + project status 전환 검증 + accept→decline 보상 트랜잭션 + idempotency 정확히-1행 검증
 - 한국어 라벨/에러/toast, Asia/Seoul KST 표시 일관성
 
 **Out of Scope (Exclusions — What NOT to Build):**
@@ -108,20 +110,24 @@ issue_number: null
 ### 1.4 성공 지표 (Success Criteria)
 
 - ✅ 빌드 무오류: `pnpm build` 0 에러, `pnpm tsc --noEmit` 0 type 에러
-- ✅ `instructor_responses` 마이그레이션 정합: `pnpm db:migrate` PASS, RLS 정책 instructor self-only 검증 통과
+- ✅ `instructor_responses` 마이그레이션 정합: `pnpm db:migrate` PASS, RLS 정책 instructor self-only 검증 통과, `CHECK XOR (project_id, proposal_inquiry_id)` 제약 검증 통과(violating row INSERT 시 23514 에러), 두 partial UNIQUE 인덱스 동작 검증
 - ✅ `notification_type` enum 5개 신규 값 추가: 마이그레이션 후 `SELECT enum_range(NULL::notification_type)` 결과에 5개 포함
-- ✅ `/me/inquiries` 페이지 렌더링: 강사가 받은 사전 문의 pending 목록 정확히 표시, 응답 패널 키보드 네비게이션 동작
-- ✅ `/me/assignments` 페이지 렌더링: 강사가 받은 정식 배정 요청 pending 목록 정확히 표시, 응답 패널 동작
-- ✅ 수락 부수효과 (배정): `instructor_responses` UPSERT + `projects.instructor_id` UPDATE + `projects.status = 'assignment_confirmed'` + `schedule_items` 1건 이상 INSERT(`schedule_kind = 'system_lecture'`) + `notifications` 1건 INSERT(`type = 'assignment_accepted'`, `recipient_id = operator_id`) 모두 단일 트랜잭션 내 실행
-- ✅ 수락 부수효과 (사전 문의): `instructor_responses` UPSERT + `proposal_inquiries.status = 'accepted'` + `notifications` 1건 INSERT(`type = 'inquiry_accepted'`, `recipient_id = operator_id`) — `schedule_items` 미생성
+- ✅ `notifications` 테이블 idempotency 마이그레이션 정합: `source_kind`, `source_id` 컬럼 존재 + `idx_notifications_idempotency` partial UNIQUE 인덱스 존재, 동일 (`recipient_user_id`, `source_kind`, `source_id`, `type`) 조합으로 동시 INSERT 시 정확히 1행만 commit (HIGH-3)
+- ✅ `instructor_responses.status` enum: `{accepted, declined, conditional}` 3개 값만 허용, 'pending' INSERT 시도 시 CHECK 위반 (MEDIUM-5)
+- ✅ `/me/inquiries` 페이지 렌더링: 강사가 받은 사전 문의 미응답(row 부재) 목록 정확히 표시, 응답 패널 키보드 네비게이션 동작
+- ✅ `/me/assignments` 페이지 렌더링: 강사가 받은 정식 배정 요청 미응답 목록 정확히 표시, 응답 패널 동작
+- ✅ 수락 부수효과 (배정): Server Action이 `validateTransition('assignment_review', 'assignment_confirmed', { instructorId: self })` 통과를 사전 검증 후 `instructor_responses` UPSERT + `projects.instructor_id` UPDATE + `projects.status = 'assignment_confirmed'` + `schedule_items` 1건 이상 INSERT(`schedule_kind = 'system_lecture'`) + `notifications` 1건 INSERT(`type = 'assignment_accepted'`, `recipient_user_id = operator_user_id`, `source_kind = 'assignment_request'`, `source_id = project_id`) 모두 단일 트랜잭션 내 실행 (MEDIUM-4)
+- ✅ 수락 부수효과 (사전 문의): `instructor_responses` UPSERT + `proposal_inquiries.status = 'accepted'` + `notifications` 1건 INSERT(`type = 'inquiry_accepted'`, `source_kind = 'proposal_inquiry'`, `source_id = inquiry_id`) — `schedule_items` 미생성
 - ✅ 거절 부수효과: `instructor_responses` status='declined' + 운영자 notifications INSERT(`type = 'assignment_declined' | 'inquiry_declined'`) + 콘솔 로그
 - ✅ Conditional 부수효과: status='conditional' + `conditional_note` 5자 이상 zod 검증 + 운영자 notifications INSERT(`type = 'inquiry_conditional'` 또는 `assignment_*` — 매핑은 §5.4) + 콘솔 로그
 - ✅ 1시간 변경 윈도: `responded_at + 1h` 이내 응답 변경 가능, 1시간 경과 후 UI는 응답을 final lock 표시 + 변경 시도 시 한국어 에러 `"응답 변경 가능 시간이 지났습니다."`
-- ✅ Idempotency: 동일 (`source_kind`, `source_id`, `instructor_id`) 조합으로 더블 클릭 시 단일 row만 존재(UPSERT), `notifications` 중복 INSERT 0건
+- ✅ Accept→Decline 보상 트랜잭션 (HIGH-2): 윈도 내 accepted → declined/conditional 전환 시 `validateTransition` 호출(또는 documented bypass) → `projects.status` reset → `projects.instructor_id` clear → 직전 accept이 INSERT한 `schedule_items` 행 하드 삭제 → `instructor_responses.status` UPDATE 새 상태 → 새 `notifications` row INSERT 모두 단일 트랜잭션
+- ✅ Idempotency (응답): 동일 (`source_kind`, source FK, `instructor_id`) 조합으로 더블 클릭 시 partial UNIQUE 인덱스 충돌 → ON CONFLICT DO UPDATE → `instructor_responses` 단일 row만 존재
+- ✅ Idempotency (알림 — HIGH-3): 동일 응답 재시도 시 partial UNIQUE 인덱스 `idx_notifications_idempotency` 충돌 → ON CONFLICT DO NOTHING → `notifications` 중복 INSERT 0건, 정확히 1행만 존재
 - ✅ RLS 격리: instructor B 토큰으로 instructor A의 `instructor_responses` row SELECT 시 0행 반환, UPDATE 시 RLS deny
 - ✅ 콘솔 로그 포맷: `[notif] assignment_accepted → operator_id=<uuid> source_id=<uuid>` 정확히 출력 (5개 type 모두)
 - ✅ 단위 테스트: state-machine, side-effects, notification-mapping 모두 PASS, 라인 커버리지 ≥ 85%
-- ✅ 통합 테스트: 운영자 배정 → 강사 수락 → 부수효과 6종 시나리오 PASS
+- ✅ 통합 테스트: 운영자 배정 → 강사 수락 → 부수효과 시나리오 + 보상 트랜잭션 + idempotency 시나리오 모두 PASS
 - ✅ Asia/Seoul 표시: 모든 timestamp(요청 시각, 응답 시각, 변경 윈도 카운트다운) KST 형식 일관 적용
 - ✅ 한국어 UI: 라벨/버튼/에러/toast 모두 한국어, 영문 평문 노출 0건
 - ✅ axe DevTools: `/me/inquiries`, `/me/assignments` critical 0건, serious 0건
@@ -135,26 +141,59 @@ issue_number: null
 
 ### 2.1 REQ-CONFIRM-RESPONSES — 통합 응답 모델 + 라이프사이클
 
-**REQ-CONFIRM-RESPONSES-001 (Ubiquitous)**
-The system **shall** define a unified `instructor_responses` table with columns: `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`, `source_kind text NOT NULL CHECK (source_kind IN ('proposal_inquiry', 'assignment_request'))`, `source_id uuid NOT NULL`, `instructor_id uuid NOT NULL REFERENCES instructors(id) ON DELETE CASCADE`, `status text NOT NULL CHECK (status IN ('pending', 'accepted', 'declined', 'conditional')) DEFAULT 'pending'`, `conditional_note text`, `responded_at timestamptz`, `created_at timestamptz NOT NULL DEFAULT now()`, `updated_at timestamptz NOT NULL DEFAULT now()` and a UNIQUE constraint on `(source_kind, source_id, instructor_id)` to enforce idempotency.
+**REQ-CONFIRM-RESPONSES-001 (Ubiquitous) — HIGH-1 + MEDIUM-5 fix**
+The system **shall** define a unified `instructor_responses` table with columns:
+- `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`
+- `source_kind text NOT NULL CHECK (source_kind IN ('proposal_inquiry', 'assignment_request'))`
+- `project_id uuid NULL REFERENCES projects(id) ON DELETE CASCADE` (set when `source_kind = 'assignment_request'`)
+- `proposal_inquiry_id uuid NULL REFERENCES proposal_inquiries(id) ON DELETE CASCADE` (set when `source_kind = 'proposal_inquiry'`)
+- `instructor_id uuid NOT NULL REFERENCES instructors(id) ON DELETE CASCADE`
+- `status text NOT NULL CHECK (status IN ('accepted', 'declined', 'conditional'))` — no DEFAULT; "pending" surface is represented by absence of a row
+- `conditional_note text`
+- `responded_at timestamptz NOT NULL DEFAULT now()` — every persisted row represents an active response
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- `updated_at timestamptz NOT NULL DEFAULT now()`
+
+The table **shall** carry a `CHECK` constraint named `instructor_responses_source_xor` enforcing exactly one of `(project_id, proposal_inquiry_id)` is non-null and matches `source_kind`:
+```sql
+CHECK (
+  (source_kind = 'assignment_request' AND project_id IS NOT NULL AND proposal_inquiry_id IS NULL) OR
+  (source_kind = 'proposal_inquiry'   AND project_id IS NULL     AND proposal_inquiry_id IS NOT NULL)
+)
+```
+
+Idempotency **shall** be enforced via two partial UNIQUE indexes (one per source kind):
+```sql
+CREATE UNIQUE INDEX uniq_instructor_responses_assignment
+  ON instructor_responses (project_id, instructor_id)
+  WHERE project_id IS NOT NULL;
+CREATE UNIQUE INDEX uniq_instructor_responses_inquiry
+  ON instructor_responses (proposal_inquiry_id, instructor_id)
+  WHERE proposal_inquiry_id IS NOT NULL;
+```
+
+**Rationale (HIGH-1)**: A single `source_id uuid` column without an FK leaves the table open to orphan rows when the referenced project or proposal_inquiry is deleted. Two explicit nullable FKs + XOR CHECK + partial UNIQUE indexes give Drizzle, PostgREST, and Supabase tooling first-class FK introspection while preserving the polymorphic discriminator. **Rationale (MEDIUM-5)**: A "pending" enum value is dead state — no acceptance scenario or REQ inserts a row with status='pending'. The pending surface is just "no row exists yet"; removing the value tightens the state machine.
 
 **REQ-CONFIRM-RESPONSES-002 (Ubiquitous)**
-The system **shall** create indexes `idx_instructor_responses_by_instructor (instructor_id, status)` and `idx_instructor_responses_by_source (source_kind, source_id)` to support both `/me/inquiries` and `/me/assignments` query patterns.
+The system **shall** create the index `idx_instructor_responses_by_instructor (instructor_id, status)` to support `/me/inquiries` and `/me/assignments` inbox queries (instructor + status filter). Per-source lookups are served by the two partial UNIQUE indexes defined in REQ-CONFIRM-RESPONSES-001 and require no additional non-unique index. `EXPLAIN ANALYZE` of `/me/assignments` and `/me/inquiries` server query plans **shall** show usage of the appropriate index (verified in M6 integration test, scenario 16 — see acceptance.md).
 
-**REQ-CONFIRM-RESPONSES-003 (Ubiquitous)**
-The system **shall** implement a state machine via `src/lib/responses/state-machine.ts` exporting `validateStatusTransition(from: ResponseStatus, to: ResponseStatus): { ok: true } | { ok: false; reason: string }`; allowed transitions are `pending → accepted | declined | conditional`, and any non-pending status MAY transition to another non-pending status only when the change window (REQ-CONFIRM-RESPONSE-WINDOW) is open.
+**REQ-CONFIRM-RESPONSES-003 (Ubiquitous) — MEDIUM-5 fix**
+The system **shall** implement a state machine via `src/lib/responses/state-machine.ts` exporting `validateStatusTransition(from: ResponseStatus | null, to: ResponseStatus): { ok: true } | { ok: false; reason: string }`. Allowed transitions:
+- `null → accepted | declined | conditional` (first response; "pending" = null)
+- `accepted ↔ declined`, `accepted ↔ conditional`, `declined ↔ conditional` — only when the change window (REQ-CONFIRM-RESPONSE-WINDOW) is open
+- transitions outside this set return `{ ok: false, reason }` with a Korean message
 
 **REQ-CONFIRM-RESPONSES-004 (Unwanted Behavior)**
 **If** a response is submitted with `status = 'conditional'` and `conditional_note` is missing, empty, or shorter than 5 characters, **then** the Server Action **shall** reject the request with the Korean message `"조건부 응답에는 5자 이상의 메모를 입력해주세요."` and **shall not** persist any row.
 
 **REQ-CONFIRM-RESPONSES-005 (Ubiquitous)**
-The `instructor_responses` table **shall** be created with RLS enabled and a policy `instructor_responses_self_only` that allows `SELECT`, `INSERT`, `UPDATE` only when `auth.uid() IN (SELECT user_id FROM instructors WHERE id = instructor_responses.instructor_id)`; all other roles **shall** receive zero rows on `SELECT` and permission-denied on writes.
+The `instructor_responses` table **shall** be created with RLS enabled and a policy `instructor_responses_self_only` that allows `SELECT`, `INSERT`, `UPDATE`, `DELETE` only when `auth.uid() IN (SELECT user_id FROM instructors WHERE id = instructor_responses.instructor_id)`; all other roles **shall** receive zero rows on `SELECT` and permission-denied on writes. (DELETE is included to allow the boundary CASCADE in REQ-CONFIRM-EFFECTS-008 reverse-compensation to operate without RLS bypass.)
 
 **REQ-CONFIRM-RESPONSES-006 (Event-Driven)**
-**When** an `instructor_responses` row is updated, the database **shall** automatically set `updated_at = now()` via a `BEFORE UPDATE` trigger; the application code **shall not** manage `updated_at` directly.
+**When** an `instructor_responses` row is updated, the database **shall** automatically set `updated_at = now()` via a `BEFORE UPDATE` trigger named `set_updated_at_instructor_responses`; the application code **shall not** manage `updated_at` directly. The trigger fires on every UPDATE statement and is verified via the acceptance scenario "trigger fires on UPDATE" (see acceptance.md scenario 17).
 
 **REQ-CONFIRM-RESPONSES-007 (Ubiquitous)**
-The system **shall** provide a typed domain module `src/lib/responses/index.ts` exporting `ResponseSourceKind`, `ResponseStatus`, `InstructorResponse`, and pure functions for state transition validation; the module **shall not** depend on Drizzle, Supabase, or React.
+The system **shall** provide a typed domain module `src/lib/responses/index.ts` exporting `ResponseSourceKind`, `ResponseStatus` (`'accepted' | 'declined' | 'conditional'`), `InstructorResponse`, and pure functions for state transition validation; the module **shall not** depend on Drizzle, Supabase, or React.
 
 ### 2.2 REQ-CONFIRM-INQUIRIES — `/me/inquiries` 사전 가용성 문의 라우트
 
@@ -196,16 +235,16 @@ The system **shall** display each assignment-request card with: 프로젝트 제
 **REQ-CONFIRM-ASSIGNMENTS-006 (Optional Feature)**
 **Where** the instructor wants to view past responses (final-locked, beyond 1-hour window), the system **shall** provide a `?include=history` toggle that includes accepted/declined/conditional rows older than 1 hour in read-only display.
 
-### 2.4 REQ-CONFIRM-EFFECTS — 수락 부수효과
+### 2.4 REQ-CONFIRM-EFFECTS — 수락 부수효과 + 보상 트랜잭션
 
-**REQ-CONFIRM-EFFECTS-001 (Event-Driven)**
-**When** an instructor responds to an `assignment_request` with `status = 'accepted'`, the system **shall** execute within a single PostgreSQL transaction: (a) UPSERT into `instructor_responses` with `responded_at = now()`, (b) UPDATE `projects SET instructor_id = self, status = 'assignment_confirmed', updated_at = now() WHERE id = $projectId AND status = 'assignment_review'`, (c) INSERT one or more `schedule_items` rows with `schedule_kind = 'system_lecture'`, `instructor_id = self`, `project_id = $projectId`, `starts_at = projects.education_start_at`, `ends_at = projects.education_end_at`, (d) INSERT one `notifications` row addressed to `projects.operator_id` with `type = 'assignment_accepted'`.
+**REQ-CONFIRM-EFFECTS-001 (Event-Driven) — MEDIUM-4 fix**
+**When** an instructor responds to an `assignment_request` with `status = 'accepted'`, the Server Action **shall** first call SPEC-PROJECT-001 `validateTransition('assignment_review', 'assignment_confirmed', { instructorId: self })` and abort with the returned Korean reason if `{ ok: false }` is received (example: `"강사를 배정해야 컨펌 단계로 이동할 수 있습니다."` — though `instructorId = self` should always satisfy this). Only on `{ ok: true }` **shall** the action execute within a single PostgreSQL transaction: (a) UPSERT into `instructor_responses` (status='accepted', responded_at = now(), `project_id = $projectId`, `proposal_inquiry_id = NULL`); (b) UPDATE `projects SET instructor_id = self, status = 'assignment_confirmed', updated_at = now() WHERE id = $projectId AND status = 'assignment_review'` — the WHERE clause acts as a TOCTOU concurrency guard, **not** as a substitute for `validateTransition`; (c) INSERT one or more `schedule_items` rows with `schedule_kind = 'system_lecture'`, `instructor_id = self`, `project_id = $projectId`, `starts_at = projects.education_start_at`, `ends_at = projects.education_end_at`; (d) INSERT one `notifications` row addressed to `projects.operator_id` with `type = 'assignment_accepted'`, `source_kind = 'assignment_request'`, `source_id = $projectId` to engage the partial UNIQUE idempotency index (REQ-CONFIRM-NOTIFY-002).
 
 **REQ-CONFIRM-EFFECTS-002 (Event-Driven)**
-**When** an instructor responds to a `proposal_inquiry` with `status = 'accepted'`, the system **shall** execute within a single transaction: (a) UPSERT into `instructor_responses`, (b) UPDATE `proposal_inquiries SET status = 'accepted'` (column owned by SPEC-PROPOSAL-001), (c) INSERT one `notifications` row addressed to the operator who initiated the inquiry with `type = 'inquiry_accepted'`; the system **shall NOT** create any `schedule_items` rows because the proposal is not yet won.
+**When** an instructor responds to a `proposal_inquiry` with `status = 'accepted'`, the system **shall** execute within a single transaction: (a) UPSERT into `instructor_responses` (status='accepted', `proposal_inquiry_id = $inquiryId`, `project_id = NULL`); (b) UPDATE `proposal_inquiries SET status = 'accepted'` (column owned by SPEC-PROPOSAL-001); (c) INSERT one `notifications` row addressed to the operator who initiated the inquiry with `type = 'inquiry_accepted'`, `source_kind = 'proposal_inquiry'`, `source_id = $inquiryId`. The system **shall NOT** create any `schedule_items` rows because the proposal is not yet won. The transaction **shall NOT** require a `validateTransition` call because the proposal_inquiries lifecycle is owned by SPEC-PROPOSAL-001 and operates outside the SPEC-PROJECT-001 13-stage enum.
 
-**REQ-CONFIRM-EFFECTS-003 (Event-Driven)**
-**When** the response status is `declined` or `conditional` for either source kind, the system **shall** UPSERT `instructor_responses` and INSERT a single `notifications` row addressed to the operator with the corresponding type from §2.5 mapping table; the system **shall NOT** modify `projects.instructor_id`, `projects.status`, or `proposal_inquiries.status`.
+**REQ-CONFIRM-EFFECTS-003 (Event-Driven) — MEDIUM-4 fix**
+**When** the response status is `declined` or `conditional` for either source kind **and** no prior `instructor_responses` row exists for `(source FK, instructor_id)` (first-response decline/conditional), the system **shall** UPSERT `instructor_responses` and INSERT a single `notifications` row addressed to the operator with the corresponding type from §2.5 mapping table. The system **shall NOT** modify `projects.instructor_id`, `projects.status`, or `proposal_inquiries.status`. (The case where a prior `accepted` row exists and is downgraded to `declined`/`conditional` is governed by REQ-CONFIRM-EFFECTS-008 and requires reverse-compensation.)
 
 **REQ-CONFIRM-EFFECTS-004 (Ubiquitous)**
 The pure-function module `src/lib/responses/side-effects.ts` **shall** export `computeAssignmentAcceptanceEffects(project: ProjectSnapshot): { scheduleItems: ScheduleItemDraft[]; nextStatus: ProjectStatus }` and `computeInquiryAcceptanceEffects(inquiry: InquirySnapshot): { inquiryStatus: 'accepted' }`; both functions **shall** be free of IO and **shall** be unit-tested.
@@ -219,13 +258,28 @@ The pure-function module `src/lib/responses/side-effects.ts` **shall** export `c
 **REQ-CONFIRM-EFFECTS-007 (Optional Feature)**
 **Where** SPEC-PAYOUT-002 introduces a `lecture_sessions` table for finer-grained per-session scheduling, the side-effect logic **shall** be refactored to derive `schedule_items` from `lecture_sessions`; until then, the M-1 acceptance flow uses `projects.education_start_at` / `education_end_at` as the single session window.
 
+**REQ-CONFIRM-EFFECTS-008 (Event-Driven) — HIGH-2 + MEDIUM-4 fix**
+**When** an instructor changes their response on an `assignment_request` from `accepted` to `declined` or `conditional` within the 1-hour change window (REQ-CONFIRM-RESPONSE-WINDOW-002), the Server Action **shall** execute the following compensating side-effects within a single PostgreSQL transaction (atomic, all-or-nothing):
+
+1. UPDATE `instructor_responses` SET `status = $newStatus`, `conditional_note = $note (if conditional, else NULL)`, `responded_at = now()` WHERE the row's `(project_id, instructor_id)` matches.
+2. Reset `projects` row: UPDATE `projects SET instructor_id = NULL, status = 'assignment_review', updated_at = now() WHERE id = $projectId AND status = 'assignment_confirmed'`. The WHERE clause acts as a TOCTOU concurrency guard.
+3. Hard-DELETE the `schedule_items` rows that were inserted by the prior accept: DELETE FROM `schedule_items WHERE project_id = $projectId AND instructor_id = self AND schedule_kind = 'system_lecture'`.
+4. INSERT a new `notifications` row reflecting the new status (per §2.5 mapping), with `source_kind = 'assignment_request'`, `source_id = $projectId`, exercising the partial UNIQUE idempotency index (REQ-CONFIRM-NOTIFY-002).
+5. Emit a `console.warn` audit line `[response:downgrade] project_id=<uuid> instructor_id=<uuid> from=accepted to=<status>` regardless of NODE_ENV.
+
+The Server Action **shall** also call `validateTransition('assignment_confirmed', 'assignment_review', { instructorId: null })` BEFORE executing step 2. If `validateTransition` returns `{ ok: false }` (the current SPEC-PROJECT-001 ALLOWED_TRANSITIONS graph **does not** include the `assignment_confirmed → assignment_review` reverse edge — see Risk table §8), the Server Action **shall** invoke a **documented bypass path** named `__bypassValidateTransitionForResponseDowngrade` exported from `src/lib/projects/status-machine.ts` (added by SPEC-PROJECT-AMEND-001 follow-up; if not yet present, the implementation MUST stub the bypass with a `// @MX:WARN @MX:REASON SPEC-PROJECT-AMEND-001 follow-up: backward transition not yet supported in ALLOWED_TRANSITIONS graph` annotation). The bypass write **shall** still trigger SPEC-DB-001's `project_status_history` trigger so the reverse transition is recorded for audit.
+
+For `proposal_inquiry` source kind, the analogous downgrade path **shall** UPDATE `instructor_responses.status` and `proposal_inquiries.status = 'pending'` (revert to the SPEC-PROPOSAL-001 default) within the same transaction; no `schedule_items` rows exist for proposal inquiries (REQ-CONFIRM-EFFECTS-002), so the DELETE step is a no-op.
+
+**Cross-reference**: SPEC-PROJECT-001 `validateTransition` **must** be amended to allow `assignment_confirmed → assignment_review` to fully eliminate the bypass; this is tracked under SPEC-PROJECT-AMEND-001 follow-up (see §8 Risks).
+
 ### 2.5 REQ-CONFIRM-NOTIFY — 운영자 알림 + 이메일 스텁
 
 **REQ-CONFIRM-NOTIFY-001 (Ubiquitous)**
 The system **shall** introduce 5 new `notification_type` enum values via migration `20260429000011_notification_types_confirm.sql` using `ALTER TYPE notification_type ADD VALUE IF NOT EXISTS '<value>'` for each of: `assignment_accepted`, `assignment_declined`, `inquiry_accepted`, `inquiry_declined`, `inquiry_conditional`.
 
-**REQ-CONFIRM-NOTIFY-002 (Ubiquitous)**
-The mapping from `(source_kind, status)` to `notification_type` **shall** be defined in `src/lib/responses/notification-mapping.ts` as:
+**REQ-CONFIRM-NOTIFY-002 (Ubiquitous) — HIGH-3 fix**
+The mapping from `(source_kind, status)` to `notification_type` **shall** be defined in `src/lib/responses/notification-mapping.ts` as 6 cases (2 source_kind × 3 non-pending status):
 
 | `source_kind` | `status` | `notification_type` |
 |---------------|----------|---------------------|
@@ -238,14 +292,35 @@ The mapping from `(source_kind, status)` to `notification_type` **shall** be def
 
 (Note: assignment conditional maps to `assignment_declined` because operator must re-issue request; SPEC-NOTIF-RULES-001 future work may add a dedicated `assignment_conditional` enum value.)
 
-**REQ-CONFIRM-NOTIFY-003 (Event-Driven)**
-**When** any response is recorded, the system **shall** INSERT one `notifications` row in the same transaction as the response with `recipient_id = operator_user_id` (resolved via `projects.operator_id` for assignments or `proposal_inquiries.created_by_user_id` for inquiries), `type = mapResponseToNotificationType(sourceKind, status)`, `title` = Korean templated string (e.g., `"강사 응답: {프로젝트명} 수락"`), `body` = Korean detail including instructor name and conditional note (truncated 200자), `link_url = '/projects/<id>'` for assignments or `/proposals/<id>` for inquiries.
+To make duplicate-prevention provable from schema (HIGH-3), migration `20260429000012_notifications_idempotency.sql` **shall** add columns `source_kind text NULL` and `source_id uuid NULL` to the existing `notifications` table and create a partial UNIQUE index:
+```sql
+ALTER TABLE notifications
+  ADD COLUMN source_kind text NULL,
+  ADD COLUMN source_id uuid NULL;
+CREATE UNIQUE INDEX idx_notifications_idempotency
+  ON notifications (recipient_user_id, source_kind, source_id, type)
+  WHERE source_kind IS NOT NULL AND source_id IS NOT NULL;
+```
+
+The columns are nullable so existing `notifications` rows from SPEC-PROJECT-001 (e.g., `assignment_request` notifications dispatched before this migration) are not affected. The partial UNIQUE index activates only when both `source_kind` and `source_id` are populated by SPEC-CONFIRM-001 INSERTs (REQ-CONFIRM-NOTIFY-003).
+
+**REQ-CONFIRM-NOTIFY-003 (Event-Driven) — HIGH-3 + LOW-8 fix**
+**When** any response is recorded, the system **shall** INSERT one `notifications` row in the same transaction as the response using the `ON CONFLICT (recipient_user_id, source_kind, source_id, type) WHERE source_kind IS NOT NULL AND source_id IS NOT NULL DO NOTHING` clause, with the following column values:
+- `recipient_user_id = operator_user_id` (resolved via `projects.operator_id → users.id` for assignments or `proposal_inquiries.created_by_user_id` for inquiries)
+- `type = mapResponseToNotificationType(sourceKind, status)`
+- `source_kind = sourceKind` (`'assignment_request'` or `'proposal_inquiry'`)
+- `source_id = projectId` for assignments, `inquiryId` for inquiries
+- `title` = Korean templated string (e.g., `"강사 응답: {프로젝트명} 수락"`)
+- `body` = Korean detail including instructor name and full `conditional_note` truncated to **1000자** (raised from 200자 per LOW-8 to minimize operator-visible information loss for long conditional notes); truncation indicated with trailing `…(생략)` when applied
+- `link_url = '/projects/<id>'` for assignments or `/proposals/<id>` for inquiries
+
+The `ON CONFLICT DO NOTHING` clause with the partial UNIQUE index from REQ-CONFIRM-NOTIFY-002 ensures concurrent retries (double-submit, network re-deliver) result in **exactly one** notification row per `(recipient_user_id, source_kind, source_id, type)` tuple — replacing the previous "1개 또는 2개 허용" behavior.
 
 **REQ-CONFIRM-NOTIFY-004 (Event-Driven)**
-**When** a notification is INSERTed, the system **shall** also emit a console-log line in the format `[notif] <notification_type> → operator_id=<uuid> source_id=<uuid>` to stdout via `console.log`, preserving ADR-005's email-stub boundary; the log line **shall** appear regardless of NODE_ENV.
+**When** a notification is INSERTed, the system **shall** also emit a console-log line in the format `[notif] <notification_type> → operator_id=<uuid> source_id=<uuid>` to stdout via `console.log`, preserving ADR-005's email-stub boundary; the log line **shall** appear regardless of NODE_ENV. The console log fires **even when** the INSERT is a no-op due to ON CONFLICT (so retries are still observable in logs), with an additional `[notif:dedup]` marker on no-op rows.
 
 **REQ-CONFIRM-NOTIFY-005 (Unwanted Behavior)**
-**If** the operator user record is deleted or `recipient_id` cannot be resolved, **then** the notification INSERT **shall** be skipped (not raise) and a `console.warn` line **shall** be emitted; the response transaction **shall** still commit so the instructor's choice is not lost.
+**If** the operator user record is deleted or `recipient_user_id` cannot be resolved, **then** the notification INSERT **shall** be skipped (not raise) and a `console.warn` line **shall** be emitted; the response transaction **shall** still commit so the instructor's choice is not lost.
 
 **REQ-CONFIRM-NOTIFY-006 (Optional Feature)**
 **Where** SPEC-NOTIF-001 introduces a real email adapter, the console-log site **shall** be replaced by an adapter call without changing the response transaction boundary; the response transaction remains the source of truth.
@@ -264,8 +339,8 @@ The system **shall** define a constant `CHANGE_WINDOW_HOURS = 1` in `src/lib/res
 **REQ-CONFIRM-RESPONSE-WINDOW-004 (Event-Driven)**
 **When** the instructor changes their response within the 1-hour window (e.g., from accepted to declined), the system **shall** UPDATE the existing `instructor_responses` row (UNIQUE constraint enforces same row) and **shall** insert a new `notifications` row reflecting the new status; the previous notification row remains for operator audit but the response transaction MUST be atomic.
 
-**REQ-CONFIRM-RESPONSE-WINDOW-005 (Ubiquitous)**
-The system **shall** ensure idempotency on Server Action re-invocation by relying on the UNIQUE constraint `(source_kind, source_id, instructor_id)`; double-clicks, network retries, or concurrent submissions from multiple tabs **shall** result in at most one row per `(source, instructor)` tuple.
+**REQ-CONFIRM-RESPONSE-WINDOW-005 (Ubiquitous) — HIGH-1 + HIGH-3 fix**
+The system **shall** ensure idempotency on Server Action re-invocation at TWO layers: (1) `instructor_responses` is deduplicated by the two partial UNIQUE indexes on `(project_id, instructor_id) WHERE project_id IS NOT NULL` and `(proposal_inquiry_id, instructor_id) WHERE proposal_inquiry_id IS NOT NULL` (REQ-CONFIRM-RESPONSES-001); and (2) `notifications` is deduplicated by `idx_notifications_idempotency` on `(recipient_user_id, source_kind, source_id, type) WHERE source_kind IS NOT NULL AND source_id IS NOT NULL` (REQ-CONFIRM-NOTIFY-002). Double-clicks, network retries, or concurrent submissions from multiple tabs **shall** result in **exactly one** `instructor_responses` row and **exactly one** `notifications` row per `(source, instructor, type)` tuple — no "1 or 2" outcomes.
 
 **REQ-CONFIRM-RESPONSE-WINDOW-006 (Optional Feature)**
 **Where** the response panel UI is rendering a non-pending response within the change window, the panel **shall** display a live countdown `"남은 변경 가능 시간: <mm:ss>"` updating every second via client component; on countdown reaching zero, the buttons **shall** disable without requiring a page refresh.
@@ -318,13 +393,18 @@ The system **shall NOT** introduce any service-role (`SUPABASE_SERVICE_ROLE_KEY`
 ### 4.1 신규 마이그레이션 (`supabase/migrations/`)
 
 - `supabase/migrations/20260429000010_instructor_responses.sql`
-  - `CREATE TABLE instructor_responses` (모든 컬럼 + UNIQUE 제약 + 인덱스 2종)
+  - `CREATE TABLE instructor_responses` — 컬럼 10종 (id, source_kind, project_id, proposal_inquiry_id, instructor_id, status, conditional_note, responded_at, created_at, updated_at) + 두 nullable FK + `CHECK instructor_responses_source_xor` + `CHECK status IN ('accepted','declined','conditional')` (no DEFAULT)
+  - 두 partial UNIQUE 인덱스: `uniq_instructor_responses_assignment (project_id, instructor_id) WHERE project_id IS NOT NULL` + `uniq_instructor_responses_inquiry (proposal_inquiry_id, instructor_id) WHERE proposal_inquiry_id IS NOT NULL`
+  - 일반 인덱스: `idx_instructor_responses_by_instructor (instructor_id, status)`
   - `ALTER TABLE instructor_responses ENABLE ROW LEVEL SECURITY`
-  - `CREATE POLICY instructor_responses_self_only` (SELECT/INSERT/UPDATE)
+  - `CREATE POLICY instructor_responses_self_only` (SELECT/INSERT/UPDATE/DELETE)
   - `CREATE TRIGGER set_updated_at_instructor_responses` (BEFORE UPDATE)
 - `supabase/migrations/20260429000011_notification_types_confirm.sql`
   - `ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'assignment_accepted'`
   - (4 추가 enum value, 동일 패턴)
+- `supabase/migrations/20260429000012_notifications_idempotency.sql` — HIGH-3 fix
+  - `ALTER TABLE notifications ADD COLUMN source_kind text NULL, ADD COLUMN source_id uuid NULL`
+  - `CREATE UNIQUE INDEX idx_notifications_idempotency ON notifications (recipient_user_id, source_kind, source_id, type) WHERE source_kind IS NOT NULL AND source_id IS NOT NULL`
 
 ### 4.2 신규 도메인 모듈 (`src/lib/responses/`)
 
@@ -364,10 +444,24 @@ The system **shall NOT** introduce any service-role (`SUPABASE_SERVICE_ROLE_KEY`
 
 ### 4.7 신규 테스트
 
-- `tests/unit/responses/state-machine.test.ts` — 4-state 전환 매트릭스 + 1시간 윈도 boundary
-- `tests/unit/responses/side-effects.test.ts` — 배정 수락 schedule 생성 / 사전 문의 수락은 schedule 미생성
-- `tests/unit/responses/notification-mapping.test.ts` — 6개 매핑 케이스 전체
-- `tests/integration/responses-flow.test.ts` — 운영자 배정 → 강사 수락 → 6종 부수효과 + 콘솔 로그
+- `tests/unit/responses/state-machine.test.ts` — 3-state 전환 매트릭스(null+3상태) + 1시간 윈도 boundary (MEDIUM-5 후 'pending' 제거)
+- `tests/unit/responses/side-effects.test.ts` — 배정 수락 schedule 생성 / 사전 문의 수락은 schedule 미생성 / accept→downgrade 보상(schedule_items 산출) (HIGH-2)
+- `tests/unit/responses/notification-mapping.test.ts` — 6 매핑 케이스(2 × 3) 전체 커버 (LOW-7)
+- `tests/integration/responses-flow.test.ts` — 통합 시나리오:
+  1. 운영자 배정 → 강사 수락 → 부수효과 검증 (schedule_items + notifications + project status)
+  2. 강사 거절 (first response) → operator notif + projects 미변경
+  3. conditional note 5자 미만 reject
+  4. 윈도 내 accept → decline downgrade → 보상 트랜잭션 (projects.status reset, schedule_items 삭제, notif 신규 INSERT) — REQ-CONFIRM-EFFECTS-008
+  5. 윈도 외 변경 시도 reject
+  6. 강사 B의 강사 A row 접근 RLS 0행
+  7. schedule_items EXCLUSION 충돌 → 트랜잭션 롤백
+  8. 더블 클릭 idempotency → instructor_responses 정확히 1행 + notifications 정확히 1행 (HIGH-3)
+  9. notifications partial UNIQUE index 동시 INSERT 정확히-1 검증
+  10. CHECK XOR 위반 INSERT 시도 → 23514 (HIGH-1)
+  11. project_id CASCADE → instructor_responses CASCADE 삭제 검증 (HIGH-1)
+  12. proposal_inquiry_id CASCADE 동일 검증 (HIGH-1)
+  13. BEFORE UPDATE trigger updated_at 갱신 (REQ-RESPONSES-006, MEDIUM-6)
+  14. EXPLAIN ANALYZE on /me/inquiries query uses idx_instructor_responses_by_instructor (REQ-RESPONSES-002, MEDIUM-6)
 
 ### 4.8 변경 없음 (참고)
 
@@ -394,24 +488,24 @@ The system **shall NOT** introduce any service-role (`SUPABASE_SERVICE_ROLE_KEY`
 
 옵션 A를 채택. SPEC-PROPOSAL-001과의 sibling 관계도 옵션 A에서 더 깨끗한데, `proposal_inquiries`는 자기 도메인(고객사 제안 단계 정보)에 집중하고 강사 응답은 `instructor_responses`가 단독 책임진다.
 
-### 5.2 source 매핑 + 조회 전략
+### 5.2 source 매핑 + 조회 전략 (HIGH-1 fix)
 
-`/me/inquiries` 페이지 데이터 흐름:
+`/me/inquiries` 페이지 데이터 흐름 (proposal_inquiry_id FK 사용):
 
 ```
 1. requireRole('instructor') → getCurrentUser() → instructorId
 2. SELECT pi.*, ir.status, ir.responded_at, ir.conditional_note
    FROM proposal_inquiries pi
    LEFT JOIN instructor_responses ir
-     ON ir.source_kind = 'proposal_inquiry'
-    AND ir.source_id = pi.id
+     ON ir.proposal_inquiry_id = pi.id
     AND ir.instructor_id = $instructorId
    WHERE pi.instructor_id = $instructorId
    ORDER BY pi.created_at DESC
-3. 클라이언트 측 필터: ?status=pending 등
+3. 클라이언트 측 필터: ?status=accepted,declined 등 (REQ-CONFIRM-INQUIRIES-005)
+   "미응답"은 ir.status IS NULL로 표현
 ```
 
-`/me/assignments` 페이지 데이터 흐름:
+`/me/assignments` 페이지 데이터 흐름 (project_id FK 사용):
 
 ```
 1. requireRole('instructor') → instructorId
@@ -421,49 +515,61 @@ The system **shall NOT** introduce any service-role (`SUPABASE_SERVICE_ROLE_KEY`
    JOIN clients c ON c.id = p.client_id
    LEFT JOIN LATERAL (
      SELECT created_at FROM notifications
-     WHERE recipient_id = $userId AND type = 'assignment_request'
-       AND link_url LIKE '%' || p.id || '%'
+     WHERE recipient_user_id = $userId AND type = 'assignment_request'
+       AND source_id = p.id
      ORDER BY created_at DESC LIMIT 1
    ) n ON true
    LEFT JOIN ai_instructor_recommendations air
      ON air.project_id = p.id
    LEFT JOIN instructor_responses ir
-     ON ir.source_kind = 'assignment_request'
-    AND ir.source_id = p.id
+     ON ir.project_id = p.id
     AND ir.instructor_id = $instructorId
    WHERE p.instructor_id = $instructorId
      AND p.status IN ('assignment_review', 'assignment_confirmed')
    ORDER BY n.created_at DESC NULLS LAST
 ```
 
-`source_id`는 assignment의 경우 `projects.id` UUID를 그대로 사용한다(notifications.link_url 파싱 대신).
+LATERAL JOIN now uses `notifications.source_id = p.id` directly (cleaner than the previous `link_url LIKE` parsing) thanks to the new `source_id` column added by migration `20260429000012_*`.
 
-### 5.3 트랜잭션 + idempotency
+### 5.3 트랜잭션 + idempotency (HIGH-1 + HIGH-3 fix)
 
 `respondToAssignment` Server Action 핵심 SQL (Drizzle `db.transaction`):
 
 ```sql
 BEGIN;
-  -- 1. UPSERT response (UNIQUE constraint enforces single row)
+  -- 0. (Server Action precondition) call validateTransition('assignment_review', 'assignment_confirmed', { instructorId: self })
+  --    abort if { ok: false }. (MEDIUM-4)
+
+  -- 1. UPSERT response — partial UNIQUE on (project_id, instructor_id) WHERE project_id IS NOT NULL
   INSERT INTO instructor_responses (
-    source_kind, source_id, instructor_id, status, conditional_note, responded_at
-  ) VALUES ('assignment_request', $projectId, $instructorId, $status, $note, now())
-  ON CONFLICT (source_kind, source_id, instructor_id)
+    source_kind, project_id, proposal_inquiry_id, instructor_id, status, conditional_note, responded_at
+  ) VALUES ('assignment_request', $projectId, NULL, $instructorId, $status, $note, now())
+  ON CONFLICT (project_id, instructor_id) WHERE project_id IS NOT NULL
   DO UPDATE SET
     status = EXCLUDED.status,
     conditional_note = EXCLUDED.conditional_note,
     responded_at = now()
-  WHERE instructor_responses.responded_at IS NULL  -- pending → first response
-     OR (now() - instructor_responses.responded_at) <= INTERVAL '1 hour'  -- within window
-  RETURNING *;
+  WHERE (now() - instructor_responses.responded_at) <= INTERVAL '1 hour'  -- within window
+  RETURNING (xmax = 0) AS inserted, *;  -- inserted=true on first INSERT, false on UPDATE path
 
-  -- 2. (accepted only) Update project + create schedule + notify operator
-  -- (declined/conditional only) Skip project update + notify operator with appropriate type
+  -- 2a. (accepted only) UPDATE projects (concurrency guard via WHERE), INSERT schedule_items
+  -- 2b. (downgrade accept→decline/conditional within window) → REQ-CONFIRM-EFFECTS-008 path:
+  --     UPDATE projects SET instructor_id=NULL, status='assignment_review' (validateTransition + bypass)
+  --     DELETE FROM schedule_items WHERE project_id=$projectId AND instructor_id=self AND schedule_kind='system_lecture'
+  -- 2c. (decline/conditional first response) Skip project update
+
+  -- 3. INSERT operator notification — partial UNIQUE on (recipient_user_id, source_kind, source_id, type)
+  INSERT INTO notifications (recipient_user_id, type, source_kind, source_id, title, body, link_url)
+  VALUES ($operatorUserId, $notificationType, 'assignment_request', $projectId, $title, $body, $linkUrl)
+  ON CONFLICT (recipient_user_id, source_kind, source_id, type)
+  WHERE source_kind IS NOT NULL AND source_id IS NOT NULL
+  DO NOTHING;
+  -- (HIGH-3) ON CONFLICT DO NOTHING ensures concurrent retries produce exactly 1 notification row
 
 COMMIT;
 ```
 
-WHERE 절의 `responded_at IS NULL OR within 1h`이 1시간 윈도 enforcement를 DB 차원에서 보장한다(클라이언트 timestamp 신뢰 X).
+WHERE 절의 `(now() - responded_at) <= INTERVAL '1 hour'`이 1시간 윈도 enforcement를 DB 차원에서 보장한다(클라이언트 timestamp 신뢰 X). 'pending' 상태가 제거되었으므로 이전의 `responded_at IS NULL OR within 1h` 분기는 `within 1h` 단일 조건으로 단순화된다 (응답 row 부재 = INSERT 경로, 응답 row 존재 = UPDATE 경로 조건부).
 
 ### 5.4 conditional 매핑 결정
 
@@ -591,6 +697,9 @@ SPEC-DB-001은 `schedule_items`에 EXCLUSION 제약(시간 범위 겹침 방지)
 | 운영자가 동일 프로젝트에 다른 강사 재배정 시 강사 A의 응답 stale | 강사 UX 혼란 | `respondToAssignment` 액션에 `projects.instructor_id = self` 사전 검증 추가 + 한국어 에러 `"이미 다른 강사에게 재배정된 프로젝트입니다."` |
 | schedule_items 생성 시 `projects.education_start_at` null | 트랜잭션 부분 실패 | REQ-CONFIRM-EFFECTS-006: schedule 생성 skip + 비차단 경고 banner 표시, 운영자가 일정 확정 후 재처리 가능 |
 | `console.log` 스텁이 production 로그를 오염 | 로그 잡음 | NODE_ENV 무관 출력 명시 (REQ-CONFIRM-NOTIFY-004), SPEC-NOTIF-001에서 adapter로 전환 시 이 라인 제거 |
+| **SPEC-PROJECT-001 ALLOWED_TRANSITIONS 그래프에 `assignment_confirmed → assignment_review` 역방향 엣지 부재** (HIGH-2 cross-reference) | accept→decline 1시간 윈도 보상 트랜잭션이 `validateTransition` 호출 시 `{ ok: false }` 반환 → REQ-CONFIRM-EFFECTS-008가 `__bypassValidateTransitionForResponseDowngrade` documented bypass 경로 사용 필요 | (1) 본 SPEC 머지 전 후속 **SPEC-PROJECT-AMEND-001** 작성 — `ALLOWED_TRANSITIONS.assignment_confirmed`에 `'assignment_review'` 추가 + `validateTransition` 단위 테스트 신규 케이스. (2) 본 SPEC 구현 시 bypass 함수에 `// @MX:WARN @MX:REASON SPEC-PROJECT-AMEND-001 follow-up` 주석 + `console.warn` 감사 로그 강제. (3) bypass write도 `project_status_history` 트리거가 자동 기록하므로 audit trail 보존됨 |
+| **HIGH-1 fix가 SPEC-PROPOSAL-001 머지 시점에 `proposal_inquiry_id` FK 대상 테이블 부재** | M1 마이그레이션 `REFERENCES proposal_inquiries(id)` 실행 실패 | M1을 SPEC-PROPOSAL-001 머지 후로 순서 의존. SPEC-PROPOSAL-001이 `proposal_inquiries(id)` PK 컬럼을 정확히 동일 이름으로 정의하는지 plan.md M1 게이트에서 검증. SPEC-PROPOSAL-001이 충분히 지연되면 본 SPEC M4(`/me/assignments`만 단독 출시)는 `proposal_inquiry_id` 컬럼을 NULL로 둔 채 schema는 정의하되 FK 제약은 별도 후속 마이그레이션으로 분리하는 옵션 검토 |
+| **HIGH-3 fix가 기존 `notifications` 행에 `source_kind`/`source_id` 컬럼 NULL** | partial UNIQUE 인덱스 `WHERE source_kind IS NOT NULL` 절로 자동 우회 | 기존 SPEC-PROJECT-001 `assignment_request` notif 행은 `source_kind=NULL`이므로 인덱스 진입 안 함. 본 SPEC INSERT만 partial UNIQUE 활성. 회귀 0건. SPEC-NOTIF-001 후속에서 backfill 검토 |
 
 ---
 

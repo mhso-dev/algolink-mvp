@@ -25,7 +25,7 @@
 
 ### M1: DB 마이그레이션 (Priority: High)
 
-**목표**: `lecture_sessions`, `settlement_sessions` 신규 테이블 + `projects` 컬럼 추가 + (선택) `project_status` enum에 `instructor_withdrawn` 추가.
+**목표**: `lecture_sessions`, `settlement_sessions` 신규 테이블 + `projects` 컬럼 추가 + **(필수)** `project_status` enum에 `instructor_withdrawn` 추가 (v0.1.1부터 필수 — REQ-EXCEPT-007 협응).
 
 **산출물**:
 
@@ -33,25 +33,48 @@
   - `lecture_session_status` enum 정의
   - `lecture_sessions` 테이블 + 인덱스 3종 (project_date, instructor_date, deleted)
   - RLS 정책 3종 (admin all / operator rw / instructor self select)
+  - **CHECK `hours > 0 AND hours <= 24`** (REQ-PAYOUT002-SESSIONS-001 / -008)
+  - **`original_session_id ... ON DELETE RESTRICT`** (LOW-7 fix — 감사 추적 보존)
 - `supabase/migrations/20260429xxxxxx_projects_hourly_rate.sql`
   - `projects.hourly_rate_krw bigint NOT NULL DEFAULT 0 CHECK (>= 0)`
   - `projects.instructor_share_pct numeric(5,2) NOT NULL DEFAULT 0 CHECK (BETWEEN 0 AND 100)`
   - 데이터 이행 가이드 주석
 - `supabase/migrations/20260429xxxxxx_settlement_sessions_link.sql`
-  - junction 테이블 + 인덱스 + RLS 정책 3종
-- (선택) `supabase/migrations/20260429xxxxxx_project_status_instructor_withdrawn.sql`
-  - `project_status` enum에 값 추가 (SPEC-PROJECT-001 협응)
+  - junction 테이블 + RLS 정책 3종
+  - **UNIQUE INDEX `settlement_sessions_lecture_session_unique` ON `(lecture_session_id)`** (REQ-PAYOUT002-LINK-006 — concurrent generate race-condition DB-layer 방지)
+- **(필수)** `supabase/migrations/20260429xxxxxx_project_status_instructor_withdrawn.sql`
+  - `ALTER TYPE project_status ADD VALUE IF NOT EXISTS 'instructor_withdrawn';`
+  - **비가역(one-way) 마이그레이션 — staging dry-run 후 sign-off 필수**
 
 **검증**:
 
 - `npx supabase db reset` 무오류
 - `pnpm db:verify` (기존 시드 + 새 마이그레이션) 통과
 - 다른 강사 토큰으로 lecture_sessions SELECT 시 0행 (RLS 검증)
-- `INSERT INTO lecture_sessions (project_id, date, hours) VALUES (..., 1.3)` → CHECK 거부
+- `INSERT INTO lecture_sessions (project_id, date, hours) VALUES (..., 1.3)` → CHECK 거부 (0.5 단위 위반)
+- `INSERT INTO lecture_sessions (project_id, date, hours) VALUES (..., 25)` → CHECK 거부 (max 24 위반)
+- 동일 `lecture_session_id`를 두 settlement_sessions 행에 link 시도 → UNIQUE 위반 (race 회귀 가드)
+
+**M1 Acceptance Gate (v0.1.1 신설)** [HARD]:
+
+1. **Rollback dry-run on staging**:
+   - 모든 forward 마이그레이션을 staging에 적용 → `pnpm db:verify` PASS 확인
+   - `npx supabase db reset` 또는 명시적 DOWN SQL 실행 (spec.md §4.2 표 참조)
+   - 다시 forward 적용 → 동일 PASS 확인
+   - lecture_sessions / projects.hourly_rate / settlement_sessions 마이그레이션은 가역(safe)임을 확인
+2. **`instructor_withdrawn` enum 추가는 one-way migration으로 sign-off**:
+   - PostgreSQL은 `ALTER TYPE ... DROP VALUE` 미지원 → post-deploy rollback 경로 없음
+   - staging에서 backup-restore 사이클 1회 거쳐 unidirectional 특성 확인
+   - 본 SPEC에서 production 적용 시 backup 가용성 사전 확인 필수
+3. **status-flow.ts exhaustiveness check**:
+   - SPEC-PROJECT-001의 `userStepFromEnum` switch에 `instructor_withdrawn` case가 추가되었는지 확인 (TypeScript `never` exhaustiveness)
+   - 단위 테스트로 `userStepFromEnum('instructor_withdrawn') === '강사매칭'` 검증
+4. **UNIQUE constraint stress test** (REQ-LINK-006):
+   - 통합 테스트에서 두 동시 generate 트랜잭션을 시뮬레이션 (예: `Promise.all([generate(...), generate(...)])`) → 두 번째가 23505로 실패함을 검증
 
 **TDD 사이클**:
 
-- RED: RLS 검증 SQL 테스트 (다른 강사 토큰에서 SELECT 시도) — 검증 환경 부재로 거부 기대
+- RED: RLS 검증 SQL 테스트 (다른 강사 토큰에서 SELECT 시도) — 검증 환경 부재로 거부 기대 + `hours=25` CHECK 거부 케이스 + UNIQUE 위반 케이스
 - GREEN: 마이그레이션 적용 후 검증 통과
 - REFACTOR: 중복 정책 통합, 인덱스 명명 일관화
 
@@ -59,19 +82,27 @@
 
 ### M2: 산식 순수 함수 (Priority: High)
 
-**목표**: `src/lib/payouts/calculator.ts` 4개 순수 함수 + 단위 테스트 100% 커버.
+**목표**: `src/lib/payouts/calculator.ts` 4개 순수 함수 + 단위 테스트 100% 커버. **정수 산술(integer arithmetic) 채택으로 IEEE-754 부동소수점 drift 차단**.
 
 **산출물**:
 
 - `src/lib/payouts/calculator.ts`
-  - `calculateInstructorFeePerHour(hourlyRateKrw, sharePct)`
-  - `calculateTotalBilledHours(sessions)`
-  - `calculateBusinessAmount(hourlyRateKrw, totalHours)`
-  - `calculateInstructorFee(feePerHour, totalHours)`
+  - `calculateInstructorFeePerHour(hourlyRateKrw, sharePct)` → `floor((rate × Math.round(pct × 100)) / 10000)` (정수 산술)
+  - `calculateTotalBilledHours(sessions)` → status='completed' AND deleted_at=null만 합산
+  - `calculateBusinessAmount(hourlyRateKrw, totalHours)` → `floor(rate × totalHours)` (`.5` 분모 차단)
+  - `calculateInstructorFee(feePerHour, totalHours)` → `floor(feePerHour × totalHours)` (`.5` 분모 차단)
   - 모든 함수에 `@MX:ANCHOR` 태그 (fan_in 예상 ≥ 3)
-  - `// floor only, never round` 주석
+  - `// floor only, never round` 주석 + IEEE-754 drift 방지 주석 (v0.1.1)
 - `src/lib/payouts/__tests__/calculator.test.ts`
-  - SPEC §2.3 REQ-PAYOUT002-CALC-005의 5+ 케이스 + 추가 edge case
+  - SPEC §2.3 REQ-PAYOUT002-CALC-005의 8+ 케이스 (a~h):
+    - (a) `(100000, 70) → 70000`
+    - (b) `(80000, 66.67) → 53336`
+    - (c) sessions filter `[completed:2.0, completed:1.5, planned:1.0, canceled:1.0, rescheduled:2.0] → 3.5`
+    - (d) `(*, 0) → 0`
+    - (e) `(0, *) → 0`
+    - **(f) IEEE-754 drift regression: `(1000, 32.3) → 323` (정수 산술이 부동소수점 식 322보다 1원 높게 산출)**
+    - (g) cascade: `(80000, 66.67, 4.5) → fee_per_hour=53336, business=360000, fee=floor(53336×4.5)=240012`
+    - (h) `(*, 33.33)` integer 변환 정확성: `Math.round(33.33 × 100) === 3333`
   - 0.5 단위 hours 검증
   - status 필터링 (completed만 포함)
 
@@ -86,6 +117,7 @@
 - `pnpm test src/lib/payouts/__tests__/calculator.test.ts` 0 failure
 - 커버리지 ≥ 90%
 - typecheck 0 errors
+- (회귀) `(1000, 32.3) → 323` 케이스 PASS는 정수 산술 채택 여부의 게이트키퍼
 
 ---
 
@@ -97,12 +129,12 @@
 
 - `src/lib/sessions/types.ts` — `LectureSession`, `LectureSessionStatus`, `SessionInput`
 - `src/lib/sessions/status-machine.ts` — 전환 검증 (`planned → completed/canceled/rescheduled`만 허용, 그 외 동결)
-- `src/lib/sessions/validation.ts` — zod 스키마 (date + hours 0.5 단위 + status + max 24)
+- `src/lib/sessions/validation.ts` — zod 스키마 (date + hours: `min(0).step(0.5).max(24)` — REQ-PAYOUT002-SESSIONS-003 + SESSIONS-008 + status). DB CHECK와 application-layer 매칭으로 defense-in-depth.
 - `src/lib/sessions/queries.ts` — listSessionsByProject / bulkUpsertSessions / cancelSession / rescheduleSession / bulkCancelFutureSessions
 - `src/lib/sessions/errors.ts` — 한국어 에러 단일 출처
 - `src/lib/sessions/index.ts` — barrel export
 - `src/lib/sessions/__tests__/status-machine.test.ts` — 모든 from×to 조합 (4×4=16)
-- `src/lib/sessions/__tests__/validation.test.ts` — 0.5 단위 / max 24 / 음수 거부
+- `src/lib/sessions/__tests__/validation.test.ts` — 0.5 단위 거부 / **max 24 거부 (hours=25 → reject with `"강의 시수는 24시간을 초과할 수 없습니다."`)** / 음수 거부 / share_pct 0~100 범위 외 거부
 - `src/lib/sessions/__tests__/queries.test.ts` — bulk ops (mock DB)
 
 **TDD 사이클**:
@@ -156,11 +188,12 @@
 **산출물**:
 
 - `src/lib/payouts/generate.ts` — `generateSettlementsForPeriod` 핵심 로직
-  - 미청구 세션 스캔 SQL (settlement_sessions 미link 조건)
+  - 미청구 세션 스캔 SQL (settlement_sessions 미link 조건 — UI 미리보기용 early reject)
   - 프로젝트별 그룹핑
   - 산식 적용 (calculator.ts 호출)
   - 트랜잭션으로 settlements + settlement_sessions INSERT
-- `src/lib/payouts/__tests__/generate.test.ts` — 미청구 스캔 + 이중 청구 방지 + flow 별 INSERT
+  - **UNIQUE 위반(SQLSTATE 23505) catch 핸들러** — race condition 발생 시 한국어 에러 `"이 강의는 이미 다른 정산에 청구되었습니다. 새로 고침 후 다시 시도해주세요."` 반환 (REQ-PAYOUT002-LINK-006)
+- `src/lib/payouts/__tests__/generate.test.ts` — 미청구 스캔 + 이중 청구 방지 + flow 별 INSERT + **race-condition 시뮬레이션 (`Promise.all` 두 generate 호출 → 한쪽만 성공)**
 - `src/components/payouts/GenerateSettlementsForm.tsx` — period selector + project filter + 미리보기 + 생성 버튼
 - `src/components/payouts/SettlementGeneratePreviewTable.tsx` — 미리보기 테이블
 - `src/app/(app)/(operator)/settlements/generate/page.tsx` — 신규 라우트
@@ -186,14 +219,18 @@
 
 **산출물**:
 
-- `src/components/projects/RescheduleDialog.tsx` — 새 날짜 입력 + 사유
+- `src/components/projects/RescheduleDialog.tsx` — 새 날짜 입력 + 사유 (notes inherit-and-amend UX, REQ-EXCEPT-002)
 - `src/components/projects/InstructorWithdrawalDialog.tsx` — 사유 입력 + 미래 세션 일괄 취소 미리보기
 - `src/app/(app)/(operator)/projects/[id]/edit/actions.ts`에 추가 액션:
-  - `cancelSessionAction(sessionId)` — status → canceled
-  - `rescheduleSessionAction(sessionId, newDate)` — 트랜잭션 (원본 → rescheduled, 새 row INSERT with original_session_id)
+  - `cancelSessionAction(sessionId, reason?)` — status → canceled (사유 notes 추가)
+  - `rescheduleSessionAction(sessionId, newDate, notes?)` — 트랜잭션 (원본 → rescheduled, 새 row INSERT with `original_session_id` + **`notes` 인계** — 운영자 amend 가능, REQ-EXCEPT-002 LOW-8)
   - `withdrawInstructorAction(projectId, reason)` — 트랜잭션 (미래 planned → canceled + project status → instructor_withdrawn)
 - 프로젝트 상세 페이지에 "강사 중도 하차" 배너 추가
-- `src/lib/projects/status-machine.ts` 확장 — `instructor_withdrawn` 상태 등록
+- **`src/lib/projects/status-flow.ts` 확장 (REQ-PAYOUT002-EXCEPT-007)**:
+  - `userStepFromEnum` switch 문에 `case 'instructor_withdrawn': return '강사매칭';` 추가
+  - TypeScript exhaustiveness check (`never` default) 통과 검증
+  - 단위 테스트 `userStepFromEnum('instructor_withdrawn') === '강사매칭'`
+- `src/lib/projects/status-machine.ts` 확장 — `instructor_withdrawn` 상태 등록 (전환 규칙은 SPEC-PROJECT-001과 협의: → `lecture_requested` 또는 `instructor_sourcing` 으로 재진입 가능)
 
 **TDD 사이클**:
 
@@ -214,15 +251,25 @@
 
 **산출물**:
 
-- `src/app/(app)/(operator)/settlements/generate/__tests__/integration.test.ts` — acceptance.md의 8개 시나리오 PASS
+- `src/app/(app)/(operator)/settlements/generate/__tests__/integration.test.ts` — acceptance.md의 17개 시나리오 PASS
 - 시나리오 1: 5회 강의 → completed → generate → settlement 1건 + 5 link
-- 시나리오 2: 같은 기간 두 번 generate → 두 번째 0건
-- 시나리오 3: 결강 1회 → 정산에서 제외
-- 시나리오 4: 일정 변경 → 원본 제외, 새 세션 청구
-- 시나리오 5: 강사 중도 하차 → 미래 일괄 canceled, 과거 보존
-- 시나리오 6: GENERATED 컬럼 INSERT 페이로드 제외 (grep + INSERT 시도 422 재현)
-- 시나리오 7: SPEC-PAYOUT-001 보존 (settlement 4-state, 세율 검증, 매입매출 위젯 정상 동작)
+- 시나리오 2: 결강 1회 → 정산에서 제외
+- 시나리오 3: 일정 변경 → 원본 제외, 새 세션 청구 (notes 인계 검증 포함)
+- 시나리오 4: 다중 프로젝트 동시 generate → settlements 2건 INSERT
+- 시나리오 5: 같은 기간 두 번 generate → 두 번째 0건 (미리보기 단계 차단)
+- 시나리오 6: 강사 중도 하차 → 미래 일괄 canceled, 과거 보존, project status='instructor_withdrawn'
+- 시나리오 7: 산식 정합 (정수 산술, IEEE-754 drift 회귀 case 포함)
 - 시나리오 8: RLS — instructor 토큰으로 다른 강사 sessions SELECT 시 0행
+- 시나리오 9: SPEC-PAYOUT-001 보존 (settlement 4-state, 세율 검증, 매입매출 위젯 정상 동작)
+- **시나리오 10 (HIGH-2 회귀)**: concurrent generate race — `Promise.all([generate(...), generate(...)])` → 한쪽만 성공, 반대편은 23505 unique violation으로 ROLLBACK + 한국어 에러
+- **시나리오 11 (MEDIUM-5)**: 0.5 단위 hours 거부 (`hours=1.3`) + max 24 거부 (`hours=25`)
+- **시나리오 12 (MEDIUM-5)**: completed/canceled/rescheduled 세션의 status freeze (planned로 되돌리기 시도 → 거부)
+- **시나리오 13 (MEDIUM-5)**: share_pct > 100 거부 + share_pct < 0 거부 (zod schema)
+- **시나리오 14 (MEDIUM-5)**: settlement_sessions에 link된 lecture_session 하드삭제 시도 → ON DELETE RESTRICT 거부
+- **시나리오 15 (MEDIUM-5)**: instructor 토큰으로 settlement_sessions SELECT 시 본인 settlement에 link된 row만 반환 (RLS join)
+- **시나리오 16 (MEDIUM-5)**: service-role Supabase client 미사용 검증 (grep `createServiceClient` → 0 hit in payouts/sessions modules)
+- **시나리오 17 (MEDIUM-5)**: settlement_flow defaulting — 프로젝트에 flow 메타데이터 있으면 default, 없으면 운영자가 미리보기에서 그룹별 선택
+- **시나리오 18 (MEDIUM-6)**: `userStepFromEnum('instructor_withdrawn') === '강사매칭'` exhaustiveness 검증
 
 **TDD 사이클**:
 
@@ -245,7 +292,12 @@
 
 - `pnpm typecheck && pnpm lint && pnpm test:unit && pnpm build` 0 에러
 - SPEC-PAYOUT-001의 기존 테스트 (46건) PASS 유지
-- `.moai/specs/SPEC-PAYOUT-002/spec.md` HISTORY 업데이트 (구현 완료 노트)
+- `.moai/specs/SPEC-PAYOUT-002/spec.md` HISTORY 업데이트 (v0.1.1 amendments 적용 노트 + 구현 완료 노트)
+- v0.1.1 회귀 가드 검증:
+  - calculator: `(1000, 32.3) → 323` 케이스 PASS (정수 산술 채택 게이트키퍼)
+  - settlement_sessions: `Promise.all` 동시 generate → 한쪽만 성공
+  - status-flow.ts: `userStepFromEnum('instructor_withdrawn') === '강사매칭'`
+  - `hours=25` 거부 + DB CHECK + zod 두 layer 검증
 - (sync phase에서) `README.md`, `CHANGELOG.md`, `.moai/project/structure.md`, `.moai/project/product.md` 업데이트
 - (sync phase에서) MX 태그 검증 (`@MX:ANCHOR` calculator, generate, status-machine)
 

@@ -1,6 +1,6 @@
 ---
 id: SPEC-PROPOSAL-001
-version: 0.1.0
+version: 0.2.0
 status: draft
 created: 2026-04-29
 updated: 2026-04-29
@@ -12,6 +12,8 @@ issue_number: null
 # SPEC-PROPOSAL-001: 제안서 도메인 + 사전 강사 문의 (Proposal Domain + Pre-Contract Instructor Inquiry)
 
 ## HISTORY
+
+- **2026-04-29 (v0.2.0)**: plan-auditor FAIL 결과(HIGH×2 + MEDIUM×2 + LOW×2) 반영. 주요 변경: (1) **HIGH-1** Won→Project 변환 트랜잭션 race-condition 방어 — `SELECT ... FOR UPDATE` 행 잠금 + 멱등 early-return 의사코드를 REQ-PROPOSAL-CONVERT-003 / §5.4 / spec-compact.md에 unify, (2) **HIGH-2** 트랜잭션 격리 수준 명시 — 신규 REQ-PROPOSAL-CONVERT-007 (READ COMMITTED) 추가, (3) **MEDIUM-3** acceptance.md에 Scenario 9~16 추가 (REQ-ENTITY-002/003, LIST-001/002/003, DETAIL-001/002/004, INQUIRY-002/006, CONVERT-002/006, SIGNAL-001/002/004, RLS-003 traceability 충당), (4) **MEDIUM-4** SPEC-CONFIRM-001 contract surface 명시 — 신규 REQ-PROPOSAL-INQUIRY-009 (`instructor_responses` 테이블은 CONFIRM-001 소유, 본 SPEC은 `proposal_inquiries.status` 컨트랙트만 노출) 추가 + plan.md prerequisites cross-ref, (5) **LOW-5** convert step 순서 일관화 — REQ-CONVERT-001 prose / §5.4 SQL / spec-compact.md 모두 §5.4 canonical 6-step 순서(SELECT FOR UPDATE → 멱등 → projects INSERT → junction → ai_recommendations → proposals UPDATE)로 통일, (6) **LOW-6** advisory lock 모호 cross-ref 제거 — DB unique 제약이 race를 직렬화하므로 §5.3에서 advisory lock 권장 문구 삭제 + R-1 보강. v0.1.0 Frozen invariants(SPEC-PROJECT-001 13단계 enum, SPEC-RECOMMEND-001 가중치) 보존.
 
 - **2026-04-29 (v0.1.0)**: 초기 작성. Algolink AI Agentic Platform MVP의 영업 상위 단계(`알고링크 → 고객사 제안서 제출`)를 정의하는 신규 도메인. 본 SPEC은 (1) `proposals` 테이블 + 워크플로우(`draft → submitted → won|lost|withdrawn`), (2) `proposal_inquiries` 테이블 + 강사 다중 사전 문의 디스패치 + 인앱 알림 스텁(`notification_type=inquiry_request`), (3) Won 제안서 → 프로젝트 자동 변환(SPEC-PROJECT-001 `projects` row + 메타데이터 복사 + accepted 강사 후보 기록), (4) 제안서 첨부(사업자등록증 X, 제안서 PDF/견적서) Storage 어댑터, (5) operator/admin 가드(`(operator)/proposals/**`)와 RLS 정합성, (6) 향후 SPEC-RECOMMEND-001이 읽을 수 있는 `prior_accepted_count` 시그널(view) 기록까지 7개 EARS 모듈로 다룬다. 강사 응답 측 처리(`/me/inquiries`, 수락·거절·조건부 회신, `proposal_inquiries.status` 갱신)는 sibling SPEC-CONFIRM-001(병행 작성)에서 다루며 본 SPEC의 책임은 디스패치까지로 한정된다. SPEC-PROJECT-001(`status: completed`) `projects` 엔티티 + 13단계 enum + KPI 산출식(`top1_acceptance_rate`)은 변경하지 않으며, SPEC-RECOMMEND-001(`status: draft`) 가중치/스코어링 정책 또한 일체 변경하지 않는다(시그널 컬럼만 제공). SPEC-CLIENT-001(`status: completed`) `clients` 테이블, SPEC-DB-001 `skill_categories`/`instructors` 테이블, SPEC-AUTH-001 `requireRole(['operator', 'admin'])` 가드를 그대로 재사용한다. 명시적 제외: AI 제안서 본문 자동 생성, 전자 서명, 실제 이메일 발송(스텁만), 다중 통화, 제안서 템플릿화.
 
@@ -104,8 +106,9 @@ Algolink AI Agentic Platform MVP의 영업 상위 단계(pre-contract sales)를 
 - ✅ 상태 전환 검증: `lost` 또는 `won` 또는 `withdrawn` 상태에서 어떠한 수정 시도도 거부, 한국어 에러 반환
 - ✅ 디스패치 결과: instructor 3명 선택 시 `proposal_inquiries` rows 3건 (status=pending) + `notifications` rows 3건 (type=inquiry_request) + 콘솔 로그 3건 (`[notif] inquiry_request → instructor_id=<uuid> proposal_id=<uuid>`)
 - ✅ 디스패치 멱등성: 동일 (proposal_id, instructor_id) 쌍은 unique 제약으로 거부, 한국어 에러 `"이미 사전 문의를 보낸 강사입니다."` 반환
-- ✅ 변환 결과: `submitted → won` 액션 호출 시 (i) `proposals.status = 'won'`, `decided_at = now()`, `converted_project_id = <new project id>` 갱신, (ii) `projects` 신규 row 1건 (title/client_id/operator_id/start_date/end_date/business_amount_krw/instructor_fee_krw 복사, status='proposal'), (iii) `project_required_skills` junction 복사, (iv) accepted 강사가 N명 있으면 `ai_instructor_recommendations` row 1건 (top3_jsonb에 accepted 강사 ID 포함, model='manual_from_proposal')
-- ✅ 변환 멱등성: 이미 `converted_project_id`가 set 된 제안서에 대한 재변환 시도 거부, 한국어 에러 반환
+- ✅ 변환 결과 (canonical 6-step per §5.4 / REQ-PROPOSAL-CONVERT-001): Step 1 `SELECT ... FOR UPDATE` 행 잠금 → Step 2 멱등/상태 체크 → Step 3 `projects` INSERT RETURNING id (title/client_id/operator_id/start_date/end_date/business_amount_krw/instructor_fee_krw 복사, status='proposal') → Step 4 `project_required_skills` junction 복사 → Step 5 accepted ≥ 1 시 `ai_instructor_recommendations` INSERT (top3_jsonb 최대 3명 capped, model='manual_from_proposal') → Step 6 `proposals` UPDATE (status='won', decided_at=now(), converted_project_id=<new>)
+- ✅ 변환 멱등성 (REQ-PROPOSAL-CONVERT-003): `converted_project_id IS NOT NULL` 재호출 시 행 잠금 후 early-return (existing project_id 동일 반환, 신규 INSERT 0건). 두 호출 race 시 정확히 1 projects row + 두 호출 동일 project_id (acceptance Scenario 4d / EC-16 검증).
+- ✅ 변환 격리 수준 (REQ-PROPOSAL-CONVERT-007): READ COMMITTED + `SELECT FOR UPDATE` 조합으로 동시 호출 직렬화 보장. SERIALIZABLE 미사용.
 - ✅ Frozen 보장: SPEC-PROJECT-001 schema(컬럼/enum/제약) 변경 0건, SPEC-RECOMMEND-001 가중치 변경 0건
 - ✅ RLS: instructor 토큰으로 `/proposals` 접근 시 silent redirect (`requireRole`), instructor가 직접 SELECT 시 0 rows
 - ✅ 시그널 view 동작: `instructor_inquiry_history` view에서 instructor_id별 `prior_accepted_count` (최근 90일) 산출 가능, SPEC-RECOMMEND-001은 본 SPEC 적용 후에도 점수 산출 결과 동일 (시그널은 읽지 않음)
@@ -213,25 +216,106 @@ The system **shall** introduce the value `inquiry_request` into the existing `no
 **REQ-PROPOSAL-INQUIRY-008 (Ubiquitous)**
 The response side (instructor receives notification → opens `/me/inquiries` → posts accept/decline/conditional) **shall** be implemented by SPEC-CONFIRM-001 (sibling SPEC); the contract this SPEC exposes is **only** the `proposal_inquiries.status` column transitions `pending → accepted | declined | conditional` and the timestamp columns `responded_at`, `responded_by_user_id`. The system **shall not** restrict which user_id may transition `pending → *` at the DB level beyond RLS — SPEC-CONFIRM-001 enforces "only the inquired instructor can respond" via Server Action validation.
 
+**REQ-PROPOSAL-INQUIRY-009 (Ubiquitous — Contract Surface with SPEC-CONFIRM-001)**
+The dispatch ↔ response handoff between SPEC-PROPOSAL-001 (this SPEC) and SPEC-CONFIRM-001 follows a unified-table pattern. SPEC-CONFIRM-001 introduces a discriminator-keyed table `instructor_responses (source_kind text, source_id uuid, ...)` that captures responses from multiple inquiry sources; for proposal inquiries it uses `source_kind = 'proposal_inquiry'` and `source_id = proposal_inquiries.id`.
+
+The contract surface between the two SPECs is exactly:
+
+| Concern | Owner | Notes |
+|---------|-------|-------|
+| `proposals` table + `proposal_inquiries` table schema and dispatch initiation (`dispatchInquiries`) | SPEC-PROPOSAL-001 (this SPEC) | Defines tables, RLS, dispatch INSERT |
+| `instructor_responses` table schema + response capture UI (`/me/inquiries` accept/decline/conditional) | SPEC-CONFIRM-001 | Defines unified response table keyed by `(source_kind, source_id)` |
+| Write-back to `proposal_inquiries.status` (`pending → accepted | declined | conditional`), `responded_at`, `responded_by_user_id` on response receipt | SPEC-CONFIRM-001 | CONFIRM-001 atomically inserts `instructor_responses` row AND updates `proposal_inquiries.status` in one transaction |
+| Read of `proposal_inquiries.status` for the response board (`InquiryResponseBoard.tsx`) | SPEC-PROPOSAL-001 (this SPEC) | RSC reads the `proposal_inquiries` table; agnostic to `instructor_responses` |
+
+The system (this SPEC) **shall not** define, INSERT into, or otherwise reference the `instructor_responses` table. The system **shall** treat `proposal_inquiries.status` transitions as an externally-driven event from SPEC-CONFIRM-001's transaction. The notification stub in REQ-PROPOSAL-INQUIRY-003 (`type = 'inquiry_request'`, link_url `/me/inquiries/<inquiry_id>`) is the only outbound side of the contract; CONFIRM-001 is responsible for the inbound side (receiving the response and updating the `proposal_inquiries.status` column owned by this SPEC).
+
+**Sequencing constraint**: SPEC-CONFIRM-001 **must be merged before** SPEC-PROPOSAL-001 implementation completes (acceptance gate). Without CONFIRM-001's `instructor_responses` table and `/me/inquiries` route, the dispatched notifications are dead-ended (instructor receives notification but cannot respond, `proposal_inquiries.status` remains `pending` forever). See plan.md prerequisites and §8 R-7 for the mitigation strategy.
+
 ### 2.5 REQ-PROPOSAL-CONVERT — Won → Project 변환
 
 **REQ-PROPOSAL-CONVERT-001 (Ubiquitous)**
-The system **shall** provide a Server Action `convertProposalToProject({ proposalId })` at `src/app/(app)/(operator)/proposals/[id]/convert/actions.ts` that, in a single PostgreSQL transaction, (a) updates `proposals.status = 'won'`, `decided_at = now()`, `converted_project_id = <new project id>`, (b) inserts a new row into `projects` with `title = proposal.title`, `client_id = proposal.client_id`, `operator_id = proposal.operator_id`, `start_date = proposal.proposed_period_start`, `end_date = proposal.proposed_period_end`, `business_amount_krw = proposal.proposed_business_amount_krw`, `instructor_fee_krw` derived from `proposal.proposed_hourly_rate_krw × estimated_hours` (or 0 when unset; documented in §5), `status = 'proposal'`, `instructor_id = NULL`, (c) copies `proposal_required_skills` rows into `project_required_skills` for the new project, (d) when ≥ 1 `proposal_inquiries` rows for this proposal have `status = 'accepted'`, inserts a single row into `ai_instructor_recommendations` for the new project with `top3_jsonb` listing the accepted instructors (capped at 3) and `model = 'manual_from_proposal'`, leaving `adopted_instructor_id = NULL`.
+The system **shall** provide a Server Action `convertProposalToProject({ proposalId })` at `src/app/(app)/(operator)/proposals/[id]/convert/actions.ts` that executes the following 6-step sequence in a single PostgreSQL transaction (canonical order — see §5.4 for SQL, REQ-PROPOSAL-CONVERT-003 for idempotency, REQ-PROPOSAL-CONVERT-007 for isolation level):
+1. **Acquire row lock** on the proposal: `SELECT id, status, converted_project_id FROM proposals WHERE id = $1 FOR UPDATE` (serializes concurrent calls — REQ-PROPOSAL-CONVERT-003).
+2. **Idempotency / status check** (REQ-PROPOSAL-CONVERT-003 / REQ-PROPOSAL-CONVERT-002 — early-return / reject paths described there).
+3. **Insert `projects`** with `title = proposal.title`, `client_id = proposal.client_id`, `operator_id = proposal.operator_id`, `start_date = proposal.proposed_period_start`, `end_date = proposal.proposed_period_end`, `business_amount_krw = proposal.proposed_business_amount_krw`, `instructor_fee_krw` derived from `proposal.proposed_hourly_rate_krw × estimated_hours` (or 0 when unset; documented in §5), `status = 'proposal'`, `instructor_id = NULL`, `project_type = 'education'`, returning `<new_project_id>`.
+4. **Copy `proposal_required_skills` → `project_required_skills`** for `<new_project_id>`.
+5. **Update `ai_instructor_recommendations`** — when ≥ 1 `proposal_inquiries` rows for this proposal have `status = 'accepted'`, INSERT one row referencing `<new_project_id>` with `top3_jsonb` listing the accepted instructors (capped at 3), `model = 'manual_from_proposal'`, `adopted_instructor_id = NULL`. When 0 accepted, skip this step.
+6. **Update `proposals`**: `SET status = 'won', decided_at = now(), converted_project_id = <new_project_id> WHERE id = $1`.
+
+The transaction commits atomically; any step failure rolls back all 6 steps.
 
 **REQ-PROPOSAL-CONVERT-002 (Unwanted Behavior)**
-**If** `proposals.status` is not `'submitted'` at conversion time, **then** the action **shall** reject with the Korean error `"제출 상태의 제안서만 수주 처리할 수 있습니다."`.
+**If** `proposals.status` is not `'submitted'` at conversion time (after the Step 1 row lock — REQ-PROPOSAL-CONVERT-001), **then** the action **shall** reject with the Korean error `"제출 상태의 제안서만 수주 처리할 수 있습니다."` and **shall** roll back the transaction (no rows inserted/updated).
 
-**REQ-PROPOSAL-CONVERT-003 (Unwanted Behavior)**
-**If** `proposals.converted_project_id IS NOT NULL`, **then** the action **shall** reject with the Korean error `"이미 프로젝트로 변환된 제안서입니다."` and **shall not** create a duplicate `projects` row.
+**REQ-PROPOSAL-CONVERT-003 (Unwanted Behavior — Idempotency Guard with Row Lock)**
+
+**If** within the convert transaction (REQ-PROPOSAL-CONVERT-001 Step 1–2) the system observes `proposals.converted_project_id IS NOT NULL` **after** acquiring the `SELECT ... FOR UPDATE` row lock, **then** the action **shall** early-return the existing `converted_project_id` (treating the call as idempotent success) **without** creating a duplicate `projects` row, returning the Korean message `"이미 프로젝트로 변환된 제안서입니다. (project_id=<existing>)"`.
+
+The row-level lock is **mandatory** (not advisory): two concurrent `convertProposalToProject(P.id)` calls (e.g., double-clicked button or two operator tabs) MUST serialize at the `SELECT ... FOR UPDATE` step. Without the lock, both transactions can pass a plain WHERE-predicate idempotency check before either commits, producing two `projects` rows and a lost-update on `proposals.converted_project_id`. Pseudocode:
+
+```
+BEGIN;  -- READ COMMITTED (REQ-PROPOSAL-CONVERT-007)
+
+-- Step 1: Acquire row lock on the proposal
+SELECT id, status, converted_project_id
+  FROM proposals
+  WHERE id = $1
+  FOR UPDATE;
+
+-- Step 2: Idempotency / status checks
+IF converted_project_id IS NOT NULL THEN
+  -- Idempotent success: return existing project_id
+  SELECT * FROM projects WHERE id = converted_project_id;
+  COMMIT;
+  RETURN { ok: true, projectId: converted_project_id, idempotent: true };
+END IF;
+
+IF status != 'submitted' THEN
+  ROLLBACK;
+  RETURN { ok: false, error: "제출 상태의 제안서만 수주 처리할 수 있습니다." };  -- REQ-CONVERT-002
+END IF;
+
+-- Step 3: Insert new projects row
+INSERT INTO projects (title, client_id, operator_id, start_date, end_date,
+                     business_amount_krw, instructor_fee_krw, status,
+                     instructor_id, project_type)
+  VALUES (...) RETURNING id INTO new_project_id;
+
+-- Step 4: Copy junction rows
+INSERT INTO project_required_skills (project_id, skill_id)
+  SELECT new_project_id, skill_id
+    FROM proposal_required_skills
+    WHERE proposal_id = $1;
+
+-- Step 5: Optionally insert ai_instructor_recommendations
+IF EXISTS (SELECT 1 FROM proposal_inquiries
+           WHERE proposal_id = $1 AND status = 'accepted') THEN
+  INSERT INTO ai_instructor_recommendations
+    (project_id, top3_jsonb, model, adopted_instructor_id)
+    VALUES (new_project_id, <top3>, 'manual_from_proposal', NULL);
+END IF;
+
+-- Step 6: Mark proposal as won (last so converted_project_id is set after projects exists)
+UPDATE proposals
+  SET status = 'won', decided_at = now(), converted_project_id = new_project_id
+  WHERE id = $1;
+
+COMMIT;
+RETURN { ok: true, projectId: new_project_id, idempotent: false };
+```
 
 **REQ-PROPOSAL-CONVERT-004 (Event-Driven)**
-**When** the conversion succeeds, the system **shall** redirect the operator to `/projects/<new_project_id>` (the SPEC-PROJECT-001 detail page) and **shall** revalidate both `/proposals` and `/projects` paths.
+**When** the conversion succeeds (either fresh conversion or idempotent early-return), the system **shall** redirect the operator to `/projects/<converted_project_id>` (the SPEC-PROJECT-001 detail page) and **shall** revalidate both `/proposals` and `/projects` paths.
 
 **REQ-PROPOSAL-CONVERT-005 (Ubiquitous)**
 The system **shall** preserve SPEC-PROJECT-001's `projects` schema unchanged (no new columns, no enum value changes); when SPEC-PROJECT-001 fields not derivable from the proposal (e.g., `instructor_id`, `notes`, `project_type`) lack a source, the conversion **shall** insert defaults (`NULL` or the SPEC-PROJECT-001 default; for `project_type` use `'education'` per SPEC-PROJECT-001 default).
 
 **REQ-PROPOSAL-CONVERT-006 (Ubiquitous)**
-The conversion logic **shall** be implemented as pure functions in `src/lib/proposals/convert.ts` (`buildProjectFromProposal`, `buildAcceptedRecommendationFromInquiries`) independent of Drizzle/Supabase; side effects (transaction, INSERTs) live in the Server Action.
+The conversion logic **shall** be implemented as pure functions in `src/lib/proposals/convert.ts` (`buildProjectFromProposal`, `buildAcceptedRecommendationFromInquiries`) independent of Drizzle/Supabase; side effects (row lock, transaction, INSERTs) live in the Server Action and **shall not** leak into the pure-function layer. Pure functions take plain TypeScript inputs (proposal record, accepted-instructor list) and return plain output objects (`ProjectInsert`, `RecommendationInsert | null`).
+
+**REQ-PROPOSAL-CONVERT-007 (Ubiquitous — Transaction Isolation Level)**
+The `convertProposalToProject` transaction **shall** execute at PostgreSQL **READ COMMITTED** isolation level (the PostgreSQL default; no explicit `SET TRANSACTION ISOLATION LEVEL` is required, but the SPEC commits to this level for stability against future config drift). The combination of `SELECT ... FOR UPDATE` row lock (REQ-PROPOSAL-CONVERT-001 Step 1 / REQ-PROPOSAL-CONVERT-003) and READ COMMITTED is **sufficient** to serialize concurrent conversion attempts on the same proposal row: the second transaction blocks at `FOR UPDATE` until the first commits or rolls back, after which the second observes the updated `converted_project_id` and takes the idempotent early-return branch (REQ-PROPOSAL-CONVERT-003). The system **shall not** require SERIALIZABLE isolation for this contract.
 
 ### 2.6 REQ-PROPOSAL-SIGNAL — 추천 엔진 입력 시그널 (read-only)
 
@@ -472,39 +556,99 @@ export function validateProposalTransition(from: ProposalStatus, to: ProposalSta
 
 ### 5.3 디스패치 트랜잭션
 
-`dispatchInquiries`는 다음 단계를 단일 트랜잭션으로 실행:
+`dispatchInquiries`는 다음 단계를 단일 트랜잭션으로 실행한다.
 
 ```sql
 BEGIN;
-  -- 1. 중복 체크 (advisory lock으로 race 방지 권장 — §8 R-2)
-  -- 2. proposals.status IN ('draft', 'submitted') 검증
+  -- 1. proposals.status IN ('draft', 'submitted') 검증 (REQ-PROPOSAL-INQUIRY-005)
+  -- 2. proposal_inquiries N행 일괄 INSERT
+  --    UNIQUE(proposal_id, instructor_id) 제약이 race condition을 직렬화한다.
+  --    (advisory lock 불필요 — DB unique constraint가 충돌을 직렬 검출하므로
+  --     동시 디스패치 시 한 트랜잭션만 성공하고 나머지는 unique violation으로 자동 롤백된다.
+  --     §8 R-1 참조.)
   INSERT INTO proposal_inquiries (proposal_id, instructor_id, ...) VALUES (...), (...), (...);
-  -- unique 제약 위반 시 전체 롤백
+  -- unique 제약 위반 시 전체 트랜잭션 롤백 + 한국어 에러 매핑
+  -- 3. notifications N행 일괄 INSERT
   INSERT INTO notifications (recipient_id, type, title, body, link_url) VALUES (...), (...), (...);
 COMMIT;
 ```
 
 각 INSERT 후 `console.log("[notif] inquiry_request → instructor_id=<uuid> proposal_id=<uuid>")`. notification body 예: `"<제안서 제목> 강의 가능 여부 사전 문의 (<기간>)"`. link_url: `/me/inquiries/<inquiry_id>` (sibling SPEC-CONFIRM-001 라우트).
 
-### 5.4 Won → Project 변환
+**Concurrency note (LOW-6 fix)**: 본 디스패치 트랜잭션은 **advisory lock을 사용하지 않는다**. UNIQUE(proposal_id, instructor_id) 제약 자체가 (a) 동일 (proposal × instructor) 페어의 중복 INSERT를 자동 거부하고, (b) 두 operator가 동시에 동일 instructor를 디스패치할 경우 한 측만 성공하도록 직렬화한다(§8 R-1에 의도된 동작으로 명시). Server Action은 unique violation(Postgres SQLSTATE `23505`)을 catch하여 한국어 에러(`"이미 사전 문의를 보낸 강사입니다."`)로 변환한다(REQ-PROPOSAL-INQUIRY-004).
 
-`convertProposalToProject`는 다음을 단일 트랜잭션으로 실행:
+### 5.4 Won → Project 변환 (Canonical 6-step Transaction)
+
+`convertProposalToProject`는 다음 canonical 6-step 순서를 **단일 트랜잭션**(READ COMMITTED — REQ-PROPOSAL-CONVERT-007)으로 실행한다. 이 순서는 REQ-PROPOSAL-CONVERT-001 prose / acceptance.md Scenario 4 / spec-compact.md와 정확히 1:1 매핑된다.
 
 ```sql
-BEGIN;
-  -- 1. proposals.status = 'submitted' AND converted_project_id IS NULL 검증
-  -- 2. accepted 강사 ID 조회
-  SELECT pi.instructor_id FROM proposal_inquiries pi WHERE pi.proposal_id = $1 AND pi.status = 'accepted' LIMIT 3;
-  -- 3. projects INSERT (모든 메타데이터 복사)
-  INSERT INTO projects (...) RETURNING id;
-  -- 4. project_required_skills 복사
-  INSERT INTO project_required_skills (project_id, skill_id) SELECT $newProjectId, skill_id FROM proposal_required_skills WHERE proposal_id = $1;
-  -- 5. accepted 강사가 있으면 ai_instructor_recommendations row 1건
-  INSERT INTO ai_instructor_recommendations (project_id, top3_jsonb, model) VALUES (...);
-  -- 6. proposals UPDATE (status='won', decided_at=now(), converted_project_id=<new>)
-  UPDATE proposals SET status='won', decided_at=now(), converted_project_id=$newProjectId WHERE id=$1;
+BEGIN;  -- READ COMMITTED (PostgreSQL default; REQ-PROPOSAL-CONVERT-007)
+
+-- Step 1: Acquire row lock on the proposal (REQ-PROPOSAL-CONVERT-001 / REQ-PROPOSAL-CONVERT-003)
+-- Without FOR UPDATE, two concurrent calls can both pass the idempotency check
+-- before either commits, producing two projects rows and a lost-update.
+SELECT id, status, converted_project_id
+  FROM proposals
+  WHERE id = $1
+  FOR UPDATE;
+
+-- Step 2: Idempotency / status checks (REQ-PROPOSAL-CONVERT-002 / REQ-PROPOSAL-CONVERT-003)
+-- IF converted_project_id IS NOT NULL → idempotent early-return (return existing project_id)
+-- IF status != 'submitted'           → reject with Korean error
+-- (handled in application layer using the row from Step 1)
+
+-- Step 3: Insert new projects row (must happen BEFORE proposals.converted_project_id is set,
+-- because that column has a FK to projects(id))
+INSERT INTO projects (
+  title, client_id, operator_id,
+  start_date, end_date,
+  business_amount_krw, instructor_fee_krw,
+  status, instructor_id, project_type
+) VALUES (
+  $proposal.title, $proposal.client_id, $proposal.operator_id,
+  $proposal.proposed_period_start, $proposal.proposed_period_end,
+  $proposal.proposed_business_amount_krw, 0,         -- instructor_fee_krw default; see below
+  'proposal', NULL, 'education'
+) RETURNING id;  -- bind to $new_project_id
+
+-- Step 4: Copy junction rows
+INSERT INTO project_required_skills (project_id, skill_id)
+  SELECT $new_project_id, skill_id
+    FROM proposal_required_skills
+    WHERE proposal_id = $1;
+
+-- Step 5: Insert ai_instructor_recommendations IF accepted instructors exist
+-- (top3_jsonb capped at 3; skip step entirely when accepted count = 0)
+INSERT INTO ai_instructor_recommendations (project_id, top3_jsonb, model, adopted_instructor_id)
+  SELECT $new_project_id,
+         (SELECT jsonb_agg(jsonb_build_object(
+            'instructorId', pi.instructor_id,
+            'finalScore', NULL, 'skillMatch', NULL, 'availability', NULL, 'satisfaction', NULL,
+            'reason', '사전 문의에서 수락한 후보 강사', 'source', 'fallback'
+          )) FROM (
+            SELECT instructor_id FROM proposal_inquiries
+              WHERE proposal_id = $1 AND status = 'accepted'
+              ORDER BY responded_at NULLS LAST
+              LIMIT 3
+          ) pi),
+         'manual_from_proposal',
+         NULL
+  WHERE EXISTS (
+    SELECT 1 FROM proposal_inquiries
+      WHERE proposal_id = $1 AND status = 'accepted'
+  );
+
+-- Step 6: Mark proposal as won (LAST so converted_project_id FK can reference projects.id from Step 3)
+UPDATE proposals
+  SET status = 'won', decided_at = now(), converted_project_id = $new_project_id
+  WHERE id = $1;
+
 COMMIT;
 ```
+
+**FK ordering note (LOW-5 fix)**: `proposals.converted_project_id` carries a FK to `projects(id)`. Therefore `projects` INSERT (Step 3) must precede `proposals` UPDATE (Step 6). The ordering above is canonical and is enforced consistently across REQ-PROPOSAL-CONVERT-001 prose, acceptance.md Scenario 4, and spec-compact.md.
+
+**Concurrency note (HIGH-1 / HIGH-2 fix)**: Combining Step 1's `FOR UPDATE` row lock with READ COMMITTED isolation is sufficient to serialize concurrent `convertProposalToProject(P.id)` calls. Two calls racing on the same proposal: the first acquires the lock, completes Steps 2–6, commits; the second blocks at Step 1, then observes `converted_project_id IS NOT NULL` and takes the idempotent early-return branch — both calls return the same `project_id`, and exactly one `projects` row exists.
 
 `buildProjectFromProposal(proposal)`은 순수 함수로 입력 proposal → 출력 `ProjectInsert` 객체 매핑(필드별 변환 규칙 명시). `instructor_fee_krw`는 다음 우선순위:
 1. `proposal.proposed_hourly_rate_krw IS NULL` → 0
@@ -596,18 +740,25 @@ LIMIT 20 OFFSET ($6 - 1) * 20;
 
 ## 7. 수용 기준 요약 (Acceptance Criteria Summary)
 
-상세 Given/When/Then 시나리오는 [`acceptance.md`](./acceptance.md) 참조. 주요 게이트:
+상세 Given/When/Then 시나리오는 [`acceptance.md`](./acceptance.md) 참조. 16개 Scenarios + EC-01~EC-18. 주요 게이트:
 
-- ✅ 등록 → 자동 redirect → 상세 페이지 도달
-- ✅ 제출 (draft → submitted) → status badge 변경 + submitted_at 기록
-- ✅ 디스패치 N=3 → proposal_inquiries 3건 + notifications 3건 + 콘솔 로그 3건
-- ✅ 디스패치 중복 → unique 제약 위반 → 한국어 에러 + 전체 롤백
-- ✅ Won 변환 → projects + project_required_skills + ai_instructor_recommendations(있으면) + proposals 갱신, 단일 트랜잭션
-- ✅ Lost / Withdrawn → frozen, 모든 수정/디스패치/변환 시도 거부
-- ✅ 응답 시뮬 (sibling) → proposal_inquiries.status pending → accepted, 응답 보드 자동 반영
-- ✅ instructor 토큰 / `/proposals` 접근 → silent redirect
-- ✅ 시그널 view → instructor별 prior_accepted_count_90d 산출, SPEC-RECOMMEND-001 점수 결과 변동 없음
-- ✅ 첨부 업로드 (5MB pdf) → files row + Storage object, 한국어 에러는 mime/size 위반 시
+- ✅ 등록 → 자동 redirect → 상세 페이지 도달 (Scenario 1)
+- ✅ 제출 (draft → submitted) → status badge 변경 + submitted_at 기록 (Scenario 2)
+- ✅ 디스패치 N=3 → proposal_inquiries 3건 + notifications 3건 + 콘솔 로그 3건 (Scenario 3)
+- ✅ 디스패치 중복 → unique 제약 위반 → 한국어 에러 + 전체 롤백 (Scenario 3a)
+- ✅ Won 변환 (canonical 6-step) → SELECT FOR UPDATE → 멱등 체크 → projects + skills 복사 + (있으면) ai_instructor_recommendations + proposals UPDATE, 단일 트랜잭션 READ COMMITTED (Scenario 4)
+- ✅ 변환 멱등성 + 동시 race → 정확히 1 projects row, 두 호출 동일 project_id (Scenario 4a, 4d / EC-16)
+- ✅ Lost / Withdrawn → frozen, 모든 수정/디스패치/변환 시도 거부 (Scenario 5)
+- ✅ 응답 시뮬 (sibling) → proposal_inquiries.status pending → accepted, 응답 보드 자동 반영 (Scenario 6)
+- ✅ instructor 토큰 / `/proposals` 접근 → silent redirect (Scenario 7)
+- ✅ 시그널 view → instructor별 prior_accepted_count_90d 산출, SPEC-RECOMMEND-001 점수 결과 변동 없음 (Scenario 14)
+- ✅ 첨부 업로드 (5MB pdf) → files row + Storage object, 한국어 에러는 mime/size 위반 시 (Scenario 8)
+- ✅ enum 값 정확성 (proposal_status 5개, inquiry_status 4개) (Scenario 9, 12)
+- ✅ 리스트 RSC + 20/page + URL params + 표시 컬럼 (Scenario 10)
+- ✅ 상세 7 섹션 + soft-delete notFound (Scenario 11)
+- ✅ convert.ts 순수성 (Drizzle/Supabase 의존 0) (Scenario 13)
+- ✅ CONFIRM-001 contract surface (`instructor_responses` 미참조) (Scenario 15)
+- ✅ service-role 클라이언트 미사용 (grep 0 hits) (Scenario 16)
 - ✅ 단위 테스트 ≥ 85% line coverage (proposals 모듈)
 
 ---
@@ -616,8 +767,8 @@ LIMIT 20 OFFSET ($6 - 1) * 20;
 
 | ID | 위험 | 영향 | 완화 |
 |----|------|------|------|
-| R-1 | `proposal_inquiries (proposal_id, instructor_id)` unique 제약 위반이 race condition으로 발생 | 두 operator가 동일 instructor를 동시 디스패치 시 한 측은 성공 다른 측은 unique 위반으로 실패 | unique 제약은 DB 레벨에서 자동 직렬화. Server Action은 unique 위반을 catch하여 한국어 에러로 변환. 두 operator가 동시 dispatch는 배타적 — 한 측만 성공이라는 게 의도된 동작. |
-| R-2 | Won 변환 트랜잭션이 부분 성공 (projects INSERT는 성공했으나 proposals UPDATE 실패) | 데이터 불일치 (projects는 생성되었으나 proposals.converted_project_id NULL) | Drizzle `db.transaction(async (tx) => { ... })` 블록으로 단일 트랜잭션 실행. 한 곳이라도 실패하면 전체 롤백. |
+| R-1 | `proposal_inquiries (proposal_id, instructor_id)` unique 제약 위반이 race condition으로 발생 | 두 operator가 동일 instructor를 동시 디스패치 시 한 측은 성공 다른 측은 unique 위반으로 실패 | UNIQUE(proposal_id, instructor_id) 제약 자체가 DB 레벨에서 충돌을 직렬 검출 + 자동 거부 — **advisory lock 불필요** (§5.3 LOW-6 fix 참조). Server Action은 SQLSTATE `23505`(unique violation)를 catch하여 한국어 에러로 변환. 두 operator가 동시 dispatch는 배타적 — 한 측만 성공이라는 게 의도된 동작. |
+| R-2 | Won 변환 트랜잭션이 부분 성공 (projects INSERT는 성공했으나 proposals UPDATE 실패), **또는** 동시 변환 race로 두 projects row 생성 | 데이터 불일치 (projects 두 개 생성 + lost-update on `proposals.converted_project_id`) | (a) Drizzle `db.transaction(async (tx) => { ... })` 블록으로 단일 트랜잭션 실행 — 한 곳이라도 실패하면 전체 롤백. (b) **HIGH-1/HIGH-2 fix**: §5.4 Step 1에서 `SELECT ... FOR UPDATE`로 proposals 행 잠금 + READ COMMITTED 격리(REQ-PROPOSAL-CONVERT-007) — 두 번째 호출은 첫 번째 commit 또는 rollback까지 차단되고, 차단 해제 시 `converted_project_id IS NOT NULL`을 관측하여 멱등 early-return 분기(REQ-PROPOSAL-CONVERT-003)로 동일 project_id 반환. 정확히 1 projects row 생성 보장. |
 | R-3 | 변환 시점에 accepted 강사 0명 → ai_instructor_recommendations row 미생성 | KPI(채택률) 또는 추천 흐름에서 분모 누락 | 0명일 경우 `ai_instructor_recommendations` INSERT 자체를 skip (NULL row 생성 안 함). SPEC-PROJECT-001의 정규 추천 실행 흐름을 그대로 따름. |
 | R-4 | `notification_type` enum에 `inquiry_request` 추가 마이그레이션이 SPEC-NOTIFY-001과 충돌 | enum value 중복 추가 시 Postgres는 idempotent 처리(`IF NOT EXISTS`) | `ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'inquiry_request';`로 안전. SPEC-NOTIFY-001과 timestamp 분리 (본 SPEC: 20260429xxxxxx). |
 | R-5 | `instructor_inquiry_history` view가 프로덕션에서 N+1 쿼리 발생 | 강사 100명 × 인콰이어리 수천 건 시 view 집계 성능 저하 | view는 query-time 계산이므로 RLS 통과 시 빠름. 성능 이슈 발견 시 후속 SPEC에서 materialized view 또는 trigger 기반 카운터 컬럼 도입. 현재는 instructors 100 × 90일 데이터셋 기준 < 100ms 예상. |
@@ -640,7 +791,7 @@ LIMIT 20 OFFSET ($6 - 1) * 20;
 - `.moai/specs/SPEC-RECOMMEND-001/spec.md`: 가중치 FROZEN, source 유니언 `claude | fallback`, model 컬럼 free-text 패턴 (호환 보존)
 - `.moai/specs/SPEC-AUTH-001/spec.md`: `requireRole(['operator', 'admin'])`, `getCurrentUser()`
 - `.moai/specs/SPEC-NOTIFY-001/spec.md`: `notifications` 테이블 + `console.log` 스텁 패턴
-- (sibling) `.moai/specs/SPEC-CONFIRM-001/spec.md`: 강사 응답 측 처리 (병행 작성 중)
+- (sibling) `.moai/specs/SPEC-CONFIRM-001/spec.md`: 강사 응답 측 처리 (병행 작성 중) — **계약 표면(REQ-PROPOSAL-INQUIRY-009 참조)**: CONFIRM-001은 `instructor_responses(source_kind='proposal_inquiry', source_id=proposal_inquiries.id)` 통합 테이블 + `/me/inquiries` 응답 화면을 소유하고, 응답 수신 시 `proposal_inquiries.status` (`pending → accepted | declined | conditional`) + `responded_at` + `responded_by_user_id`를 동일 트랜잭션 내에서 갱신한다. 본 SPEC은 `instructor_responses` 테이블을 정의/조회/INSERT하지 않으며 `proposal_inquiries.status` 컬럼만 읽어 응답 보드를 렌더링한다. **머지 순서 의존성**: SPEC-CONFIRM-001이 본 SPEC implementation 완료 전 머지되어야 한다(plan.md prerequisites + §8 R-7 참조).
 - [`acceptance.md`](./acceptance.md): Given/When/Then 시나리오
 - [`plan.md`](./plan.md): 마일스톤 분해
 - [`spec-compact.md`](./spec-compact.md): EARS 요약본
