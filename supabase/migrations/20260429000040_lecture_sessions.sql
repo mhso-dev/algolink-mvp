@@ -89,8 +89,11 @@ CREATE POLICY "lecture_sessions_instructor_self_select" ON "lecture_sessions"
   );
 
 -- ===========================================
--- 5. updated_at 트리거 (기존 set_updated_at 함수 재사용)
+-- 5. updated_at 트리거 (기존 app.touch_updated_at 함수 재사용)
+-- 20260427000050_triggers.sql 의 헬퍼와 동일 패턴.
+-- 트리거 명명 규약: trg_<table>_updated_at
 -- ===========================================
-CREATE TRIGGER "lecture_sessions_set_updated_at"
+DROP TRIGGER IF EXISTS "trg_lecture_sessions_updated_at" ON "lecture_sessions";
+CREATE TRIGGER "trg_lecture_sessions_updated_at"
   BEFORE UPDATE ON "lecture_sessions"
-  FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+  FOR EACH ROW EXECUTE FUNCTION app.touch_updated_at();

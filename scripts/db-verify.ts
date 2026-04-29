@@ -134,19 +134,21 @@ async function main() {
   });
 
   // ===== Section 5: Project Workflow =====
-  await check("AC-DB001-PROJ-01: project_status enum 정확히 13개", async () => {
+  await check("AC-DB001-PROJ-01: project_status enum 정확히 14개 (SPEC-PAYOUT-002 evolved)", async () => {
     const rows = await sql<{ enumlabel: string }[]>`
       SELECT enumlabel FROM pg_enum e
       JOIN pg_type t ON e.enumtypid = t.oid
       WHERE t.typname = 'project_status'
       ORDER BY e.enumsortorder
     `;
-    assert(rows.length === 13, `enum 수 ${rows.length} ≠ 13`);
+    // SPEC-DB-001 13개 + SPEC-PAYOUT-002 REQ-EXCEPT-007 'instructor_withdrawn' 추가 = 14
+    assert(rows.length === 14, `enum 수 ${rows.length} ≠ 14`);
     const expected = [
       "proposal", "contract_confirmed", "lecture_requested", "instructor_sourcing",
       "assignment_review", "assignment_confirmed", "education_confirmed", "recruiting",
       "progress_confirmed", "in_progress", "education_done", "settlement_in_progress",
       "task_done",
+      "instructor_withdrawn",
     ];
     for (let i = 0; i < expected.length; i++) {
       assert(rows[i].enumlabel === expected[i], `index ${i}: ${rows[i].enumlabel} ≠ ${expected[i]}`);
