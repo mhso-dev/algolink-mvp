@@ -18,3 +18,4 @@ export * from "./notes";
 export * from "./notifications";
 export * from "./ai-artifacts";
 export * from "./review";
+export * from "./organization-info";

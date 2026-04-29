@@ -32,6 +32,17 @@ export function validateTaxRate(
     if (Math.abs(rate - CORPORATE_TAX_RATE) < 1e-9) return { ok: true };
     return { ok: false, reason: PAYOUT_ERRORS.TAX_RATE_CORPORATE_NONZERO };
   }
+  if (flow === "client_direct") {
+    // SPEC-RECEIPT-001 §M2 — client_direct는 government와 동일한 3.30/8.80 화이트리스트.
+    const matches = GOVERNMENT_TAX_RATES.some(
+      (allowed) => Math.abs(rate - allowed) < 1e-9,
+    );
+    if (matches) return { ok: true };
+    return {
+      ok: false,
+      reason: PAYOUT_ERRORS.TAX_RATE_CLIENT_DIRECT_INVALID,
+    };
+  }
   // government
   const matches = GOVERNMENT_TAX_RATES.some(
     (allowed) => Math.abs(rate - allowed) < 1e-9,

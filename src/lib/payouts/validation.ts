@@ -42,6 +42,19 @@ export const settlementUpdateSchema = z
         });
       }
     }
+    // SPEC-RECEIPT-001 §M2 REQ-RECEIPT-FLOW-005 — client_direct 분기.
+    if (data.settlement_flow === "client_direct") {
+      const matches = GOVERNMENT_TAX_RATES.some(
+        (allowed) => Math.abs(data.withholding_tax_rate - allowed) < 1e-9,
+      );
+      if (!matches) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: PAYOUT_ERRORS.TAX_RATE_CLIENT_DIRECT_INVALID,
+          path: ["withholding_tax_rate"],
+        });
+      }
+    }
   });
 
 export type SettlementUpdateInput = z.infer<typeof settlementUpdateSchema>;
