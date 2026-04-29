@@ -2,8 +2,12 @@
 // @MX:REASON: 모든 응답 흐름(/me/inquiries, /me/assignments)이 본 테이블 통과. fan_in 매우 높음.
 // @MX:WARN: project_id, proposal_inquiry_id 둘 중 하나만 NOT NULL (CHECK XOR 강제).
 // @MX:REASON: source_kind discriminator + 두 nullable FK + CHECK XOR로 referential integrity 보장.
+//
+// SPEC-PROPOSAL-001 §M1 — proposal_inquiries 정의 확장 (CONFIRM-001 stub → SPEC §5.1 정식).
+// 마이그레이션 20260429180010_proposal_inquiries_extend.sql이 ALTER TABLE로 컬럼 보강.
 import {
   pgTable,
+  pgEnum,
   uuid,
   text,
   timestamp,
@@ -13,27 +17,54 @@ import {
 import { sql } from "drizzle-orm";
 import { instructors } from "./instructor";
 import { projects } from "./project";
+import { proposals } from "./proposal";
 
-// proposal_inquiries — SPEC-CONFIRM-001 §M1 stub (SPEC-PROPOSAL-001 미머지 대응).
-// SPEC-PROPOSAL-001 머지 후 본 테이블 정의는 SPEC-PROPOSAL-001 schema 파일이 정식 정의.
+// SPEC-PROPOSAL-001 REQ-PROPOSAL-INQUIRY-002 — 정확히 4개 값.
+export const inquiryStatus = pgEnum("inquiry_status", [
+  "pending",
+  "accepted",
+  "declined",
+  "conditional",
+]);
+
+// proposal_inquiries — SPEC-PROPOSAL-001 §5.1 정식 정의 (CONFIRM-001 stub 보강 완료).
 export const proposalInquiries = pgTable(
   "proposal_inquiries",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    proposalId: uuid("proposal_id").references(() => proposals.id, {
+      onDelete: "cascade",
+    }),
     instructorId: uuid("instructor_id")
       .notNull()
       .references(() => instructors.id, { onDelete: "cascade" }),
-    status: text("status").notNull().default("pending"), // pending | accepted | declined | conditional
-    createdByUserId: uuid("created_by_user_id"),
-    requestedStart: timestamp("requested_start", { withTimezone: true }),
-    requestedEnd: timestamp("requested_end", { withTimezone: true }),
-    skillStack: text("skill_stack").array(),
-    operatorMemo: text("operator_memo"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    proposedTimeSlotStart: timestamp("proposed_time_slot_start", {
+      withTimezone: true,
+    }),
+    proposedTimeSlotEnd: timestamp("proposed_time_slot_end", {
+      withTimezone: true,
+    }),
+    questionNote: text("question_note"),
+    status: inquiryStatus("status").notNull().default("pending"),
+    conditionalNote: text("conditional_note"),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+    respondedByUserId: uuid("responded_by_user_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => [
-    index("idx_proposal_inquiries_instructor_status").on(t.instructorId, t.status),
+    index("idx_proposal_inquiries_instructor_status").on(
+      t.instructorId,
+      t.status,
+    ),
+    index("idx_proposal_inquiries_proposal_status").on(t.proposalId, t.status),
+    uniqueIndex("uniq_proposal_inquiries_proposal_instructor")
+      .on(t.proposalId, t.instructorId)
+      .where(sql`proposal_id IS NOT NULL`),
   ],
 );
 
