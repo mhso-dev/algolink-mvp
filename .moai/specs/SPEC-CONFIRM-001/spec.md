@@ -6,7 +6,7 @@ created: 2026-04-29
 updated: 2026-04-29
 author: 철
 priority: medium
-issue_number: null
+issue_number: 16
 ---
 
 # SPEC-CONFIRM-001: 강사 응답 시스템 (Instructor Response System — Inquiries / Assignments)
