@@ -164,7 +164,12 @@ export async function generateSettlementsForPeriod(
     }
 
     // settlements INSERT (GENERATED 컬럼 제외 — REQ-PAYOUT002-GENERATE-004)
-    const insertPayload = {
+    // SPEC-PAYOUT-002 v0.1.3 + SPEC-RECEIPT-001 v0.2.1 cross-SPEC contract (Option A):
+    // client_direct 흐름일 때 instructor_remittance_amount_krw를 함께 populate.
+    // derive 식: business_amount_krw - instructor_fee_krw = profit_krw (PAYOUT-001 GENERATED).
+    // RECEIPT-001은 본 컬럼을 read-only 소비.
+    const profit = row.business_amount_krw - row.instructor_fee_krw;
+    const insertPayload: Record<string, unknown> = {
       project_id: row.project_id,
       instructor_id: row.instructor_id,
       settlement_flow: flow,
@@ -173,6 +178,9 @@ export async function generateSettlementsForPeriod(
       instructor_fee_krw: row.instructor_fee_krw,
       withholding_tax_rate: taxRate,
     };
+    if (flow === "client_direct") {
+      insertPayload.instructor_remittance_amount_krw = profit;
+    }
     const { data: settlementRow, error: insErr } = await supabase
       .from("settlements")
       .insert(insertPayload)
@@ -308,5 +316,9 @@ export function groupAndCompute(
 }
 
 function isValidFlow(value: string | null): boolean {
-  return value === "corporate" || value === "government";
+  return (
+    value === "corporate" ||
+    value === "government" ||
+    value === "client_direct"
+  );
 }
