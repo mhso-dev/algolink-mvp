@@ -254,7 +254,7 @@ async function main() {
   });
 
   // ===== Section 8: Notifications enum =====
-  await check("AC-DB001-NOTIF-01: notification_type enum 검증 (SPEC-DB-001 5종 + SPEC-PROJECT-001 assignment_request + SPEC-RECEIPT-001 receipt_issued + SPEC-CONFIRM-001 5종)", async () => {
+  await check("AC-DB001-NOTIF-01: notification_type enum 검증 (SPEC-DB-001 5종 + SPEC-PROJECT-001 assignment_request + SPEC-RECEIPT-001 receipt_issued + SPEC-CONFIRM-001 5종 + SPEC-PROPOSAL-001 inquiry_request)", async () => {
     const rows = await sql<{ enumlabel: string }[]>`
       SELECT enumlabel FROM pg_enum e
       JOIN pg_type t ON e.enumtypid = t.oid
@@ -265,11 +265,13 @@ async function main() {
     // SPEC-PROJECT-001 마이그레이션이 assignment_request를 추가.
     // SPEC-RECEIPT-001 §M1 마이그레이션이 receipt_issued를 추가.
     // SPEC-CONFIRM-001 §M1 마이그레이션이 5종(assignment_accepted/declined, inquiry_accepted/declined/conditional)을 추가.
+    // SPEC-PROPOSAL-001 §M1 마이그레이션이 inquiry_request를 추가 (REQ-PROPOSAL-INQUIRY-007).
     const expected = [
       "assignment_accepted", "assignment_declined", "assignment_overdue",
       "assignment_request", "dday_unprocessed", "inquiry_accepted",
-      "inquiry_conditional", "inquiry_declined", "low_satisfaction_assignment",
-      "receipt_issued", "schedule_conflict", "settlement_requested",
+      "inquiry_conditional", "inquiry_declined", "inquiry_request",
+      "low_satisfaction_assignment", "receipt_issued", "schedule_conflict",
+      "settlement_requested",
     ];
     assert(JSON.stringify(names) === JSON.stringify(expected),
       `notification_type ${JSON.stringify(names)} ≠ ${JSON.stringify(expected)}`);
@@ -418,6 +420,167 @@ async function main() {
         WHERE n.nspname = 'app' AND proname = 'current_user_role'
       `;
       assert(rows.length === 1, `app.current_user_role() 함수 누락`);
+    },
+  );
+
+  // ===== SPEC-PROPOSAL-001 §M1 verify =====
+  await check(
+    "AC-PROPOSAL-001-ENUM-STATUS: proposal_status enum 정확히 5개 (draft, submitted, won, lost, withdrawn)",
+    async () => {
+      const rows = await sql<{ enumlabel: string }[]>`
+        SELECT enumlabel FROM pg_enum e
+        JOIN pg_type t ON e.enumtypid = t.oid
+        WHERE t.typname = 'proposal_status'
+        ORDER BY enumlabel
+      `;
+      const names = rows.map((r) => r.enumlabel).sort();
+      const expected = ["draft", "lost", "submitted", "withdrawn", "won"];
+      assert(
+        JSON.stringify(names) === JSON.stringify(expected),
+        `proposal_status enum ${JSON.stringify(names)} ≠ ${JSON.stringify(expected)}`,
+      );
+    },
+  );
+
+  await check(
+    "AC-PROPOSAL-001-ENUM-INQUIRY: inquiry_status enum 정확히 4개 (pending, accepted, declined, conditional)",
+    async () => {
+      const rows = await sql<{ enumlabel: string }[]>`
+        SELECT enumlabel FROM pg_enum e
+        JOIN pg_type t ON e.enumtypid = t.oid
+        WHERE t.typname = 'inquiry_status'
+        ORDER BY enumlabel
+      `;
+      const names = rows.map((r) => r.enumlabel).sort();
+      const expected = ["accepted", "conditional", "declined", "pending"];
+      assert(
+        JSON.stringify(names) === JSON.stringify(expected),
+        `inquiry_status enum ${JSON.stringify(names)} ≠ ${JSON.stringify(expected)}`,
+      );
+    },
+  );
+
+  await check(
+    "AC-PROPOSAL-001-TABLES: proposals + proposal_required_skills 테이블 존재",
+    async () => {
+      const rows = await sql<{ tablename: string }[]>`
+        SELECT tablename FROM pg_tables
+        WHERE schemaname = 'public'
+          AND tablename IN ('proposals', 'proposal_required_skills', 'proposal_inquiries')
+        ORDER BY tablename
+      `;
+      const names = rows.map((r) => r.tablename);
+      assert(
+        names.length === 3,
+        `proposals/proposal_required_skills/proposal_inquiries 테이블 누락: ${JSON.stringify(names)}`,
+      );
+    },
+  );
+
+  await check(
+    "AC-PROPOSAL-001-INQUIRIES-COLUMNS: proposal_inquiries SPEC §5.1 컬럼 정합 (proposal_id, proposed_time_slot_*, question_note 등)",
+    async () => {
+      const rows = await sql<{ column_name: string }[]>`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'proposal_inquiries'
+        ORDER BY column_name
+      `;
+      const names = rows.map((r) => r.column_name);
+      const required = [
+        "id",
+        "proposal_id",
+        "instructor_id",
+        "proposed_time_slot_start",
+        "proposed_time_slot_end",
+        "question_note",
+        "status",
+        "conditional_note",
+        "responded_at",
+        "responded_by_user_id",
+        "created_at",
+        "updated_at",
+      ];
+      const missing = required.filter((c) => !names.includes(c));
+      assert(
+        missing.length === 0,
+        `proposal_inquiries SPEC §5.1 컬럼 누락: ${JSON.stringify(missing)} (현재: ${JSON.stringify(names)})`,
+      );
+    },
+  );
+
+  await check(
+    "AC-PROPOSAL-001-INQUIRIES-UNIQUE: UNIQUE(proposal_id, instructor_id) partial 인덱스 존재 (REQ-PROPOSAL-INQUIRY-001)",
+    async () => {
+      const rows = await sql<{ indexname: string }[]>`
+        SELECT indexname FROM pg_indexes
+        WHERE tablename = 'proposal_inquiries'
+          AND indexname = 'uniq_proposal_inquiries_proposal_instructor'
+      `;
+      assert(
+        rows.length === 1,
+        `uniq_proposal_inquiries_proposal_instructor 인덱스 누락`,
+      );
+    },
+  );
+
+  await check(
+    "AC-PROPOSAL-001-VIEW: instructor_inquiry_history view 존재 + 5 컬럼 (REQ-PROPOSAL-SIGNAL-001)",
+    async () => {
+      const tableRow = await sql<{ relkind: string }[]>`
+        SELECT relkind FROM pg_class WHERE relname = 'instructor_inquiry_history'
+      `;
+      assert(
+        tableRow.length === 1 && tableRow[0]!.relkind === "v",
+        `instructor_inquiry_history view 부재 또는 materialized view (relkind=${tableRow[0]?.relkind})`,
+      );
+      const cols = await sql<{ column_name: string }[]>`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'instructor_inquiry_history'
+        ORDER BY column_name
+      `;
+      const names = cols.map((r) => r.column_name).sort();
+      const expected = [
+        "instructor_id",
+        "last_responded_at",
+        "prior_accepted_count_90d",
+        "prior_declined_count_90d",
+        "prior_pending_count",
+      ];
+      assert(
+        JSON.stringify(names) === JSON.stringify(expected),
+        `instructor_inquiry_history 컬럼 ${JSON.stringify(names)} ≠ ${JSON.stringify(expected)}`,
+      );
+    },
+  );
+
+  await check(
+    "AC-PROPOSAL-001-BUCKET: proposal-attachments Storage 버킷 생성 (REQ-PROPOSAL-RLS-004)",
+    async () => {
+      const rows = await sql<{ id: string }[]>`
+        SELECT id FROM storage.buckets WHERE id = 'proposal-attachments'
+      `;
+      assert(rows.length === 1, `proposal-attachments 버킷 누락`);
+    },
+  );
+
+  await check(
+    "AC-PROPOSAL-001-RLS: proposals 테이블 RLS 활성 + operator_admin_all 정책 존재",
+    async () => {
+      const rls = await sql<{ relrowsecurity: boolean }[]>`
+        SELECT relrowsecurity FROM pg_class WHERE relname = 'proposals'
+      `;
+      assert(
+        rls.length === 1 && rls[0]!.relrowsecurity,
+        `proposals RLS 비활성`,
+      );
+      const policies = await sql<{ policyname: string }[]>`
+        SELECT policyname FROM pg_policies
+        WHERE tablename = 'proposals'
+          AND policyname = 'proposals_operator_admin_all'
+      `;
+      assert(policies.length === 1, `proposals_operator_admin_all 정책 누락`);
     },
   );
 

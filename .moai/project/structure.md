@@ -17,6 +17,17 @@ algolink/
 │   │   └── me/inquiries/         # 사전 가용성 문의 inbox ✅ SPEC-CONFIRM-001
 │   ├── (operator)/               # 담당자 + 관리자 영역
 │   │   ├── dashboard/
+│   │   ├── proposals/            # 제안서 도메인 ✅ SPEC-PROPOSAL-001
+│   │   │   ├── page.tsx          # 리스트 + 필터 (ProposalFiltersBar)
+│   │   │   ├── new/page.tsx      # 신규 등록 (ProposalForm)
+│   │   │   └── [id]/
+│   │   │       ├── page.tsx      # 상세 7섹션 (StatusControls / InquiryResponseBoard / ConvertToProjectButton)
+│   │   │       ├── edit/
+│   │   │       │   ├── page.tsx
+│   │   │       │   └── actions.ts  # updateProposal + transitionProposalStatus
+│   │   │       ├── new/actions.ts  # createProposal
+│   │   │       ├── inquiries/dispatch/actions.ts  # dispatchInquiriesAction (idempotent UNIQUE)
+│   │   │       └── convert/actions.ts             # convertProposalToProjectAction (6-step atomic)
 │   │   ├── projects/
 │   │   │   ├── new/
 │   │   │   └── [id]/
@@ -72,6 +83,17 @@ algolink/
 │   │   │   ├── errors.ts         # RESPONSE_ERRORS 상수 (한국어 12종+)
 │   │   │   ├── types.ts          # ResponseSourceKind, ResponseStatus, InstructorResponse 등
 │   │   │   └── index.ts          # public re-export
+│   │   ├── proposals/            # 제안서 도메인 ✅ SPEC-PROPOSAL-001
+│   │   │   ├── status-machine.ts # 상태 전환 그래프 (ANCHOR: validateProposalTransition — 모든 상태 전환 통과)
+│   │   │   ├── inquiry.ts        # 사전 문의 빌더 (ANCHOR: buildInquiryRecords — dispatch Action 호출)
+│   │   │   ├── convert.ts        # Won→Project 변환 도메인 순수 함수 (ANCHOR: buildProjectFromProposal)
+│   │   │   ├── signal.ts         # instructor_inquiry_history view 90일 시그널 쿼리 (server-only, WARN)
+│   │   │   ├── list-query.ts     # 리스트 검색/필터/페이지네이션 순수 함수
+│   │   │   ├── queries.ts        # DB 쿼리 (ANCHOR: 라우트 전체 호출)
+│   │   │   ├── validation.ts     # zod 스키마 (proposalSchema, inquiryDispatchSchema)
+│   │   │   ├── errors.ts         # PROPOSAL_ERRORS 상수 (한국어)
+│   │   │   ├── types.ts          # ProposalStatus, InquiryStatus, ProposalRecord 등 타입
+│   │   │   └── labels.ts         # 한국어 레이블 맵
 │   │   ├── projects/             # 프로젝트 CRUD (list-query, list-queries, status-machine, errors) ✅ SPEC-PROJECT-001 / SPEC-PROJECT-AMEND-001
 │   │   ├── recommend/            # AI 추천 엔진 ✅ SPEC-PROJECT-001
 │   │   │   ├── engine.ts         # 추천 실행 오케스트레이터
@@ -136,6 +158,14 @@ algolink/
 │   │   │   ├── resume-pdf-document.tsx    # @react-pdf/renderer 문서 (M8, 2026-04-28)
 │   │   │   ├── payout-settings-form.tsx   # 마스킹 표시 + 지급정보 입력 (M7, 2026-04-28)
 │   │   │   └── ...                        # (기존 컴포넌트)
+│   │   ├── proposals/            # 제안서 도메인 컴포넌트 ✅ SPEC-PROPOSAL-001
+│   │   │   ├── ProposalForm.tsx             # 신규/수정 폼 (Zod validation)
+│   │   │   ├── ProposalFiltersBar.tsx       # 리스트 필터 (status/client/operator)
+│   │   │   ├── ProposalStatusBadge.tsx      # 상태 뱃지 (5종 색상 맵)
+│   │   │   ├── InquiryDispatchTrigger.tsx   # 사전 문의 디스패치 트리거
+│   │   │   ├── InquiryResponseBoard.tsx     # 문의 응답 현황 보드
+│   │   │   ├── StatusControls.tsx           # 상태 전환 컨트롤 (submit/won/lost/withdrawn)
+│   │   │   └── ConvertToProjectButton.tsx   # Won → Project 변환 버튼 (6-step atomic 호출)
 │   │   ├── projects/             # 프로젝트 관리 컴포넌트 ✅ SPEC-PROJECT-001
 │   │   └── resume/               # 이력서 관련 컴포넌트 ✅ SPEC-ME-001
 │   │
@@ -284,5 +314,5 @@ NODE_ENV=development|production
 
 ---
 
-Version: 1.3.0
+Version: 1.4.0
 Last Updated: 2026-04-29
