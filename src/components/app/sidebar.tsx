@@ -27,14 +27,24 @@ export function Sidebar({ sections, collapsed = false, forceVisible = false }: S
       <aside
         className={cn(
           "flex-col bg-[var(--color-secondary)] text-[var(--color-secondary-foreground)] transition-[width] duration-150",
-          forceVisible ? "flex" : "hidden lg:flex",
-          collapsed ? "w-[var(--layout-sidebar-width-collapsed)]" : "w-[var(--layout-sidebar-width)]",
+          forceVisible
+            ? "flex h-full w-full"
+            : cn(
+                "hidden lg:flex",
+                collapsed
+                  ? "w-[var(--layout-sidebar-width-collapsed)]"
+                  : "w-[var(--layout-sidebar-width)]",
+              ),
         )}
-        style={{
-          width: collapsed
-            ? "var(--layout-sidebar-width-collapsed)"
-            : "var(--layout-sidebar-width)",
-        }}
+        style={
+          forceVisible
+            ? undefined
+            : {
+                width: collapsed
+                  ? "var(--layout-sidebar-width-collapsed)"
+                  : "var(--layout-sidebar-width)",
+              }
+        }
         aria-label="주 내비게이션"
       >
         {/* Logo */}

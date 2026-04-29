@@ -29,13 +29,13 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-[var(--color-surface)] p-6 shadow-lg transition ease-in-out",
+  "fixed z-50 flex flex-col gap-4 bg-[var(--color-surface)] p-6 shadow-lg transition ease-in-out",
   {
     variants: {
       side: {
         top: "inset-x-0 top-0 border-b data-[state=open]:animate-[algolink-slide-in-bottom_200ms_cubic-bezier(0,0,0.2,1)]",
         bottom: "inset-x-0 bottom-0 border-t",
-        left: "inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
+        left: "inset-y-0 left-0 h-dvh w-3/4 border-r sm:max-w-sm data-[state=open]:animate-[algolink-slide-in-left_200ms_cubic-bezier(0,0,0.2,1)] data-[state=closed]:animate-[algolink-slide-out-left_150ms_cubic-bezier(0.4,0,1,1)]",
         right:
           "inset-y-0 right-0 h-full w-full border-l sm:max-w-xl data-[state=open]:animate-[algolink-slide-in-right_200ms_cubic-bezier(0,0,0.2,1)] data-[state=closed]:animate-[algolink-slide-out-right_150ms_cubic-bezier(0.4,0,1,1)]",
       },
@@ -61,10 +61,10 @@ const SheetContent = React.forwardRef<
       {...props}
     >
       <SheetPrimitive.Close
-        className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2"
+        className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-md text-current/70 transition-colors hover:bg-foreground/10 hover:text-current focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"
         aria-label="닫기"
       >
-        <X className="h-4 w-4" />
+        <X className="h-5 w-5" />
       </SheetPrimitive.Close>
       {children}
     </SheetPrimitive.Content>

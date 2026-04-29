@@ -46,7 +46,11 @@ export function MobileNav({ sections }: MobileNavProps) {
           <Menu className="size-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-72 p-0 pb-safe">
+      {/* SPEC-MOBILE-001 §M2 follow-up: drawer 폭/높이/safe-area + dark bg 정합 */}
+      <SheetContent
+        side="left"
+        className="flex w-[85vw] max-w-[320px] flex-col bg-[var(--color-secondary)] p-0 pt-safe pb-safe text-[var(--color-secondary-foreground)]"
+      >
         <Sidebar sections={sections} forceVisible />
       </SheetContent>
     </Sheet>
