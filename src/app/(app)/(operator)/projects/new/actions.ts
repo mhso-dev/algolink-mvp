@@ -51,6 +51,9 @@ export async function createProjectAction(
       .filter(Boolean),
     businessAmountKrw: formData.get("businessAmountKrw"),
     instructorFeeKrw: formData.get("instructorFeeKrw"),
+    // SPEC-PAYOUT-002 §M4 — 시급 + 분배율
+    hourlyRateKrw: formData.get("hourlyRateKrw"),
+    instructorSharePct: formData.get("instructorSharePct"),
     notes: blankToUndef(formData.get("notes")),
   });
 
@@ -75,6 +78,9 @@ export async function createProjectAction(
     education_end_at: data.endAt ? data.endAt.toISOString() : null,
     business_amount_krw: data.businessAmountKrw,
     instructor_fee_krw: data.instructorFeeKrw,
+    // SPEC-PAYOUT-002 §M4 — 시급 + 분배율 (REQ-PROJECT-FIELDS-001/-004)
+    hourly_rate_krw: data.hourlyRateKrw,
+    instructor_share_pct: data.instructorSharePct,
     notes: data.notes ?? null,
     status: "proposal" as const,
   };

@@ -10,6 +10,7 @@ import {
   date,
   timestamp,
   index,
+  numeric,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -45,6 +46,13 @@ export const projects = pgTable(
     marginKrw: bigint("margin_krw", { mode: "number" }).generatedAlwaysAs(
       sql`business_amount_krw - instructor_fee_krw`,
     ),
+
+    // SPEC-PAYOUT-002 §M1 — 시급 + 분배율 (REQ-PAYOUT002-PROJECT-FIELDS-001/002)
+    // backward compat: businessAmountKrw / instructorFeeKrw는 보존, 정산 INSERT는 본 컬럼 산식 결과를 사용.
+    hourlyRateKrw: bigint("hourly_rate_krw", { mode: "number" }).notNull().default(0),
+    instructorSharePct: numeric("instructor_share_pct", { precision: 5, scale: 2 })
+      .notNull()
+      .default("0"),
 
     // 정산 흐름 hint (실제 정산 row는 settlements 테이블)
     settlementFlowHint: text("settlement_flow_hint"), // 'corporate' | 'government'

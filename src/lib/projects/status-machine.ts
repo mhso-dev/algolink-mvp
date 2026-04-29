@@ -16,7 +16,14 @@ export const USER_STEPS = [
 ] as const;
 export type UserStep = (typeof USER_STEPS)[number];
 
-/** 13단계 enum → 7단계 user step 매핑 (REQ-PROJECT-STATUS-001). */
+/**
+ * 14단계 enum → 7단계 user step 매핑 (REQ-PROJECT-STATUS-001).
+ *
+ * SPEC-PAYOUT-002 §M6 REQ-PAYOUT002-EXCEPT-007 — `instructor_withdrawn` → '강사매칭'.
+ * 강사 중도 하차 시 프로젝트 워크플로우는 강사 재배정 단계로 회귀한다.
+ * `defaultEnumForUserStep('강사매칭')`은 forward-flow 기본값(`lecture_requested`)을 보존하므로
+ * `instructor_withdrawn`은 regression 진입점일 뿐 default가 되지 않는다.
+ */
 export function userStepFromEnum(status: ProjectStatus): UserStep {
   switch (status) {
     case "proposal":
@@ -24,6 +31,7 @@ export function userStepFromEnum(status: ProjectStatus): UserStep {
       return "의뢰";
     case "lecture_requested":
     case "instructor_sourcing":
+    case "instructor_withdrawn": // SPEC-PAYOUT-002 REQ-EXCEPT-007 — 강사 중도 하차는 재배정 대기 (강사매칭 단계)
       return "강사매칭";
     case "assignment_review":
       return "요청";
@@ -40,7 +48,7 @@ export function userStepFromEnum(status: ProjectStatus): UserStep {
     case "task_done":
       return "정산";
     default: {
-      // exhaustiveness check
+      // exhaustiveness check — never assign이 통과하면 14개 case 모두 cover.
       const _exhaustive: never = status;
       throw new Error(`Unhandled project status: ${String(_exhaustive)}`);
     }
@@ -74,21 +82,27 @@ export function defaultEnumForUserStep(step: UserStep): ProjectStatus {
 /**
  * 허용된 상태 전환 그래프 (REQ-PROJECT-STATUS-002).
  * 자유 전환을 막아 워크플로우 무결성을 강제한다.
+ *
+ * SPEC-PAYOUT-002 §M6 — `instructor_withdrawn`은 강사 재배정 단계로의 regression entry이며,
+ * 다른 status에서 자유롭게 전환되지 않는다. 진입은 `withdrawInstructorAction` Server Action으로만,
+ * 회복은 다시 `lecture_requested`/`instructor_sourcing`로의 forward 전환만 허용.
  */
 export const ALLOWED_TRANSITIONS: Record<ProjectStatus, readonly ProjectStatus[]> = {
   proposal: ["contract_confirmed", "lecture_requested"],
   contract_confirmed: ["lecture_requested"],
-  lecture_requested: ["instructor_sourcing", "assignment_review"],
-  instructor_sourcing: ["assignment_review"],
-  assignment_review: ["assignment_confirmed"],
-  assignment_confirmed: ["education_confirmed", "recruiting"],
-  education_confirmed: ["recruiting", "progress_confirmed"],
-  recruiting: ["progress_confirmed"],
-  progress_confirmed: ["in_progress"],
-  in_progress: ["education_done"],
+  lecture_requested: ["instructor_sourcing", "assignment_review", "instructor_withdrawn"],
+  instructor_sourcing: ["assignment_review", "instructor_withdrawn"],
+  assignment_review: ["assignment_confirmed", "instructor_withdrawn"],
+  assignment_confirmed: ["education_confirmed", "recruiting", "instructor_withdrawn"],
+  education_confirmed: ["recruiting", "progress_confirmed", "instructor_withdrawn"],
+  recruiting: ["progress_confirmed", "instructor_withdrawn"],
+  progress_confirmed: ["in_progress", "instructor_withdrawn"],
+  in_progress: ["education_done", "instructor_withdrawn"],
   education_done: ["settlement_in_progress"],
   settlement_in_progress: ["task_done"],
   task_done: [],
+  // SPEC-PAYOUT-002 §M6 — 강사 재배정 시 강사매칭 단계로 forward
+  instructor_withdrawn: ["lecture_requested", "instructor_sourcing"],
 };
 
 /** validateTransition 입력 — 강사 배정 여부 등 사이드 컨텍스트. */

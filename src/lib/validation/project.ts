@@ -30,6 +30,19 @@ const optionalNonNegativeInt = z.preprocess(
     .min(0, { message: "0 이상의 정수여야 합니다." }),
 );
 
+// SPEC-PAYOUT-002 §M4 REQ-PAYOUT002-PROJECT-FIELDS-001/-005 — 시급 + 분배율 검증.
+const optionalSharePct = z.preprocess(
+  (v) => {
+    if (v === undefined || v === null || v === "") return 0;
+    if (typeof v === "string") return Number(v);
+    return v;
+  },
+  z
+    .number({ error: "강사 분배율은 숫자여야 합니다." })
+    .min(0, { message: "강사 분배율은 0~100 사이여야 합니다." })
+    .max(100, { message: "강사 분배율은 0~100 사이여야 합니다." }),
+);
+
 export const createProjectSchema = z
   .object({
     title: z
@@ -46,6 +59,9 @@ export const createProjectSchema = z
     requiredSkillIds: z.array(uuidLike).max(9, "최대 9개까지 선택 가능합니다.").default([]),
     businessAmountKrw: optionalNonNegativeInt,
     instructorFeeKrw: optionalNonNegativeInt,
+    // SPEC-PAYOUT-002 — 시간당 사업비 + 강사 분배율 (REQ-PROJECT-FIELDS-001/-005).
+    hourlyRateKrw: optionalNonNegativeInt,
+    instructorSharePct: optionalSharePct,
     notes: z.string().max(2000).optional(),
   })
   .superRefine((data, ctx) => {

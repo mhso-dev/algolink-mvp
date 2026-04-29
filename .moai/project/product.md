@@ -102,6 +102,12 @@
   - 정산 상태(전/요청/완료/보류)
   - 1-클릭 정산 요청 메일링(스텁)
   - 매입매출 현황 테이블
+  - **시간당 사업비 기반 자동 정산 산정** — **✅ 완료** (SPEC-PAYOUT-002 M1~M8 완료, 2026-04-29)
+    - `lecture_sessions` 강의 1회 1행 기록 (date/hours/status matrix) ✅
+    - 정수 산술 정산 산식 (`floor((rate × share_pct) / 100)`) ✅
+    - `/settlements/generate` 운영자 트리거 배치 정산 생성 ✅
+    - 예외 처리 3종: 결강(canceled) / 일정 변경(rescheduled + original_session_id) / 강사 중도 하차(instructor_withdrawn) ✅
+    - `settlement_sessions` junction + UNIQUE INDEX 이중 청구 방지 ✅
 - [F-206] 알림 트리거
   - 강사 배정 지연(요청 후 N시간 미응답)
   - 일정 충돌 감지
