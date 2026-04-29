@@ -4,8 +4,10 @@ import { pgEnum } from "drizzle-orm/pg-core";
 // 사용자 역할 — RLS 정책의 1차 분기 키.
 export const userRole = pgEnum("user_role", ["instructor", "operator", "admin"]);
 
-// 13단계 프로젝트 워크플로우 (SPEC §2.6 REQ-DB001-PROJECT-WORKFLOW).
+// 13단계 프로젝트 워크플로우 + SPEC-PAYOUT-002 instructor_withdrawn (총 14단계).
+// REQ-DB001-PROJECT-WORKFLOW + REQ-PAYOUT002-EXCEPT-007.
 // 추가/제거 시 ALTER TYPE ... ADD VALUE BEFORE/AFTER 사용 (무중단).
+// instructor_withdrawn은 SPEC-PAYOUT-002 §M1 마이그레이션에서 추가됨 (비가역).
 export const projectStatus = pgEnum("project_status", [
   "proposal",
   "contract_confirmed",
@@ -20,6 +22,16 @@ export const projectStatus = pgEnum("project_status", [
   "education_done",
   "settlement_in_progress",
   "task_done",
+  "instructor_withdrawn",
+]);
+
+// SPEC-PAYOUT-002 §M1 — 강의 세션 상태 (4종).
+// REQ-PAYOUT002-SESSIONS-002.
+export const lectureSessionStatus = pgEnum("lecture_session_status", [
+  "planned",
+  "completed",
+  "canceled",
+  "rescheduled",
 ]);
 
 // 프로젝트 유형 — 교육과 교재개발 동일 테이블에서 표현.

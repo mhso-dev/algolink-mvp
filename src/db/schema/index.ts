@@ -12,6 +12,8 @@ export * from "./project";
 export * from "./project-required-skills";
 export * from "./schedule";
 export * from "./settlement";
+export * from "./lecture-session";
+export * from "./settlement-session";
 export * from "./notes";
 export * from "./notifications";
 export * from "./ai-artifacts";
