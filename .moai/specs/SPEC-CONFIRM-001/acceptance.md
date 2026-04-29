@@ -1,0 +1,394 @@
+---
+spec_id: SPEC-CONFIRM-001
+version: 0.1.0
+created: 2026-04-29
+updated: 2026-04-29
+author: 철
+---
+
+# Acceptance: SPEC-CONFIRM-001 Given/When/Then 시나리오
+
+본 문서는 SPEC-CONFIRM-001의 수용 기준을 Given/When/Then 형식으로 명세한다. 각 시나리오는 통합 테스트 또는 수동 검증의 진입점이며, plan.md M6 통합 테스트의 단위 시나리오로 매핑된다.
+
+## 1. 핵심 시나리오 (정상 흐름)
+
+### 시나리오 1 — 강사가 사전 가용성 문의 inbox에서 pending 항목을 확인
+
+**REQ 매핑**: REQ-CONFIRM-INQUIRIES-001, REQ-CONFIRM-INQUIRIES-002, REQ-CONFIRM-RLS-001
+
+**Given**:
+- 강사 A(`instructor_id = ia`)가 `auth.uid() = ua`로 로그인된 상태
+- SPEC-PROPOSAL-001 흐름으로 운영자 O가 강사 A에게 사전 문의 1건 발송
+  - `proposal_inquiries (id = pi1, instructor_id = ia, requested_start = '2026-05-10 09:00 KST', requested_end = '2026-05-10 18:00 KST', skill_stack = ['React 18'], operator_memo = '5월 중순 가능 여부 확인 부탁드립니다.', created_by_user_id = uo, status = 'pending')`
+- 강사 A의 `instructor_responses` row는 아직 없음 (응답 미수행)
+
+**When**:
+- 강사 A가 `/me/inquiries`에 진입
+
+**Then**:
+- 페이지에 카드 1건 표시
+  - 제목 = pi1 source 문서 제목
+  - 요청 일정 범위 = `2026-05-10 09:00 KST ~ 2026-05-10 18:00 KST`
+  - 기술스택 태그 = `[React 18]`
+  - 운영자 메모 = `"5월 중순 가능 여부 확인 부탁드립니다."`
+  - 응답 상태 배지 = `"미응답"` (pending)
+  - ResponsePanel의 3 버튼(수락/거절/조건부) 모두 enabled
+- URL filter `?status=pending` 기본 적용
+
+---
+
+### 시나리오 2 — 강사가 사전 가용성 문의를 수락하면 운영자에게 알림이 가고 schedule은 생성되지 않음
+
+**REQ 매핑**: REQ-CONFIRM-INQUIRIES-003, REQ-CONFIRM-EFFECTS-002, REQ-CONFIRM-NOTIFY-003, REQ-CONFIRM-NOTIFY-004
+
+**Given**:
+- 시나리오 1 상태
+- `instructor_responses` row 0개 (UPSERT 대상)
+
+**When**:
+- 강사 A가 inquiry pi1의 ResponsePanel "수락" 버튼 클릭
+- 확인 다이얼로그에서 "확인" 클릭
+- `respondToInquiry({ inquiryId: 'pi1', status: 'accepted' })` Server Action 호출
+
+**Then**:
+- 단일 트랜잭션 내에서:
+  - `instructor_responses` 1 row INSERT: `(source_kind='proposal_inquiry', source_id='pi1', instructor_id='ia', status='accepted', conditional_note=null, responded_at=now())`
+  - `proposal_inquiries.status` = `'accepted'` (pi1)
+  - `notifications` 1 row INSERT: `(recipient_id='uo', type='inquiry_accepted', title='강사 응답: <문의 제목> 수락', body='강사 A님이 사전 문의를 수락하였습니다.', link_url='/proposals/<pi1_proposal_id>')`
+  - `schedule_items` row 0건 (제안 미수주 단계이므로 미생성) — REQ-CONFIRM-EFFECTS-002 단언
+- stdout에 `[notif] inquiry_accepted → operator_id=uo source_id=pi1` 출력
+- 강사 UI: 카드 응답 상태 배지 = `"수락"`, 1시간 카운트다운 시작
+- toast = `"응답이 저장되었습니다."`
+
+---
+
+### 시나리오 3 — 강사가 정식 배정 요청을 거절하면 프로젝트 풀로 환원, 운영자가 알림 받음
+
+**REQ 매핑**: REQ-CONFIRM-ASSIGNMENTS-003, REQ-CONFIRM-EFFECTS-003, REQ-CONFIRM-NOTIFY-002 (assignment_declined)
+
+**Given**:
+- SPEC-PROJECT-001 §2.7 흐름으로 운영자 O가 강사 A에게 1-클릭 배정 발송 완료
+  - `projects (id='p1', operator_id='uo', instructor_id='ia', status='assignment_review', education_start_at='2026-06-01 09:00 KST', education_end_at='2026-06-03 18:00 KST', business_amount_krw=5000000)`
+  - `notifications (recipient_id='ua', type='assignment_request', source_id='p1')` 이미 INSERT됨
+  - `instructor_responses` row 0개
+
+**When**:
+- 강사 A가 `/me/assignments` 진입 → assignment-card 1건 표시
+- "거절" 버튼 클릭 → 확인 다이얼로그 → 확정
+- `respondToAssignment({ projectId: 'p1', status: 'declined' })` 호출
+
+**Then**:
+- 단일 트랜잭션 내:
+  - `instructor_responses` 1 row INSERT: `(source_kind='assignment_request', source_id='p1', instructor_id='ia', status='declined', responded_at=now())`
+  - `projects.instructor_id` = 변경 없음(여전히 'ia') — 운영자가 unassign 별도 처리 필요
+  - `projects.status` = 변경 없음(`assignment_review` 유지)
+  - `schedule_items` 0건 INSERT
+  - `notifications` 1 row INSERT: `(recipient_id='uo', type='assignment_declined', title='강사 응답: <프로젝트 제목> 거절', body='강사 A님이 배정 요청을 거절하였습니다.', link_url='/projects/p1')`
+- stdout에 `[notif] assignment_declined → operator_id=uo source_id=p1`
+- 강사 UI: 응답 상태 배지 = `"거절"`, 1시간 카운트다운 시작
+- 운영자가 `/notifications` 페이지에서 알림 수신 → SPEC-PROJECT-001 §2.6 추천 다시 실행 흐름으로 진입 가능 (본 SPEC 외)
+
+---
+
+### 시나리오 4 — 강사 조건부 응답 시 conditional_note 5자 미만이면 reject
+
+**REQ 매핑**: REQ-CONFIRM-RESPONSES-004 (note 검증), REQ-CONFIRM-INQUIRIES-003 / REQ-CONFIRM-ASSIGNMENTS-003
+
+**Given**:
+- 시나리오 1 상태 (사전 문의 pi1, instructor A pending)
+
+**When (4a — note 너무 짧음)**:
+- 강사 A가 "조건부" 클릭 → textarea 활성화
+- "OK" (2자, 5자 미만) 입력 후 저장 클릭
+
+**Then (4a)**:
+- Server Action zod 검증 fail → return `{ ok: false, reason: "조건부 응답에는 5자 이상의 메모를 입력해주세요." }`
+- DB 변경 0건 (`instructor_responses`, `notifications` 모두 미INSERT)
+- 강사 UI에 한국어 에러 toast 표시
+- ResponsePanel 상태 유지 (textarea 값 보존)
+
+**When (4b — 정상 입력)**:
+- 강사가 "5/3은 가능, 5/4는 18시 이후만 가능합니다." (28자) 입력 후 저장
+
+**Then (4b)**:
+- 트랜잭션 내:
+  - `instructor_responses` UPSERT: `(status='conditional', conditional_note='5/3은 가능, 5/4는 18시 이후만 가능합니다.', responded_at=now())`
+  - `notifications` INSERT: `(recipient_id='uo', type='inquiry_conditional', body='[조건부] 강사 A님: 5/3은 가능, 5/4는 18시 이후만 가능합니다.')` (body 200자 미만 truncate 적용)
+- stdout `[notif] inquiry_conditional → operator_id=uo source_id=pi1`
+- (배정 요청 케이스라면 type=assignment_declined, body에 `[조건부]` 접두사 — spec.md §5.4)
+
+---
+
+### 시나리오 5 — 강사가 정식 배정 요청을 수락하면 schedule_items가 자동 생성됨
+
+**REQ 매핑**: REQ-CONFIRM-EFFECTS-001 (배정 수락 6종 부수효과)
+
+**Given**:
+- 시나리오 3과 동일한 초기 상태 (project p1, status=assignment_review)
+- 강사 A의 `schedule_items`에 동일 시간대(2026-06-01 ~ 06-03) 충돌 없음
+
+**When**:
+- 강사 A가 `/me/assignments`에서 "수락" 클릭
+
+**Then**:
+- 단일 트랜잭션 내 6개 작업 모두 완료:
+  1. `instructor_responses` UPSERT: `(source_kind='assignment_request', source_id='p1', instructor_id='ia', status='accepted', responded_at=now())`
+  2. `projects` UPDATE: `(instructor_id='ia', status='assignment_confirmed', updated_at=now())` WHERE id='p1' AND status='assignment_review' (일치 row 1개)
+  3. `schedule_items` INSERT: `(instructor_id='ia', project_id='p1', schedule_kind='system_lecture', starts_at='2026-06-01 09:00 KST', ends_at='2026-06-03 18:00 KST')` 1 row
+  4. `notifications` INSERT: `(recipient_id='uo', type='assignment_accepted', title='강사 응답: <프로젝트 제목> 수락', link_url='/projects/p1')`
+  5. stdout `[notif] assignment_accepted → operator_id=uo source_id=p1`
+- 강사 UI: 카드에 녹색 banner `"배정이 확정되었습니다. 일정에 자동 등록되었습니다."` + `/me/calendar` 링크
+- 응답 상태 배지 = `"수락"`, 1시간 카운트다운
+- `/me/calendar` 진입 시 새 이벤트 표시 (system_lecture, 파란색)
+
+---
+
+### 시나리오 6 — 1시간 변경 윈도 내 응답 변경 OK / 윈도 외 reject
+
+**REQ 매핑**: REQ-CONFIRM-RESPONSE-WINDOW-001/002/003/004
+
+**Given (6a — 윈도 내 변경 가능)**:
+- 시나리오 5 직후 상태 (강사 A가 p1 수락 완료, `responded_at = T0`)
+- 현재 시각 = T0 + 30분
+
+**When (6a)**:
+- 강사 A가 일정 충돌 발견 → `/me/assignments`에서 "응답 변경" 버튼 클릭
+- ResponsePanel 재오픈 → "거절" 선택 → 저장
+
+**Then (6a)**:
+- 트랜잭션:
+  - `instructor_responses` UPDATE (UNIQUE 제약으로 동일 row): `(status='declined', responded_at=now())`
+  - `projects.status` 변경 시점 결정: 본 SPEC은 자동 reset 안 함 (운영자 수동 처리). REQ-CONFIRM-EFFECTS-003에서 명시.
+    - 단, `schedule_items` row는 별도 cleanup 미수행 (M-future 작업, 본 SPEC scope 밖)
+  - `notifications` 새 row INSERT: `(recipient_id='uo', type='assignment_declined', body='강사 A님이 응답을 변경하였습니다: 거절')`
+- 운영자는 가장 최근 알림(declined)을 신뢰
+
+**Given (6b — 윈도 외 reject)**:
+- 시나리오 5 직후 상태, 현재 시각 = T0 + 1h 1분 (윈도 만료)
+
+**When (6b)**:
+- 강사 A가 강제로 (브라우저 stale tab에서) Server Action 재호출 시도
+
+**Then (6b)**:
+- Server Action: DB UPSERT의 WHERE 절(`responded_at IS NULL OR (now() - responded_at) <= INTERVAL '1 hour'`) 미일치 → 0 row affected
+- return `{ ok: false, reason: "응답 변경 가능 시간이 지났습니다. 운영자에게 문의해주세요." }`
+- DB 변경 0건
+- UI에 한국어 에러 toast + ResponsePanel disabled 상태 + "응답 확정" 배지
+
+---
+
+### 시나리오 7 — RLS: 강사 B가 강사 A의 응답에 접근 시도 → 0행 / permission denied
+
+**REQ 매핑**: REQ-CONFIRM-RLS-002, REQ-CONFIRM-RLS-003
+
+**Given**:
+- 강사 A의 `instructor_responses` row 1개 존재 (`id='r1', instructor_id='ia'`)
+- 강사 B(`instructor_id='ib', auth.uid()='ub'`) 로그인 상태
+- 강사 B가 r1의 UUID를 어떻게든 알고 있음 (URL tampering, DevTools 등)
+
+**When (7a — SELECT 시도)**:
+- 강사 B의 user-scoped Supabase client로 `SELECT * FROM instructor_responses WHERE id = 'r1'`
+
+**Then (7a)**:
+- RLS policy `instructor_responses_self_only` 적용 → 0 rows 반환
+- 페이지에 카드 미표시
+- UI: `notFound()` 또는 빈 inbox 표시
+
+**When (7b — UPDATE 시도)**:
+- 강사 B가 `respondToAssignment({ projectId: '<강사 A의 프로젝트 ID>', status: 'declined' })` 호출 시도
+
+**Then (7b)**:
+- Server Action 내부 SELECT WHERE id='ia' AND auth.uid()='ub' → 0 rows
+- 또는 UPSERT INSERT 시도 시 RLS deny
+- return `{ ok: false, reason: "본인 응답만 수정할 수 있습니다." }`
+- DB 변경 0건
+
+---
+
+### 시나리오 8 — Idempotency: 더블 클릭 / 네트워크 retry 시 단일 row만 존재
+
+**REQ 매핑**: REQ-CONFIRM-RESPONSE-WINDOW-005
+
+**Given**:
+- 시나리오 5 초기 상태 (강사 A pending)
+
+**When**:
+- 강사 A가 "수락" 버튼을 빠르게 2회 클릭 (브라우저 debounce 우회 또는 네트워크 retry 시뮬레이션)
+- 두 번째 클릭이 첫 번째 응답 도착 전에 트리거되어 두 개의 Server Action이 거의 동시에 실행됨
+
+**Then**:
+- 첫 번째 트랜잭션: `instructor_responses` INSERT 성공 (unique key 새 row)
+- 두 번째 트랜잭션: UNIQUE `(source_kind='assignment_request', source_id='p1', instructor_id='ia')` 충돌 → `ON CONFLICT DO UPDATE` 경로로 진입 → 동일 status로 UPDATE (실질 변경 없음)
+- 최종: `instructor_responses` rows = 1개
+- `notifications` rows = 1개 또는 2개 (트랜잭션 격리 수준에 따라; READ COMMITTED에서는 양쪽 INSERT 모두 commit 가능 — 운영 영향 미미하므로 허용. SPEC-NOTIF-001 후속에서 dedup 검토)
+- 강사 UI: 응답 상태 = "수락" 1건만 표시 (notifications dedup은 운영자 측 inbox에서 처리)
+
+**보강 케이스**:
+- 동일 클릭이 동일 status 재전송이면 멱등 (no-op)
+- 동일 클릭이 다른 status 전환이면 (e.g., 1차 "수락" 후 2차 "거절") → REQ-CONFIRM-RESPONSE-WINDOW-004 처리 (UPDATE + 새 notification)
+
+---
+
+## 2. 추가 시나리오 (엣지 케이스)
+
+### 시나리오 9 — schedule_items EXCLUSION 충돌 시 트랜잭션 롤백
+
+**REQ 매핑**: REQ-CONFIRM-EFFECTS-005
+
+**Given**:
+- 강사 A의 `schedule_items`에 이미 `(starts_at='2026-06-02 09:00', ends_at='2026-06-02 12:00', schedule_kind='unavailable')` row 존재 (강사 본인이 미리 등록한 강의 불가 일정)
+- 운영자가 `projects (education_start_at='2026-06-01 09:00 KST', education_end_at='2026-06-03 18:00 KST')` 배정 요청
+
+**When**:
+- 강사 A가 "수락" 클릭
+
+**Then**:
+- 트랜잭션 내 `schedule_items` INSERT 시도 → EXCLUSION constraint 위반 (overlap) → exception
+- 전체 트랜잭션 롤백
+- `instructor_responses` row 미생성, `projects` 미변경, `notifications` 미INSERT
+- Server Action return `{ ok: false, reason: "이미 등록된 강의 일정과 겹쳐 자동 등록에 실패했습니다. 운영자에게 문의해주세요." }`
+- 강사 UI에 한국어 에러 toast
+- ResponsePanel 상태 유지 (다시 시도 또는 conditional 응답 가능)
+
+---
+
+### 시나리오 10 — `projects.education_start_at` null인 경우 schedule_items 미생성 + 경고 banner
+
+**REQ 매핑**: REQ-CONFIRM-EFFECTS-006
+
+**Given**:
+- `projects (id='p2', education_start_at=null, education_end_at=null, status='assignment_review')`
+- 강사 A에게 배정 요청 발송됨
+
+**When**:
+- 강사 A가 "수락" 클릭
+
+**Then**:
+- 트랜잭션:
+  - `instructor_responses` UPSERT 성공
+  - `projects.instructor_id`, `status` UPDATE 성공
+  - `schedule_items` INSERT **skip** (REQ-CONFIRM-EFFECTS-006 단언, side-effects.ts 순수 함수가 빈 배열 반환)
+  - `notifications` INSERT 성공 (`assignment_accepted`)
+- 강사 UI: 응답 상태 = "수락" + 노란색 비차단 경고 banner `"강의 시작/종료일이 미정이어서 일정 등록이 보류되었습니다."`
+- 운영자가 추후 `projects` 일정 확정 후 별도 작업으로 schedule_items 보강 (운영자 admin UI는 본 SPEC 외)
+
+---
+
+### 시나리오 11 — 운영자가 강사 A 배정 후 다른 강사 B로 재배정 → 강사 A 응답 시 reject
+
+**REQ 매핑**: REQ-CONFIRM-ASSIGNMENTS-005
+
+**Given**:
+- 처음 운영자가 강사 A에게 배정 요청 발송 (`projects.instructor_id='ia'`)
+- 강사 A 응답 전, 운영자가 마음을 바꿔 강사 B에게 재배정 → `projects.instructor_id='ib'`로 UPDATE (SPEC-PROJECT-001 §2.7 REQ-PROJECT-ASSIGN-006 reassign 경로)
+- 강사 A의 stale `/me/assignments` 페이지에는 여전히 카드 표시됨
+
+**When**:
+- 강사 A가 stale 카드의 "수락" 클릭
+
+**Then**:
+- Server Action `respondToAssignment` 내부 사전 검증: `SELECT instructor_id FROM projects WHERE id='p1'` → 'ib' (강사 A의 'ia'와 불일치)
+- return `{ ok: false, reason: "이미 다른 강사에게 재배정된 프로젝트입니다." }`
+- DB 변경 0건
+- 강사 UI에 한국어 에러 toast + 자동 새로고침 안내 또는 카드 자동 제거
+
+---
+
+### 시나리오 12 — operator user 삭제 후 강사 응답 시 notification skip + commit
+
+**REQ 매핑**: REQ-CONFIRM-NOTIFY-005
+
+**Given**:
+- 운영자 O가 SPEC-AUTH-001 흐름으로 비활성화 또는 삭제됨 (auth.users row 삭제)
+- 강사 A에게는 이미 배정 요청 알림이 발송된 상태 (예전에 INSERT됨)
+- 강사 A 응답 시 `projects.operator_id='uo'`이지만 users 테이블에 'uo'가 없음
+
+**When**:
+- 강사 A가 "거절" 클릭
+
+**Then**:
+- Server Action 트랜잭션:
+  - `instructor_responses` UPSERT 성공
+  - `notifications` INSERT 시도 → recipient_id='uo' FK 위반 (또는 application-level pre-check fail) → notification INSERT **skip**
+  - stderr에 `console.warn("[notif:skip] operator_id=uo not found for source_id=p1")` 출력
+  - 트랜잭션 commit (응답은 보존)
+- 강사 UI: 응답 상태 = "거절" 표시 (정상 동작)
+- 알림 손실은 운영자 admin 측에서 별도 audit (본 SPEC 외)
+
+---
+
+## 3. 비기능 시나리오
+
+### 시나리오 13 — 한국어 일관성 + Asia/Seoul KST 표시
+
+**REQ 매핑**: REQ-ME-A11Y-004/005 패턴 재사용
+
+**Given**:
+- 본 SPEC의 모든 사용자 노출 텍스트
+
+**When**:
+- 강사가 `/me/inquiries`, `/me/assignments` 진입
+
+**Then**:
+- 모든 라벨/버튼/배지/에러/toast 한국어
+- 영문 평문 노출 0건 (Supabase 에러 코드 직노출 금지)
+- 모든 시각 표시 KST 형식 (`2026-05-10 09:00 KST` 또는 `2026년 5월 10일 09:00`)
+- UTC 표시 0건
+
+---
+
+### 시나리오 14 — 접근성 (axe DevTools + 키보드)
+
+**REQ 매핑**: REQ-CONFIRM-INQUIRIES-001 / ASSIGNMENTS-001 (server component) + 일반 a11y 가이드
+
+**Given**:
+- 강사가 `/me/inquiries` 또는 `/me/assignments` 진입
+- 스크린리더 사용 또는 키보드 only 모드
+
+**Then**:
+- axe DevTools critical = 0
+- Lighthouse Accessibility ≥ 95
+- 모든 버튼/textarea Tab 도달 가능
+- ResponsePanel의 conditional textarea에 `<Label htmlFor>` + `aria-describedby` 적용
+- 카운트다운 영역에 `role="timer"` + `aria-live="polite"` (선택)
+- 응답 상태 배지에 `aria-label` 한국어 명시 ("미응답" / "수락" / "거절" / "조건부 응답")
+
+---
+
+### 시나리오 15 — 콘솔 로그 5개 type 정확한 포맷
+
+**REQ 매핑**: REQ-CONFIRM-NOTIFY-004
+
+**Given**:
+- 5개 응답 시나리오 각각
+
+**Then**:
+- `[notif] assignment_accepted → operator_id=<uuid> source_id=<uuid>` (시나리오 5)
+- `[notif] assignment_declined → operator_id=<uuid> source_id=<uuid>` (시나리오 3, 시나리오 4 conditional 케이스)
+- `[notif] inquiry_accepted → operator_id=<uuid> source_id=<uuid>` (시나리오 2)
+- `[notif] inquiry_declined → operator_id=<uuid> source_id=<uuid>` (사전 문의 거절 케이스)
+- `[notif] inquiry_conditional → operator_id=<uuid> source_id=<uuid>` (시나리오 4b)
+
+UUID는 정상 36자 hyphen-delimited 형식, NODE_ENV 무관 출력.
+
+---
+
+## 4. Definition of Done
+
+본 SPEC의 모든 시나리오가 통과해야 다음 조건이 성립한다:
+
+- [ ] 시나리오 1-8: 핵심 흐름 모두 PASS (M6 통합 테스트)
+- [ ] 시나리오 9-12: 엣지 케이스 모두 PASS
+- [ ] 시나리오 13-15: 비기능 검증 통과
+- [ ] `pnpm typecheck && pnpm lint && pnpm test:unit && pnpm build` 전체 PASS
+- [ ] 단위 테스트 라인 커버리지 ≥ 85% (responses 모듈)
+- [ ] axe DevTools `/me/inquiries`, `/me/assignments` critical 0건
+- [ ] Lighthouse Accessibility ≥ 95
+- [ ] 기존 SPEC(SPEC-PROJECT-001, SPEC-AUTH-001, SPEC-ME-001, SPEC-DB-001) 회귀 0건
+- [ ] 한국어 + KST 일관성 검증 PASS
+- [ ] RLS 격리 검증 PASS (instructor B → instructor A row 0행)
+- [ ] 마이그레이션 5개 enum value 추가 + `instructor_responses` 테이블 정합 검증
+
+---
+
+_End of SPEC-CONFIRM-001 acceptance.md_
