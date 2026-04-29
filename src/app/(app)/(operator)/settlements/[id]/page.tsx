@@ -23,8 +23,11 @@ import {
   settlementStatusBadgeVariant,
   type SettlementStatus,
 } from "@/lib/payouts";
+import { getStatusLabel } from "@/lib/payouts/status-machine";
 import { SettlementActionsPanel } from "./actions-panel";
 import { Container } from "@/components/app/container";
+import { RemittanceConfirmationPanel } from "@/components/payouts/remittance-confirmation-panel";
+import { ReceiptPreviewLink } from "@/components/payouts/receipt-preview-link";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +79,22 @@ export default async function SettlementDetailPage({ params }: PageProps) {
 
   const ratePercent = Number(settlement.withholding_tax_rate ?? 0);
   const status = settlement.status;
+  const isClientDirect = settlement.settlement_flow === "client_direct";
+
+  // SPEC-RECEIPT-001 §M6 — client_direct 흐름의 영수증 정보 + storage_path 조회.
+  let receiptStoragePath: string | null = null;
+  if (isClientDirect && settlement.receipt_file_id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: file } = await (supabase as any)
+      .from("files")
+      .select("storage_path")
+      .eq("id", settlement.receipt_file_id)
+      .maybeSingle();
+    receiptStoragePath = (file as { storage_path?: string } | null)?.storage_path ?? null;
+  }
+
+  // status badge label은 client_direct flow일 때 의미 재해석된 라벨 사용.
+  const statusLabel = getStatusLabel(status, settlement.settlement_flow);
 
   return (
     <Container variant="narrow" className="flex flex-col gap-5 py-6">
@@ -104,9 +123,17 @@ export default async function SettlementDetailPage({ params }: PageProps) {
               {SETTLEMENT_FLOW_LABEL[settlement.settlement_flow]}
             </Badge>
             <Badge variant={settlementStatusBadgeVariant(status)}>
-              {SETTLEMENT_STATUS_LABEL[status]}
+              {statusLabel}
             </Badge>
           </div>
+          {isClientDirect ? (
+            <p
+              className="rounded-md bg-[var(--color-bg-muted)] px-3 py-2 text-xs text-[var(--color-text-muted)]"
+              aria-label="자금 흐름"
+            >
+              자금 흐름: 고객사 → 강사 → 알고링크
+            </p>
+          ) : null}
         </div>
       </header>
 
@@ -222,19 +249,74 @@ export default async function SettlementDetailPage({ params }: PageProps) {
         </Card>
       )}
 
-      {/* 상태 전환 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>상태 전환</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <SettlementActionsPanel
-            settlementId={settlement.id}
-            status={status}
-            instructorName={instructorName}
-          />
-        </CardContent>
-      </Card>
+      {/* SPEC-RECEIPT-001 §M5 — 운영자 수취 확인 + 영수증 발급 패널 */}
+      {isClientDirect && status === "requested" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>수취 확인 + 영수증 발급</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RemittanceConfirmationPanel
+              settlementId={settlement.id}
+              expectedAmountKrw={
+                settlement.instructor_remittance_amount_krw ?? 0
+              }
+              registeredRemittance={{
+                date: null, // 강사 송금 등록 일자는 별도 조회 (M6 후속)
+                amountKrw: settlement.client_payout_amount_krw,
+              }}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* SPEC-RECEIPT-001 §M6 — 영수증 발급 완료 정보 */}
+      {isClientDirect && status === "paid" && settlement.receipt_number ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>영수증 발급 정보</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <dl className="grid grid-cols-2 gap-y-2 text-sm md:grid-cols-3">
+              <dt className="text-[var(--color-text-muted)]">영수증 번호</dt>
+              <dd className="md:col-span-2 font-medium">
+                {settlement.receipt_number}
+              </dd>
+              <dt className="text-[var(--color-text-muted)]">발급 일시</dt>
+              <dd className="md:col-span-2">
+                {formatKstDateTime(settlement.receipt_issued_at)}
+              </dd>
+              <dt className="text-[var(--color-text-muted)]">강사 입금 확인</dt>
+              <dd className="md:col-span-2">
+                {formatKstDateTime(settlement.instructor_remittance_received_at)}
+              </dd>
+            </dl>
+            {receiptStoragePath ? (
+              <ReceiptPreviewLink
+                storagePath={receiptStoragePath}
+                receiptNumber={settlement.receipt_number}
+              />
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* 상태 전환 (corporate/government 또는 client_direct paid 외) */}
+      {!isClientDirect ||
+      (isClientDirect && status !== "requested" && status !== "paid") ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>상태 전환</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SettlementActionsPanel
+              settlementId={settlement.id}
+              status={status}
+              instructorName={instructorName}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* 이력 */}
       <Card>

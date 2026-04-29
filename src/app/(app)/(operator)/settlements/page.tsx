@@ -408,6 +408,7 @@ function PayoutFiltersBar({
           <option value="">전체</option>
           <option value="corporate">기업</option>
           <option value="government">정부</option>
+          <option value="client_direct">고객 직접</option>
         </select>
       </label>
       <label className="flex flex-col gap-1 text-xs">
