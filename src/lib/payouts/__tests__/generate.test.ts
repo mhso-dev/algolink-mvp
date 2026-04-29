@@ -378,6 +378,110 @@ test("Scenario 17: flow override → settlement INSERT 정상", async () => {
   assert.equal(r.createdCount, 1);
 });
 
+// SPEC-PAYOUT-002 v0.1.3 + SPEC-RECEIPT-001 v0.2.1 cross-SPEC contract (Option A) ===
+// flow='client_direct'일 때 instructor_remittance_amount_krw 자동 채움 검증.
+
+test("client_direct flow override → instructor_remittance_amount_krw 자동 populate (Option A)", async () => {
+  const sessions = [
+    makeSession({ id: "s-1", project_id: PROJ_A, hours: 5.0 }),
+  ];
+  // 산식: hourly_rate=100_000 × 5h = 500_000 (business_amount).
+  //       instructor_fee = floor(100_000 × 70 / 100) × 5 = 350_000.
+  //       profit = 500_000 - 350_000 = 150_000 → instructor_remittance_amount_krw.
+  const mock = mockSupa([
+    { data: [], error: null },
+    { data: sessions, error: null },
+    {
+      data: [
+        {
+          id: PROJ_A,
+          instructor_id: INSTR_A,
+          hourly_rate_krw: 100_000,
+          instructor_share_pct: 70,
+          settlement_flow_hint: null,
+        },
+      ],
+      error: null,
+    },
+    { data: { id: "settle-cd" }, error: null },
+    { data: [{ lecture_session_id: "s-1" }], error: null },
+  ]);
+  const r = await generateSettlementsForPeriod(mock as never, {
+    periodStart: "2026-05-01",
+    periodEnd: "2026-05-31",
+    flowOverrides: { [PROJ_A]: "client_direct" },
+    taxRateOverrides: { [PROJ_A]: 3.3 },
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.createdCount, 1);
+
+  // settlements INSERT 호출 캡쳐 — instructor_remittance_amount_krw가 페이로드에 포함되어야.
+  const insertCall = mock.calls.find(
+    (c) => c.table === "settlements" && c.method === "insert",
+  );
+  assert.ok(insertCall, "settlements insert call exists");
+  const payload = insertCall!.args?.[0] as Record<string, unknown>;
+  assert.equal(payload.settlement_flow, "client_direct");
+  // 150,000 = 500,000 - 350,000.
+  assert.equal(payload.instructor_remittance_amount_krw, 150_000);
+});
+
+test("corporate flow → instructor_remittance_amount_krw NOT in payload (Option A)", async () => {
+  const sessions = [makeSession({ id: "s-1", project_id: PROJ_A })];
+  const mock = mockSupa([
+    { data: [], error: null },
+    { data: sessions, error: null },
+    {
+      data: [
+        {
+          id: PROJ_A,
+          instructor_id: INSTR_A,
+          hourly_rate_krw: 100_000,
+          instructor_share_pct: 70,
+          settlement_flow_hint: "corporate",
+        },
+      ],
+      error: null,
+    },
+    { data: { id: "settle-c" }, error: null },
+    { data: [{ lecture_session_id: "s-1" }], error: null },
+  ]);
+  const r = await generateSettlementsForPeriod(mock as never, {
+    periodStart: "2026-05-01",
+    periodEnd: "2026-05-31",
+  });
+  assert.equal(r.ok, true);
+
+  const insertCall = mock.calls.find(
+    (c) => c.table === "settlements" && c.method === "insert",
+  );
+  const payload = insertCall!.args?.[0] as Record<string, unknown>;
+  assert.equal(payload.settlement_flow, "corporate");
+  // corporate flow는 instructor_remittance_amount_krw를 추가하지 않음 (NULL 유지).
+  assert.ok(
+    !("instructor_remittance_amount_krw" in payload),
+    `corporate flow should not populate instructor_remittance_amount_krw, got: ${JSON.stringify(payload)}`,
+  );
+});
+
+test("client_direct + settlement_flow_hint='client_direct' → 자동 default_flow 인식", () => {
+  const sessions = [makeSession({ id: "s-1", project_id: PROJ_A })];
+  const projects = new Map([
+    [
+      PROJ_A,
+      {
+        id: PROJ_A,
+        instructor_id: INSTR_A,
+        hourly_rate_krw: 100_000,
+        instructor_share_pct: 70,
+        settlement_flow_hint: "client_direct",
+      },
+    ],
+  ]);
+  const rows = groupAndCompute(sessions, projects);
+  assert.equal(rows[0].default_flow, "client_direct");
+});
+
 test("buildSettlementPreview: 미청구 0건 → unbilledCount=0", async () => {
   const mock = mockSupa([
     { data: [], error: null },

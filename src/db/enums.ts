@@ -37,8 +37,13 @@ export const lectureSessionStatus = pgEnum("lecture_session_status", [
 // 프로젝트 유형 — 교육과 교재개발 동일 테이블에서 표현.
 export const projectType = pgEnum("project_type", ["education", "material_development"]);
 
-// 정산 흐름 — 기업/정부에 따라 원천세율 분기.
-export const settlementFlow = pgEnum("settlement_flow", ["corporate", "government"]);
+// 정산 흐름 — 기업/정부/고객 직접 정산.
+// SPEC-RECEIPT-001 §M1: client_direct 추가 (6-2 흐름, 원천세율 3.30/8.80 허용).
+export const settlementFlow = pgEnum("settlement_flow", [
+  "corporate",
+  "government",
+  "client_direct",
+]);
 
 // 정산 상태.
 export const settlementStatus = pgEnum("settlement_status", [
@@ -63,6 +68,7 @@ export const entityType = pgEnum("entity_type", ["project", "instructor", "clien
 
 // 인앱 알림 종류 (SPEC §2.10 REQ-DB001-NOTIFICATIONS-TYPE).
 // SPEC-PROJECT-001 §5: assignment_request 추가 (ADD VALUE IF NOT EXISTS).
+// SPEC-RECEIPT-001 §M1: receipt_issued 추가.
 export const notificationType = pgEnum("notification_type", [
   "assignment_overdue",
   "schedule_conflict",
@@ -70,6 +76,7 @@ export const notificationType = pgEnum("notification_type", [
   "dday_unprocessed",
   "settlement_requested",
   "assignment_request",
+  "receipt_issued",
 ]);
 
 // SPEC-SKILL-ABSTRACT-001: 강사 기술 분류 enum 제거 (3-tier 분류, 숙련도).

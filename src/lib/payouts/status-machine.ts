@@ -66,3 +66,40 @@ export function allTransitionPairs(): Array<{
   }
   return pairs;
 }
+
+/**
+ * SPEC-RECEIPT-001 §M2 — flow별 상태 라벨 분기.
+ * client_direct 흐름은 6-2 자금 흐름에 맞춰 의미 재해석된 라벨 사용.
+ *
+ * 백엔드 enum 값(pending/requested/paid/held)은 변경 없음 — UI 라벨만 분기.
+ */
+import type { SettlementFlow } from "./types";
+
+export function getStatusLabel(
+  status: SettlementStatus,
+  flow: SettlementFlow,
+): string {
+  if (flow === "client_direct") {
+    switch (status) {
+      case "pending":
+        return "수취 대기";
+      case "requested":
+        return "입금 확인 대기";
+      case "paid":
+        return "영수증 발급 완료";
+      case "held":
+        return "보류";
+    }
+  }
+  // corporate / government — 기존 SPEC-PAYOUT-001 라벨.
+  switch (status) {
+    case "pending":
+      return "정산 전";
+    case "requested":
+      return "정산 요청";
+    case "paid":
+      return "정산 완료";
+    case "held":
+      return "보류";
+  }
+}

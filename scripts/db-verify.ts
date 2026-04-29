@@ -254,7 +254,7 @@ async function main() {
   });
 
   // ===== Section 8: Notifications enum =====
-  await check("AC-DB001-NOTIF-01: notification_type enum 검증 (SPEC-DB-001 5종 + SPEC-PROJECT-001 assignment_request)", async () => {
+  await check("AC-DB001-NOTIF-01: notification_type enum 검증 (SPEC-DB-001 5종 + SPEC-PROJECT-001 assignment_request + SPEC-RECEIPT-001 receipt_issued)", async () => {
     const rows = await sql<{ enumlabel: string }[]>`
       SELECT enumlabel FROM pg_enum e
       JOIN pg_type t ON e.enumtypid = t.oid
@@ -262,14 +262,103 @@ async function main() {
       ORDER BY enumlabel
     `;
     const names = rows.map((r) => r.enumlabel).sort();
-    // SPEC-PROJECT-001 마이그레이션 91 가 assignment_request 를 ADD VALUE IF NOT EXISTS 로 추가.
+    // SPEC-PROJECT-001 마이그레이션이 assignment_request를 추가.
+    // SPEC-RECEIPT-001 §M1 마이그레이션이 receipt_issued를 추가.
     const expected = [
       "assignment_overdue", "assignment_request", "dday_unprocessed",
-      "low_satisfaction_assignment", "schedule_conflict", "settlement_requested",
+      "low_satisfaction_assignment", "receipt_issued", "schedule_conflict",
+      "settlement_requested",
     ];
     assert(JSON.stringify(names) === JSON.stringify(expected),
       `notification_type ${JSON.stringify(names)} ≠ ${JSON.stringify(expected)}`);
   });
+
+  // ===== SPEC-RECEIPT-001 §M1 verify =====
+  await check(
+    "AC-RECEIPT-001-FLOW: settlement_flow에 client_direct 추가",
+    async () => {
+      const rows = await sql<{ enumlabel: string }[]>`
+        SELECT enumlabel FROM pg_enum e
+        JOIN pg_type t ON e.enumtypid = t.oid
+        WHERE t.typname = 'settlement_flow'
+        ORDER BY enumlabel
+      `;
+      const names = rows.map((r) => r.enumlabel).sort();
+      const expected = ["client_direct", "corporate", "government"];
+      assert(
+        JSON.stringify(names) === JSON.stringify(expected),
+        `settlement_flow ${JSON.stringify(names)} ≠ ${JSON.stringify(expected)}`,
+      );
+    },
+  );
+
+  await check(
+    "AC-RECEIPT-001-COLUMNS: settlements 6개 신규 컬럼 존재",
+    async () => {
+      const rows = await sql<{ column_name: string }[]>`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'settlements'
+          AND column_name IN ('instructor_remittance_amount_krw',
+                              'instructor_remittance_received_at',
+                              'client_payout_amount_krw',
+                              'receipt_file_id',
+                              'receipt_issued_at',
+                              'receipt_number')
+      `;
+      assert(rows.length === 6, `settlements 신규 6 컬럼 중 ${rows.length}개만 존재`);
+    },
+  );
+
+  await check(
+    "AC-RECEIPT-001-COUNTER: app.next_receipt_number() 함수 정상 발급",
+    async () => {
+      const result = await sql<{ next_receipt_number: string }[]>`
+        SELECT app.next_receipt_number() AS next_receipt_number
+      `;
+      const value = result[0]?.next_receipt_number ?? "";
+      assert(
+        /^RCP-\d{4}-\d{4}$/.test(value),
+        `app.next_receipt_number 결과 "${value}"가 RCP-YYYY-NNNN 형식 위반`,
+      );
+    },
+  );
+
+  await check(
+    "AC-RECEIPT-001-ORG: organization_info 테이블 + 1행 존재",
+    async () => {
+      const rows = await sql<{ id: number; name: string }[]>`
+        SELECT id, name FROM organization_info WHERE id = 1
+      `;
+      assert(rows.length === 1, `organization_info 1행 누락`);
+      assert(rows[0]!.id === 1, `organization_info.id = 1 강제 위반`);
+    },
+  );
+
+  await check(
+    "AC-RECEIPT-001-BUCKET: payout-receipts + payout-evidence Storage 버킷 생성",
+    async () => {
+      const rows = await sql<{ id: string }[]>`
+        SELECT id FROM storage.buckets
+        WHERE id IN ('payout-receipts', 'payout-evidence')
+      `;
+      assert(
+        rows.length === 2,
+        `Storage 버킷 누락 (현재: ${rows.map((r) => r.id).join(",")})`,
+      );
+    },
+  );
+
+  await check(
+    "AC-RECEIPT-001-HELPER: app.current_user_role() 함수 존재",
+    async () => {
+      const rows = await sql<{ proname: string }[]>`
+        SELECT proname FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = 'app' AND proname = 'current_user_role'
+      `;
+      assert(rows.length === 1, `app.current_user_role() 함수 누락`);
+    },
+  );
 
   // ===== Section 11: Review =====
   await check("AC-DB001-REVIEW-01: score > 5 CHECK 거부", async () => {

@@ -1,7 +1,8 @@
-// @MX:ANCHOR: SPEC-DB-001 §2.8 REQ-DB001-SETTLEMENT — corporate/government 정산.
+// @MX:ANCHOR: SPEC-DB-001 §2.8 REQ-DB001-SETTLEMENT — corporate/government/client_direct 정산.
 // @MX:REASON: CHECK 제약(원천세율 화이트리스트) + GENERATED 컬럼이 비즈니스 규칙 강제.
 // @MX:WARN: withholding_tax_rate은 numeric(5,2)만 허용 — 0/3.30/8.80 외 값 INSERT 거부.
 // @MX:REASON: 세무법상 적용 가능한 세율이 고정.
+// SPEC-RECEIPT-001 §M1: 6개 nullable 컬럼 추가 (강사 송금/영수증 데이터).
 import {
   pgTable,
   uuid,
@@ -18,6 +19,7 @@ import { sql } from "drizzle-orm";
 import { settlementFlow, settlementStatus } from "../enums";
 import { projects } from "./project";
 import { instructors } from "./instructor";
+import { files } from "./files";
 
 export const settlements = pgTable(
   "settlements",
@@ -63,16 +65,38 @@ export const settlements = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     createdBy: uuid("created_by"),
+
+    // SPEC-RECEIPT-001 §M1 — 6-2 흐름 (client_direct) 강사 송금 + 영수증 컬럼.
+    // 모두 nullable. corporate/government 흐름은 NULL 유지.
+    instructorRemittanceAmountKrw: bigint("instructor_remittance_amount_krw", {
+      mode: "number",
+    }),
+    instructorRemittanceReceivedAt: timestamp("instructor_remittance_received_at", {
+      withTimezone: true,
+    }),
+    clientPayoutAmountKrw: bigint("client_payout_amount_krw", { mode: "number" }),
+    receiptFileId: uuid("receipt_file_id").references(() => files.id, {
+      onDelete: "set null",
+    }),
+    receiptIssuedAt: timestamp("receipt_issued_at", { withTimezone: true }),
+    receiptNumber: text("receipt_number").unique(),
   },
   (t) => [
-    // REQ-DB001-SETTLEMENT-WITHHOLDING — 흐름 ↔ 세율 화이트리스트 강제.
+    // REQ-DB001-SETTLEMENT-WITHHOLDING + REQ-RECEIPT-FLOW-002 — 3 disjunct.
     check(
       "settlements_withholding_rate_check",
       sql`(
         (settlement_flow = 'corporate' AND withholding_tax_rate = 0)
         OR
         (settlement_flow = 'government' AND withholding_tax_rate IN (3.30, 8.80))
+        OR
+        (settlement_flow = 'client_direct' AND withholding_tax_rate IN (3.30, 8.80))
       )`,
+    ),
+    // REQ-RECEIPT-COLUMNS-002 — RCP-YYYY-NNNN 4-digit 형식 검증.
+    check(
+      "settlements_receipt_number_format_check",
+      sql`(receipt_number IS NULL OR receipt_number ~ '^RCP-\\d{4}-\\d{4}$')`,
     ),
     index("idx_settlements_project").on(t.projectId),
     index("idx_settlements_instructor").on(t.instructorId),

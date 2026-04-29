@@ -4,6 +4,23 @@
 
 ## [Unreleased]
 
+### Added (SPEC-RECEIPT-001 — 고객 직접 정산 + 자동 영수증 발급, Issue #15)
+- **M1**: 마이그레이션 7건 (`app.current_user_role` helper, `settlement_flow=client_direct` enum 확장, `settlements` 6개 nullable 컬럼, `organization_info` singleton 테이블, `payout-receipts` Storage 버킷, `notification_type=receipt_issued`, `receipt_counters` + `app.next_receipt_number()` 연도별 reset). db:verify 30/30 PASS
+- **M2**: 도메인 순수 함수 3종 — `receipt-number.ts` (RPC 래퍼), `organization-info.ts` (DB 우선 → env fallback), `client-direct-validation.ts` (zod refinement)
+- **M3**: `src/lib/payouts/receipt-pdf.ts` + `ReceiptDocument.tsx` — `@react-pdf/renderer` + NotoSansKR 절대 경로 등록, A4 portrait 한국어 단일 페이지 영수증 PDF 렌더
+- **M4**: 강사 송금 등록 Server Action (`registerInstructorRemittance`) — pending → requested 전환 + `client_payout_amount_krw` UPDATE + 첨부 파일 Storage 업로드 (`payout-evidence` bucket-relative)
+- **M5**: 운영자 수취 확인 atomic 8-step Server Action (`confirmRemittanceAndIssueReceipt`) — PII GUC + `decrypt_pii` RPC + `pii_access_log` INSERT + PDF 렌더 + Storage 업로드 + settlements UPDATE + notifications INSERT + best-effort compensating cleanup
+- **M6**: UI 와이어링 — 강사 `/me/payouts/[id]` "송금 완료 등록" CTA + 영수증 다운로드 signed URL, 운영자 `/settlements/[id]/confirm-remittance` 패널 + flow indicator
+- **M7**: 통합 테스트 71 신규 unit tests + 10 통합 시나리오 PASS. db:verify 6개 신규 검증 포함 30/30 PASS
+
+### Changed (SPEC-RECEIPT-001 cross-SPEC)
+- **SPEC-PAYOUT-002 `generate.ts` amendment**: `client_direct` 흐름 정산 행 생성 시 `instructor_remittance_amount_krw` 컬럼을 `business_amount_krw - instructor_fee_krw`(profit_krw)로 populate (cross-SPEC contract, Option A 채택)
+
+### Notes (SPEC-RECEIPT-001)
+- 71 신규 단위 테스트 + 10 통합 시나리오 PASS / typecheck 0 error / lint NO REGRESSION / pnpm build PASS / db:verify 30/30 PASS
+- 회귀 0건: SPEC-PAYOUT-001 `corporate`/`government` 흐름 16개 상태 전환 테스트 PASS
+- 실제 이메일/SMS 발송, 국세청 세금계산서, 영수증 취소/재발급 UI는 후속 SPEC에 위임
+
 ### Added (SPEC-PAYOUT-002 — 시간당 사업비 기반 자동 정산 산정, Issue #14)
 - **M1**: `lecture_sessions` 신규 테이블 (project_id, instructor_id, date, hours, status enum, original_session_id self-FK, soft delete) + `settlement_sessions` junction + `projects.hourly_rate_krw` / `instructor_share_pct` 컬럼 추가. db:verify 24/24 PASS
 - **M2**: 정수 산술 정산 산식 순수 함수 (`src/lib/payouts/calculator.ts`) — `floor((rate × round(pct × 100)) / 10000)` IEEE-754 drift 차단
