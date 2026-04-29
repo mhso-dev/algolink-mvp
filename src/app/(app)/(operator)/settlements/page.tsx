@@ -35,6 +35,7 @@ import {
   settlementStatusBadgeVariant,
   type PayoutPeriod,
 } from "@/lib/payouts";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -96,7 +97,7 @@ export default async function SettlementsListPage({ searchParams }: PageProps) {
   const periodLabel = formatPeriodLabel(period);
 
   return (
-    <div className="mx-auto max-w-[1440px] px-6 py-6 flex flex-col gap-5">
+    <Container variant="default" className="flex flex-col gap-5 py-6">
       <header className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -252,7 +253,7 @@ export default async function SettlementsListPage({ searchParams }: PageProps) {
           })}
         </nav>
       )}
-    </div>
+    </Container>
   );
 }
 

@@ -13,6 +13,7 @@ import { sumMargin } from "@/lib/admin/aggregations/margin";
 import { getMonthlyTrend } from "@/lib/admin/aggregations/by-month";
 import { getTopClients } from "@/lib/admin/aggregations/by-client";
 import { getTopInstructors } from "@/lib/admin/aggregations/by-instructor";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ export default async function AdminDashboardPage({
   ]);
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-6 flex flex-col gap-5">
+    <Container variant="narrow" className="flex flex-col gap-5 py-6">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">매출 / 매입 집계</h1>
@@ -184,6 +185,6 @@ export default async function AdminDashboardPage({
           </CardContent>
         </Card>
       </section>
-    </div>
+    </Container>
   );
 }

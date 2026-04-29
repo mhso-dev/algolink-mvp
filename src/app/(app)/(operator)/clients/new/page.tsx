@@ -5,6 +5,7 @@ import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
 import { ClientForm } from "../_components/client-form";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export default async function NewClientPage() {
   await requireUser();
 
   return (
-    <div className="mx-auto max-w-[1000px] px-6 py-6 flex flex-col gap-6">
+    <Container variant="narrow" className="flex flex-col gap-6 py-6">
       <header className="flex items-center gap-3">
         <Button asChild variant="ghost" size="icon">
           <Link href="/clients" aria-label="고객사 목록으로 돌아가기">
@@ -28,6 +29,6 @@ export default async function NewClientPage() {
       </header>
 
       <ClientForm mode="create" />
-    </div>
+    </Container>
   );
 }

@@ -23,6 +23,7 @@ import {
   buildPageMeta,
 } from "@/lib/clients/list-query";
 import { listClients } from "@/lib/clients/queries";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-5">
+    <Container variant="narrow" className="flex flex-col gap-5 py-6">
       <header className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -155,7 +156,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
           ) : null}
         </div>
       ) : null}
-    </div>
+    </Container>
   );
 }
 

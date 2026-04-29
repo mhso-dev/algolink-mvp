@@ -11,6 +11,7 @@ import {
   startOfMonthKst,
   startOfNextMonthKst,
 } from "@/lib/dashboard/calendar-events";
+import { Container } from "@/components/app/container";
 
 export const revalidate = 30;
 
@@ -30,7 +31,7 @@ export default async function CalendarPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-[1200px] flex-col gap-4 px-6 py-6">
+    <Container variant="narrow" className="flex flex-col gap-4 py-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">강사 일정</h1>
         <Button asChild variant="outline" size="sm">
@@ -51,6 +52,6 @@ export default async function CalendarPage() {
         initialMonthIndex0={monthIndex0}
         events={events}
       />
-    </div>
+    </Container>
   );
 }

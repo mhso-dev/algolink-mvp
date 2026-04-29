@@ -11,6 +11,7 @@ import {
 import { summarizeSettlements } from "@/lib/instructor/settlement-summary";
 import { SettlementList } from "@/components/instructor/settlement-list";
 import { SettlementSummaryWidget } from "@/components/instructor/settlement-summary-widget";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export default async function MySettlementsPage() {
   const monthly = groupByMonth(records);
 
   return (
-    <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-5">
+    <Container variant="narrow" className="flex flex-col gap-5 py-6">
       <header>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <Receipt className="h-6 w-6 text-[var(--color-primary)]" />
@@ -58,6 +59,6 @@ export default async function MySettlementsPage() {
       ) : (
         <SettlementList groups={monthly} />
       )}
-    </div>
+    </Container>
   );
 }

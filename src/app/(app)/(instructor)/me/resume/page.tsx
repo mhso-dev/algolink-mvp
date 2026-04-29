@@ -7,6 +7,7 @@ import { ensureInstructorRow, getMyBasicInfo, getMyResumeSections } from "@/lib/
 import { getAllSkillCategories, getMySkills } from "@/lib/instructor/skill-queries";
 import { MeResumeForm } from "@/components/instructor/me-resume-form";
 import { MeSkillsPickerSection } from "@/components/instructor/me-skills-picker-section";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function ResumePage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-6">
+    <Container variant="narrow" className="flex flex-col gap-6 py-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -96,6 +97,6 @@ export default async function ResumePage() {
         categories={skillCategories}
         initialSelectedIds={mySkills.map((s) => s.skillId)}
       />
-    </div>
+    </Container>
   );
 }

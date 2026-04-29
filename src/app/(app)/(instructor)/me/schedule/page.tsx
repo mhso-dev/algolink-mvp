@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { ensureInstructorRow, getMySchedules } from "@/lib/instructor/me-queries";
 import { MeCalendarView, type MeScheduleEvent } from "@/components/instructor/me-calendar-view";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function SchedulePage() {
   }));
 
   return (
-    <div className="mx-auto max-w-[1400px] px-6 py-6 flex flex-col gap-5">
+    <Container variant="default" className="flex flex-col gap-5 py-6">
       <header>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <CalendarDays className="h-6 w-6 text-[var(--color-primary)]" />
@@ -43,6 +44,6 @@ export default async function SchedulePage() {
       </header>
 
       <MeCalendarView initialEvents={events} />
-    </div>
+    </Container>
   );
 }

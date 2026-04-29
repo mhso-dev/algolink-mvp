@@ -13,6 +13,7 @@ import { InstructorListFilters } from "@/components/instructor/instructor-list-f
 import { InstructorListTable } from "@/components/instructor/instructor-list-table";
 import { InstructorPagination } from "@/components/instructor/pagination";
 import type { InstructorListSort } from "@/lib/instructor/types";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -45,11 +46,11 @@ export default async function InstructorsPage({
 
   if (!parsed.success) {
     return (
-      <div className="mx-auto max-w-[1440px] px-6 py-6">
+      <Container variant="default" className="py-6">
         <p className="text-sm text-[var(--color-state-alert)]" role="alert">
           {parsed.error.issues[0]?.message ?? "잘못된 필터입니다."}
         </p>
-      </div>
+      </Container>
     );
   }
 
@@ -78,7 +79,7 @@ export default async function InstructorsPage({
   baseSearch.set("dir", dir);
 
   return (
-    <div className="mx-auto max-w-[1440px] px-6 py-6 flex flex-col gap-5">
+    <Container variant="default" className="flex flex-col gap-5 py-6">
       <header className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -118,6 +119,6 @@ export default async function InstructorsPage({
         total={total}
         baseSearch={baseSearch}
       />
-    </div>
+    </Container>
   );
 }

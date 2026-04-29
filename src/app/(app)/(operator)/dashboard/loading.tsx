@@ -1,8 +1,9 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { Container } from "@/components/app/container";
 
 export default function DashboardLoading() {
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-6 py-6">
+    <Container variant="default" className="flex flex-col gap-6 py-6">
       <Skeleton className="h-9 w-64" />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
@@ -19,6 +20,6 @@ export default function DashboardLoading() {
           <Skeleton key={i} className="h-64" />
         ))}
       </div>
-    </div>
+    </Container>
   );
 }

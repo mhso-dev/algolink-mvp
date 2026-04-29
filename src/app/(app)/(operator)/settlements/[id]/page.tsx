@@ -24,6 +24,7 @@ import {
   type SettlementStatus,
 } from "@/lib/payouts";
 import { SettlementActionsPanel } from "./actions-panel";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +78,7 @@ export default async function SettlementDetailPage({ params }: PageProps) {
   const status = settlement.status;
 
   return (
-    <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-5">
+    <Container variant="narrow" className="flex flex-col gap-5 py-6">
       <div>
         <Button variant="ghost" size="sm" asChild>
           <Link href="/settlements">
@@ -268,6 +269,6 @@ export default async function SettlementDetailPage({ params }: PageProps) {
           )}
         </CardContent>
       </Card>
-    </div>
+    </Container>
   );
 }

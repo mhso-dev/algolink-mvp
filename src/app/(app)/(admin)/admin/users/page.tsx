@@ -15,6 +15,7 @@ import {
 import { requireRole } from "@/auth/guards";
 import { listUsers } from "@/lib/admin/users/queries";
 import { parseAdminUserListQuery } from "@/lib/admin/users/list-query";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function AdminUsersPage({
   const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-6 flex flex-col gap-5">
+    <Container variant="narrow" className="flex flex-col gap-5 py-6">
       <header>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <Settings className="h-6 w-6 text-[var(--color-primary)]" />
@@ -137,6 +138,6 @@ export default async function AdminUsersPage({
           {query.page} / {totalPages} 페이지
         </span>
       </footer>
-    </div>
+    </Container>
   );
 }

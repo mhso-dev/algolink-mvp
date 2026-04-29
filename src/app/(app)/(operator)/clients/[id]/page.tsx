@@ -11,6 +11,7 @@ import { requireUser } from "@/lib/auth";
 import { getClient } from "@/lib/clients/queries";
 import { getBusinessLicenseSignedUrl } from "@/lib/clients/file-upload";
 import { DeleteClientButton } from "../_components/delete-client-button";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-[1000px] px-6 py-6 flex flex-col gap-6">
+    <Container variant="narrow" className="flex flex-col gap-6 py-6">
       <header className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="icon">
@@ -141,7 +142,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
           </ul>
         )}
       </Card>
-    </div>
+    </Container>
   );
 }
 

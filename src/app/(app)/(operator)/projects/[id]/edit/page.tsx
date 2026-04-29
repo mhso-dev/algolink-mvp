@@ -13,6 +13,7 @@ import { getCurrentUser } from "@/auth/server";
 import { STATUS_LABELS, type ProjectStatus } from "@/lib/projects";
 import { ProjectEditForm } from "@/components/projects/project-edit-form";
 import { getAllSkillCategories } from "@/lib/instructor/skill-queries";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +91,7 @@ export default async function EditProjectPage({ params }: PageProps) {
   };
 
   return (
-    <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-4">
+    <Container variant="narrow" className="flex flex-col gap-4 py-6">
       <header className="flex items-center gap-3">
         <Button asChild variant="ghost" size="icon">
           <Link href={`/projects/${id}`} aria-label="상세로 돌아가기">
@@ -120,6 +121,6 @@ export default async function EditProjectPage({ params }: PageProps) {
         skills={skillCategories}
         locked={lockedDueToTaskDone}
       />
-    </div>
+    </Container>
   );
 }

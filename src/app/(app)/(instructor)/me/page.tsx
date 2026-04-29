@@ -14,6 +14,7 @@ import {
   summarizeSettlements,
   type SettlementInput,
 } from "@/lib/instructor/settlement-summary";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +67,7 @@ export default async function InstructorDashboardPage() {
     );
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-6 flex flex-col gap-6">
+    <Container variant="narrow" className="flex flex-col gap-6 py-6">
       <header>
         <h1 className="text-2xl font-bold tracking-tight">
           안녕하세요, <span className="text-[var(--color-primary)]">{session.displayName}</span>님
@@ -215,6 +216,6 @@ export default async function InstructorDashboardPage() {
           </Button>
         </CardContent>
       </Card>
-    </div>
+    </Container>
   );
 }

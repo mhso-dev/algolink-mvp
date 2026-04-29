@@ -18,6 +18,7 @@ import {
   isDashboardColumnLabel,
   type DashboardColumnLabel,
 } from "@/lib/dashboard/types";
+import { Container } from "@/components/app/container";
 
 export const revalidate = 30;
 
@@ -60,7 +61,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     previewResult.status === "rejected";
 
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-6 py-6">
+    <Container variant="default" className="flex flex-col gap-6 py-6">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
@@ -101,6 +102,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         </section>
         <NotificationPreview preview={preview} />
       </div>
-    </div>
+    </Container>
   );
 }

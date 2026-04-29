@@ -27,6 +27,7 @@ import {
   type RecommendationHistoryEntry,
   type StatusHistoryEntry,
 } from "@/components/projects/assignment-history-list";
+import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
 
@@ -242,7 +243,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     : [];
 
   return (
-    <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-6">
+    <Container variant="narrow" className="flex flex-col gap-6 py-6">
       <header className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="icon">
@@ -365,7 +366,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
         recommendations={recommendationHistory}
         statusHistory={statusHistory}
       />
-    </div>
+    </Container>
   );
 }
 
