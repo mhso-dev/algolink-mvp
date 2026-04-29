@@ -1,6 +1,11 @@
 "use server";
 
-// SPEC-CONFIRM-001 §M3 — `respondToAssignment` Server Action.
+// @MX:WARN: SPEC-CONFIRM-001 §M3 — `respondToAssignment` 5-step 보상 트랜잭션.
+// @MX:REASON: accepted → declined/conditional 다운그레이드 시 (1) instructor_responses UPDATE
+//   (2) projects.status 역방향 전환 (3) schedule_items 하드 DELETE (4) notifications INSERT
+//   (5) console.warn 감사 로그 — 중간 실패 시 부분 commit 위험. Supabase JS 단일 트랜잭션 미지원.
+// @MX:SPEC: SPEC-CONFIRM-001
+//
 // REQ-CONFIRM-EFFECTS-001/003/008 — first-response + downgrade 보상 트랜잭션.
 // HIGH-2 통합: AMEND-001 ALLOWED_TRANSITIONS 확장 적용 → bypass 함수 미사용 정식 validateTransition.
 // HIGH-3 통합: notifications partial UNIQUE → ON CONFLICT DO NOTHING으로 정확히-1 INSERT.

@@ -79,6 +79,15 @@
 - [F-104] 정산 조회 — **✅ 완료** (SPEC-ME-001 M5/M7 완료, 2026-04-28)
   - 인건비(3.3%/8.8%) / 세금계산서 처리 선택 ✅ (월별 그룹 + 분기 UI)
   - 본인 지급 정보 등록(통장사본 첨부) ✅ (pgcrypto RPC 암호화, payout-queries.ts)
+- [F-X] 강사 응답 시스템 — **✅ 완료** (SPEC-CONFIRM-001 M1~M4 완료, 2026-04-29)
+  - `instructor_responses` 통합 응답 모델 (`CHECK XOR` + partial UNIQUE idempotency) ✅
+  - `/me/assignments` 정식 배정 요청 inbox + 응답 패널 (3-state + 1시간 카운트다운 타이머) ✅
+  - `/me/inquiries` 사전 가용성 문의 inbox (SPEC-PROPOSAL-001 연동) ✅
+  - 수락 부수효과: `validateTransition` + `projects.instructor_id` UPDATE + `schedule_items` INSERT 단일 트랜잭션 ✅
+  - 1시간 변경 윈도 + accepted → declined 보상 트랜잭션 (`projects.status` reset + `schedule_items` DELETE) ✅
+  - 알림 idempotency: `notifications` partial UNIQUE (`idx_notifications_idempotency`) → 정확히-1행 보장 ✅
+  - SPEC-PROJECT-AMEND-001 통합: `ALLOWED_TRANSITIONS.assignment_confirmed` backward edge `assignment_review` 추가 ✅
+  - 5종 신규 `notification_type` enum 값 추가 ✅
 
 #### 담당자 영역
 - [F-201] 메인 대시보드 (의뢰/배정확정/교육중 필터 + 강사 일정 월력) — **✅ 완료** (SPEC-DASHBOARD-001 M1~M6)
@@ -205,5 +214,5 @@
 
 ---
 
-Version: 1.2.0
-Last Updated: 2026-04-28
+Version: 1.3.0
+Last Updated: 2026-04-29

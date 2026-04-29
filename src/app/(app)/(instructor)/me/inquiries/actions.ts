@@ -1,7 +1,9 @@
 "use server";
 
-// SPEC-CONFIRM-001 §M3 — `respondToInquiry` Server Action.
+// @MX:NOTE: SPEC-CONFIRM-001 §M3 — `respondToInquiry` — 사전 가용성 문의 응답.
+// @MX:SPEC: SPEC-CONFIRM-001
 // REQ-CONFIRM-EFFECTS-002 — 사전 가용성 문의 수락 흐름 (schedule 미생성).
+// proposal_inquiries.status 역방향 전환(accepted → pending) 포함.
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
