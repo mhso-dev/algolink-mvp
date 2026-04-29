@@ -130,7 +130,7 @@ export default async function SettlementsListPage({ searchParams }: PageProps) {
             />
             <Stat label="정산 건수" value={`${aggregate.count}건`} />
           </div>
-          <p className="mt-3 text-xs text-[var(--color-text-muted)]">
+          <p className="mt-3 text-sm md:text-xs text-[var(--color-text-muted)]">
             보류 상태와 삭제된 정산은 합계에서 제외됩니다.
           </p>
         </CardContent>
@@ -191,7 +191,7 @@ export default async function SettlementsListPage({ searchParams }: PageProps) {
                                 {SETTLEMENT_STATUS_LABEL[s.status]}
                               </Badge>
                             </div>
-                            <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                            <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm md:text-xs">
                               <dt className="text-[var(--color-text-muted)]">강사비</dt>
                               <dd className="text-right font-tabular">
                                 {formatKRW(s.instructor_fee_krw)}

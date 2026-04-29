@@ -276,6 +276,7 @@ export function ClientForm({ mode, clientId, defaultValues }: ClientFormProps) {
                   onClick={() => moveContact(idx, -1)}
                   disabled={idx === 0}
                   aria-label="위로 이동"
+                  className="min-h-touch min-w-touch"
                 >
                   <ArrowUp className="h-4 w-4" />
                 </Button>
@@ -286,6 +287,7 @@ export function ClientForm({ mode, clientId, defaultValues }: ClientFormProps) {
                   onClick={() => moveContact(idx, 1)}
                   disabled={idx === contacts.length - 1}
                   aria-label="아래로 이동"
+                  className="min-h-touch min-w-touch"
                 >
                   <ArrowDown className="h-4 w-4" />
                 </Button>
@@ -296,6 +298,7 @@ export function ClientForm({ mode, clientId, defaultValues }: ClientFormProps) {
                   onClick={() => removeContact(idx)}
                   disabled={contacts.length <= 1}
                   aria-label="담당자 삭제"
+                  className="min-h-touch min-w-touch"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

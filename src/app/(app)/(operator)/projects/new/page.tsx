@@ -35,7 +35,7 @@ export default async function NewProjectPage() {
     <Container variant="narrow" className="flex flex-col gap-6 py-6">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" size="icon">
+          <Button asChild variant="ghost" size="icon" className="min-h-touch min-w-touch">
             <Link href="/projects" aria-label="프로젝트 목록으로 돌아가기">
               <ChevronLeft />
             </Link>

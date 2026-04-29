@@ -16,7 +16,7 @@ export default async function NewInstructorPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-6 flex flex-col gap-6">
       <header className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="icon">
+        <Button asChild variant="ghost" size="icon" className="min-h-touch min-w-touch">
           <Link href="/instructors" aria-label="강사 목록으로">
             <ChevronLeft />
           </Link>

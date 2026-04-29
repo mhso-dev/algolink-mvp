@@ -93,26 +93,26 @@ export function ResumeForm() {
         <Section id="basic" title="기본사항">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field label="이름 (한글)" required>
-              <Input name="nameKr" />
+              <Input name="nameKr" className="min-h-touch" autoComplete="name" />
             </Field>
             <Field label="한자">
-              <Input name="nameHanja" />
+              <Input name="nameHanja" className="min-h-touch" />
             </Field>
             <Field label="영문">
-              <Input name="nameEn" />
+              <Input name="nameEn" className="min-h-touch" autoComplete="name" />
             </Field>
             <Field label="생년월일">
-              <Input type="date" name="birthDate" />
+              <Input type="date" name="birthDate" className="min-h-touch" autoComplete="bday" />
             </Field>
             <Field label="이메일" required>
-              <Input type="email" name="email" />
+              <Input type="email" name="email" className="min-h-touch" autoComplete="email" inputMode="email" />
             </Field>
             <Field label="전화번호">
-              <Input type="tel" name="phone" placeholder="010-0000-0000" />
+              <Input type="tel" name="phone" className="min-h-touch" autoComplete="tel" inputMode="tel" placeholder="010-0000-0000" />
             </Field>
           </div>
           <Field label="주소" hint="다운로드 시 마스킹 옵션을 켜면 제외됩니다.">
-            <Input name="address" />
+            <Input name="address" className="min-h-touch" autoComplete="street-address" />
           </Field>
         </Section>
 
@@ -223,14 +223,14 @@ export function ResumeForm() {
                 <Eye className="h-3.5 w-3.5 text-[var(--color-state-pending)]" />
               )}
             </label>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" className="min-h-touch">
                 <Download /> PDF
               </Button>
-              <Button type="button" variant="outline" disabled>
+              <Button type="button" variant="outline" disabled className="min-h-touch">
                 <Download /> Word (준비 중)
               </Button>
-              <Button type="button" variant="outline" disabled>
+              <Button type="button" variant="outline" disabled className="min-h-touch">
                 <Download /> 한글 (준비 중)
               </Button>
             </div>

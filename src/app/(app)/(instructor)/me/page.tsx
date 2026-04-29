@@ -93,7 +93,7 @@ export default async function InstructorDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* 다가오는 일정 */}
         <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 space-y-0">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <CalendarDays className="h-4 w-4" /> 다가오는 일정
@@ -119,7 +119,7 @@ export default async function InstructorDashboardPage() {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm line-clamp-1">{p.title}</p>
-                    <p className="text-xs text-[var(--color-text-muted)] font-tabular mt-0.5">
+                    <p className="text-sm md:text-xs text-[var(--color-text-muted)] font-tabular mt-0.5">
                       {p.education_start_at
                         ? format(new Date(p.education_start_at), "yyyy.MM.dd HH:mm", { locale: ko })
                         : "일정 미정"}
@@ -133,7 +133,7 @@ export default async function InstructorDashboardPage() {
 
         {/* 정산 요약 */}
         <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 space-y-0">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Receipt className="h-4 w-4" /> 정산 요약
@@ -186,7 +186,7 @@ export default async function InstructorDashboardPage() {
               <FileText className="h-5 w-5 text-[var(--color-primary)]" />
               <div className="text-left">
                 <p className="text-sm font-medium">이력서 관리</p>
-                <p className="text-xs text-[var(--color-text-muted)] font-normal">
+                <p className="text-sm md:text-xs text-[var(--color-text-muted)] font-normal">
                   PDF 업로드로 자동 채우기
                 </p>
               </div>
@@ -197,7 +197,7 @@ export default async function InstructorDashboardPage() {
               <CalendarDays className="h-5 w-5 text-[var(--color-primary)]" />
               <div className="text-left">
                 <p className="text-sm font-medium">일정 관리</p>
-                <p className="text-xs text-[var(--color-text-muted)] font-normal">
+                <p className="text-sm md:text-xs text-[var(--color-text-muted)] font-normal">
                   강의·개인 일정 통합
                 </p>
               </div>
@@ -208,7 +208,7 @@ export default async function InstructorDashboardPage() {
               <Receipt className="h-5 w-5 text-[var(--color-primary)]" />
               <div className="text-left">
                 <p className="text-sm font-medium">정산 조회</p>
-                <p className="text-xs text-[var(--color-text-muted)] font-normal">
+                <p className="text-sm md:text-xs text-[var(--color-text-muted)] font-normal">
                   지급 내역·세금 처리
                 </p>
               </div>

@@ -93,7 +93,7 @@ export default async function EditProjectPage({ params }: PageProps) {
   return (
     <Container variant="narrow" className="flex flex-col gap-4 py-6">
       <header className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="icon">
+        <Button asChild variant="ghost" size="icon" className="min-h-touch min-w-touch">
           <Link href={`/projects/${id}`} aria-label="상세로 돌아가기">
             <ChevronLeft />
           </Link>

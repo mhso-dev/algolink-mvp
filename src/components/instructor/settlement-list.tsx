@@ -62,9 +62,9 @@ export function SettlementList({ groups }: SettlementListProps) {
     <div className="space-y-4">
       {groups.map((g) => (
         <Card key={g.monthKey ?? "no-period"} className="overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
             <CardTitle>{g.label}</CardTitle>
-            <div className="text-xs text-[var(--color-text-muted)] flex flex-wrap gap-x-3">
+            <div className="text-sm md:text-xs text-[var(--color-text-muted)] flex flex-wrap gap-x-3">
               <span>총 {g.summary.count}건</span>
               <span>강사료 {formatKRW(Number(g.summary.totalFeeKrw))}</span>
               <span>실수령 {formatKRW(Number(g.summary.totalNetKrw))}</span>

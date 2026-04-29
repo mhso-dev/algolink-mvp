@@ -109,29 +109,29 @@ function BasicInfoSection({ initial }: { initial: BasicInfo }) {
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField label="이름(한글)" required error={errors.nameKr}>
-            <Input value={data.nameKr} onChange={(e) => setData({ ...data, nameKr: e.target.value })} />
+            <Input className="min-h-touch" autoComplete="name" value={data.nameKr} onChange={(e) => setData({ ...data, nameKr: e.target.value })} />
           </FormField>
           <FormField label="한자" error={errors.nameHanja}>
-            <Input value={data.nameHanja} onChange={(e) => setData({ ...data, nameHanja: e.target.value })} />
+            <Input className="min-h-touch" value={data.nameHanja} onChange={(e) => setData({ ...data, nameHanja: e.target.value })} />
           </FormField>
           <FormField label="영문" error={errors.nameEn}>
-            <Input value={data.nameEn} onChange={(e) => setData({ ...data, nameEn: e.target.value })} />
+            <Input className="min-h-touch" autoComplete="name" value={data.nameEn} onChange={(e) => setData({ ...data, nameEn: e.target.value })} />
           </FormField>
           <FormField label="생년월일" error={errors.birthDate}>
-            <Input type="date" value={data.birthDate} onChange={(e) => setData({ ...data, birthDate: e.target.value })} />
+            <Input type="date" className="min-h-touch" autoComplete="bday" value={data.birthDate} onChange={(e) => setData({ ...data, birthDate: e.target.value })} />
           </FormField>
           <FormField label="이메일" error={errors.email}>
-            <Input type="email" value={data.email} onChange={(e) => setData({ ...data, email: e.target.value })} />
+            <Input type="email" className="min-h-touch" autoComplete="email" inputMode="email" value={data.email} onChange={(e) => setData({ ...data, email: e.target.value })} />
           </FormField>
           <FormField label="전화번호" error={errors.phone}>
-            <Input type="tel" value={data.phone} onChange={(e) => setData({ ...data, phone: e.target.value })} placeholder="010-0000-0000" />
+            <Input type="tel" className="min-h-touch" autoComplete="tel" inputMode="tel" value={data.phone} onChange={(e) => setData({ ...data, phone: e.target.value })} placeholder="010-0000-0000" />
           </FormField>
         </div>
         <FormField label="주소" hint="다운로드 시 마스킹 옵션을 켜면 시/구까지만 노출됩니다." error={errors.address}>
-          <Input value={data.address} onChange={(e) => setData({ ...data, address: e.target.value })} />
+          <Input className="min-h-touch" autoComplete="street-address" value={data.address} onChange={(e) => setData({ ...data, address: e.target.value })} />
         </FormField>
         <div>
-          <Button type="button" onClick={handleSave} disabled={pending}>
+          <Button type="button" onClick={handleSave} disabled={pending} className="w-full sm:w-auto min-h-touch">
             <Save /> {pending ? "저장 중..." : "기본정보 저장"}
           </Button>
         </div>
@@ -160,8 +160,8 @@ function FormField({
     <div className="flex flex-col gap-1.5">
       <Label required={required}>{label}</Label>
       {children}
-      {hint && <p className="text-xs text-[var(--color-text-subtle)]">{hint}</p>}
-      {error && <p id={errId} role="alert" className="text-xs text-[var(--color-state-alert)]">{error}</p>}
+      {hint && <p className="text-sm md:text-xs text-[var(--color-text-subtle)]">{hint}</p>}
+      {error && <p id={errId} role="alert" className="text-sm md:text-xs text-[var(--color-state-alert)]">{error}</p>}
     </div>
   );
 }
@@ -201,9 +201,9 @@ function SectionShell({
 
   return (
     <Card id={`section-${id}`}>
-      <CardHeader className="flex-row items-center justify-between">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
         <CardTitle>{title}</CardTitle>
-        <Button type="button" variant="outline" size="sm" onClick={() => setAdding(true)}>
+        <Button type="button" variant="outline" size="sm" onClick={() => setAdding(true)} className="w-full sm:w-auto min-h-touch">
           <Plus /> 추가
         </Button>
       </CardHeader>
@@ -274,7 +274,7 @@ function EducationSection({ rows }: { rows: Row[] }) {
           <span className="font-medium">{String(r.school ?? "")}</span>
           {r.major ? <span className="text-[var(--color-text-muted)]"> · {String(r.major)}</span> : null}
           {r.degree ? <span className="text-[var(--color-text-subtle)]"> ({String(r.degree)})</span> : null}
-          <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
+          <p className="text-sm md:text-xs text-[var(--color-text-subtle)] mt-0.5">
             {String(r.start_date ?? "")} ~ {String(r.end_date ?? "재학중")}
           </p>
         </div>
@@ -320,7 +320,7 @@ function EducationDialog({ mode, row, onClose }: { mode: "add" | "edit"; row?: R
         <FormField label="학교명" required error={errors.school}>
           <Input value={form.school} onChange={(e) => setForm({ ...form, school: e.target.value })} required />
         </FormField>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField label="전공" error={errors.major}>
             <Input value={form.major} onChange={(e) => setForm({ ...form, major: e.target.value })} />
           </FormField>
@@ -355,7 +355,7 @@ function WorkExperienceSection({ rows }: { rows: Row[] }) {
         <div className="text-sm">
           <span className="font-medium">{String(r.company ?? "")}</span>
           {r.position ? <span className="text-[var(--color-text-muted)]"> · {String(r.position)}</span> : null}
-          <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
+          <p className="text-sm md:text-xs text-[var(--color-text-subtle)] mt-0.5">
             {String(r.start_date ?? "")} ~ {String(r.end_date ?? "재직중")}
           </p>
         </div>
@@ -400,7 +400,7 @@ function WorkDialog({ mode, row, onClose }: { mode: "add" | "edit"; row?: Row; o
         <FormField label="회사명" required error={errors.company}>
           <Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} required />
         </FormField>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField label="직위" error={errors.position}>
             <Input value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} />
           </FormField>
@@ -433,7 +433,7 @@ function TeachingExperienceSection({ rows }: { rows: Row[] }) {
         <div className="text-sm">
           <span className="font-medium">{String(r.title ?? "")}</span>
           {r.organization ? <span className="text-[var(--color-text-muted)]"> · {String(r.organization)}</span> : null}
-          <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
+          <p className="text-sm md:text-xs text-[var(--color-text-subtle)] mt-0.5">
             {String(r.start_date ?? "")} ~ {String(r.end_date ?? "")}
           </p>
         </div>
@@ -481,7 +481,7 @@ function TeachingDialog({ mode, row, onClose }: { mode: "add" | "edit"; row?: Ro
         <FormField label="발주처/기관" error={errors.organization}>
           <Input value={form.organization} onChange={(e) => setForm({ ...form, organization: e.target.value })} />
         </FormField>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField label="시작" error={errors.startDate}>
             <Input type="month" value={form.startDate.slice(0, 7)} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
           </FormField>
@@ -510,7 +510,7 @@ function CertificationSection({ rows }: { rows: Row[] }) {
         <div className="text-sm">
           <span className="font-medium">{String(r.name ?? "")}</span>
           {r.issuer ? <span className="text-[var(--color-text-muted)]"> · {String(r.issuer)}</span> : null}
-          <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">{String(r.issued_date ?? "")}</p>
+          <p className="text-sm md:text-xs text-[var(--color-text-subtle)] mt-0.5">{String(r.issued_date ?? "")}</p>
         </div>
       )}
       AddDialog={({ onClose }) => <CertDialog mode="add" onClose={onClose} />}
@@ -556,7 +556,7 @@ function CertDialog({ mode, row, onClose }: { mode: "add" | "edit"; row?: Row; o
         <FormField label="발급기관" error={errors.issuer}>
           <Input value={form.issuer} onChange={(e) => setForm({ ...form, issuer: e.target.value })} />
         </FormField>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField label="취득일" error={errors.issuedDate}>
             <Input type="date" value={form.issuedDate} onChange={(e) => setForm({ ...form, issuedDate: e.target.value })} />
           </FormField>
@@ -585,7 +585,7 @@ function PublicationSection({ rows }: { rows: Row[] }) {
         <div className="text-sm">
           <span className="font-medium">{String(r.title ?? "")}</span>
           {r.publisher ? <span className="text-[var(--color-text-muted)]"> · {String(r.publisher)}</span> : null}
-          <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">{String(r.published_date ?? "")}</p>
+          <p className="text-sm md:text-xs text-[var(--color-text-subtle)] mt-0.5">{String(r.published_date ?? "")}</p>
         </div>
       )}
       AddDialog={({ onClose }) => <PubDialog mode="add" onClose={onClose} />}
@@ -631,7 +631,7 @@ function PubDialog({ mode, row, onClose }: { mode: "add" | "edit"; row?: Row; on
         <FormField label="출판사" error={errors.publisher}>
           <Input value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} />
         </FormField>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField label="발행일" error={errors.publishedDate}>
             <Input type="date" value={form.publishedDate} onChange={(e) => setForm({ ...form, publishedDate: e.target.value })} />
           </FormField>
@@ -660,7 +660,7 @@ function InstructorProjectSection({ rows }: { rows: Row[] }) {
         <div className="text-sm">
           <span className="font-medium">{String(r.title ?? "")}</span>
           {r.role ? <span className="text-[var(--color-text-muted)]"> · {String(r.role)}</span> : null}
-          <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
+          <p className="text-sm md:text-xs text-[var(--color-text-subtle)] mt-0.5">
             {String(r.start_date ?? "")} ~ {String(r.end_date ?? "")}
           </p>
         </div>
@@ -708,7 +708,7 @@ function ProjDialog({ mode, row, onClose }: { mode: "add" | "edit"; row?: Row; o
         <FormField label="역할" error={errors.role}>
           <Input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} />
         </FormField>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField label="시작" error={errors.startDate}>
             <Input type="month" value={form.startDate.slice(0, 7)} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
           </FormField>
@@ -737,7 +737,7 @@ function OtherActivitySection({ rows }: { rows: Row[] }) {
         <div className="text-sm">
           <span className="font-medium">{String(r.title ?? "")}</span>
           {r.category ? <span className="text-[var(--color-text-muted)]"> · {String(r.category)}</span> : null}
-          <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">{String(r.activity_date ?? "")}</p>
+          <p className="text-sm md:text-xs text-[var(--color-text-subtle)] mt-0.5">{String(r.activity_date ?? "")}</p>
         </div>
       )}
       AddDialog={({ onClose }) => <OtherDialog mode="add" onClose={onClose} />}
@@ -798,11 +798,11 @@ function OtherDialog({ mode, row, onClose }: { mode: "add" | "edit"; row?: Row; 
 
 function DialogActions({ onClose, pending }: { onClose: () => void; pending: boolean }) {
   return (
-    <div className="flex justify-end gap-2 pt-2">
-      <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
+    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+      <Button type="button" variant="outline" onClick={onClose} disabled={pending} className="w-full sm:w-auto min-h-touch">
         취소
       </Button>
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" disabled={pending} className="w-full sm:w-auto min-h-touch">
         <Save /> {pending ? "저장 중..." : "저장"}
       </Button>
     </div>

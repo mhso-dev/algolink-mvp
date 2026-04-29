@@ -67,6 +67,7 @@ export function OperatorCalendar({
             variant="outline"
             onClick={() => setMonth(shiftMonth(year, monthIndex0, -1))}
             aria-label="이전 달"
+            className="min-h-touch min-w-touch"
           >
             <ChevronLeft />
           </Button>
@@ -87,6 +88,7 @@ export function OperatorCalendar({
             variant="outline"
             onClick={() => setMonth(shiftMonth(year, monthIndex0, 1))}
             aria-label="다음 달"
+            className="min-h-touch min-w-touch"
           >
             <ChevronRight />
           </Button>

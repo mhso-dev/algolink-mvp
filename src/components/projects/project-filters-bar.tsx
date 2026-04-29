@@ -202,7 +202,7 @@ export function ProjectFiltersBar({ query, clients, operators }: Props) {
           value={query.operatorId ?? "__ALL__"}
           onValueChange={(v) => setSelect("operatorId", v)}
         >
-          <SelectTrigger className="min-w-[140px]">
+          <SelectTrigger className="flex-1 sm:min-w-[140px] sm:flex-none">
             <SelectValue placeholder="담당자" />
           </SelectTrigger>
           <SelectContent>
@@ -219,7 +219,7 @@ export function ProjectFiltersBar({ query, clients, operators }: Props) {
           value={query.clientId ?? "__ALL__"}
           onValueChange={(v) => setSelect("clientId", v)}
         >
-          <SelectTrigger className="min-w-[140px]">
+          <SelectTrigger className="flex-1 sm:min-w-[140px] sm:flex-none">
             <SelectValue placeholder="고객사" />
           </SelectTrigger>
           <SelectContent>
@@ -257,7 +257,7 @@ export function ProjectFiltersBar({ query, clients, operators }: Props) {
         </div>
 
         <Select value={query.sort} onValueChange={(v) => setSort(v as ProjectSortKey)}>
-          <SelectTrigger className="min-w-[120px]">
+          <SelectTrigger className="flex-1 sm:min-w-[120px] sm:flex-none">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

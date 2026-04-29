@@ -39,7 +39,7 @@ export function NotificationDropdown({
               : "알림"
           }
           aria-expanded={open}
-          className="relative"
+          className="relative min-h-touch min-w-touch"
         >
           <Bell className="h-4 w-4" />
           {display && (

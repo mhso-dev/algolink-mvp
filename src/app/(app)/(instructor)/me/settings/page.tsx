@@ -23,7 +23,7 @@ export default async function InstructorSettingsPage() {
 
       <Link href="/me/settings/payout" className="block">
         <Card className="hover:border-[var(--color-primary)] transition-colors">
-          <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 space-y-0">
             <div className="flex items-center gap-3">
               <CreditCard className="h-5 w-5 text-[var(--color-primary)]" />
               <div>

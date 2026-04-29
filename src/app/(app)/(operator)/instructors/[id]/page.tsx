@@ -49,7 +49,7 @@ export default async function InstructorDetailPage({
   return (
     <div className="mx-auto max-w-3xl px-6 py-6 flex flex-col gap-6">
       <header className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="icon">
+        <Button asChild variant="ghost" size="icon" className="min-h-touch min-w-touch">
           <Link href="/instructors" aria-label="강사 목록으로">
             <ChevronLeft />
           </Link>
@@ -61,7 +61,7 @@ export default async function InstructorDetailPage({
           <div className="flex-1">
             <h1 className="text-xl font-bold">{detail.nameKr}</h1>
             {detail.nameEn ? (
-              <p className="text-xs text-[var(--color-text-muted)]">
+              <p className="text-sm md:text-xs text-[var(--color-text-muted)]">
                 {detail.nameEn}
               </p>
             ) : null}
@@ -75,19 +75,19 @@ export default async function InstructorDetailPage({
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <p className="text-xs text-[var(--color-text-muted)]">이메일</p>
+            <p className="text-sm md:text-xs text-[var(--color-text-muted)]">이메일</p>
             <p className="font-tabular">{detail.email ?? "-"}</p>
           </div>
           <div>
-            <p className="text-xs text-[var(--color-text-muted)]">전화번호</p>
+            <p className="text-sm md:text-xs text-[var(--color-text-muted)]">전화번호</p>
             <p className="font-tabular">{formatKoreanPhone(detail.phone)}</p>
           </div>
           <div>
-            <p className="text-xs text-[var(--color-text-muted)]">등록일</p>
+            <p className="text-sm md:text-xs text-[var(--color-text-muted)]">등록일</p>
             <p className="font-tabular">{formatKstDate(detail.createdAt)}</p>
           </div>
           <div>
-            <p className="text-xs text-[var(--color-text-muted)]">계정 연결</p>
+            <p className="text-sm md:text-xs text-[var(--color-text-muted)]">계정 연결</p>
             <p>
               {detail.userId ? (
                 <Badge variant="secondary">연결됨</Badge>
@@ -97,12 +97,12 @@ export default async function InstructorDetailPage({
             </p>
           </div>
           <div className="col-span-2">
-            <p className="text-xs text-[var(--color-text-muted)] mb-1">
+            <p className="text-sm md:text-xs text-[var(--color-text-muted)] mb-1">
               기술스택
             </p>
             <div className="flex flex-wrap gap-1">
               {detail.skills.length === 0 ? (
-                <span className="text-xs text-[var(--color-text-muted)]">
+                <span className="text-sm md:text-xs text-[var(--color-text-muted)]">
                   등록된 기술스택이 없습니다.
                 </span>
               ) : (

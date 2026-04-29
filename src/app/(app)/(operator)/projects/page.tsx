@@ -121,7 +121,7 @@ export default async function ProjectsListPage({ searchParams }: PageProps) {
         {projects.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-sm font-medium mb-2">조건에 맞는 프로젝트가 없습니다</p>
-            <p className="text-xs text-[var(--color-text-muted)] mb-4">
+            <p className="text-sm md:text-xs text-[var(--color-text-muted)] mb-4">
               필터를 변경하거나 새 일정을 추가해 보세요.
             </p>
             <Button asChild>

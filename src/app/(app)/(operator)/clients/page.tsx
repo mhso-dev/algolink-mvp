@@ -131,7 +131,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                       <p className="mt-1 text-sm text-[var(--color-text-muted)] truncate">
                         {c.address ?? "—"}
                       </p>
-                      <div className="mt-2 flex items-center gap-3 text-xs text-[var(--color-text-muted)]">
+                      <div className="mt-2 flex items-center gap-3 text-sm md:text-xs text-[var(--color-text-muted)]">
                         <span>
                           사업자등록증{" "}
                           {c.business_license_file_id ? "첨부" : "미첨부"}

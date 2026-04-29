@@ -39,7 +39,7 @@ function renderAiSummary(text: string) {
 export function SatisfactionSummaryCard({ instructorId, result }: Props) {
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-3">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Sparkles className="h-4 w-4 text-[var(--color-primary)]" />
           AI 만족도 요약
@@ -77,7 +77,7 @@ export function SatisfactionSummaryCard({ instructorId, result }: Props) {
               {result.recentComments.map((c, i) => (
                 <li
                   key={i}
-                  className="text-xs border-l-2 border-[var(--color-border)] pl-3"
+                  className="text-sm md:text-xs border-l-2 border-[var(--color-border)] pl-3"
                 >
                   <Badge variant="secondary" className="mr-1">
                     {c.score}/5
@@ -89,7 +89,7 @@ export function SatisfactionSummaryCard({ instructorId, result }: Props) {
                 </li>
               ))}
               {result.recentComments.length === 0 ? (
-                <li className="text-xs text-[var(--color-text-muted)]">
+                <li className="text-sm md:text-xs text-[var(--color-text-muted)]">
                   최근 코멘트가 없습니다.
                 </li>
               ) : null}

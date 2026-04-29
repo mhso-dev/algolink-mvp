@@ -100,7 +100,7 @@ export function RecommendationPanel(props: Props) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[var(--color-primary)]" />
           강사 추천
@@ -113,7 +113,7 @@ export function RecommendationPanel(props: Props) {
         )}
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-xs text-[var(--color-text-muted)]">{disclaimer}</p>
+        <p className="text-sm md:text-xs text-[var(--color-text-muted)]">{disclaimer}</p>
 
         {loading && (
           <div
