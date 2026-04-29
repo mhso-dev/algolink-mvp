@@ -180,6 +180,8 @@ export interface SessionActionState {
   error?: string;
 }
 
+// @MX:NOTE: SPEC-PAYOUT-002 §M6 — 결강 처리 진입점. planned → canceled + notes 사유 저장.
+// @MX:SPEC: SPEC-PAYOUT-002
 /**
  * 결강 처리 (REQ-PAYOUT002-EXCEPT-001).
  * planned → canceled, notes에 사유 prepend.
@@ -214,6 +216,8 @@ export async function cancelSessionAction(
   return { ok: true };
 }
 
+// @MX:NOTE: SPEC-PAYOUT-002 §M6 — 일정 변경 진입점. 원본 rescheduled + 신규 row INSERT (original_session_id 연결).
+// @MX:SPEC: SPEC-PAYOUT-002
 /**
  * 일정 변경 처리 (REQ-PAYOUT002-EXCEPT-002).
  * 원본 → rescheduled, 새 row INSERT (notes carry-forward LOW-8).
@@ -256,6 +260,10 @@ export async function rescheduleSessionAction(
   return { ok: true };
 }
 
+// @MX:NOTE: SPEC-PAYOUT-002 §M6 — 강사 중도 하차 진입점. 미래 planned 일괄 canceled + project status → instructor_withdrawn.
+// @MX:WARN: 2-step 쓰기 (세션 bulk cancel → project status 전환). 세션 cancel 성공 후 status 업데이트 실패 시 부분 상태 가능.
+// @MX:REASON: Supabase Server Action 단일 트랜잭션 미지원. 실패 시 운영자에게 에러 반환 — 재시도 안전(idempotent).
+// @MX:SPEC: SPEC-PAYOUT-002
 /**
  * 강사 중도 하차 처리 (REQ-PAYOUT002-EXCEPT-003).
  * 미래 planned → canceled 일괄 + project status → instructor_withdrawn.

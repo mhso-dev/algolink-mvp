@@ -46,6 +46,17 @@ algolink/
 │   │   │   ├── payout-queries.ts # instructors PII 컬럼 UPDATE + pii_access_log
 │   │   │   ├── payout-bank-bundle.ts   # 계좌 번호 묶음 직렬화 helper
 │   │   │   └── ...               # (me-queries, resume-mask, settlement-summary 등 기존 모듈)
+│   │   ├── payouts/              # 정산 도메인 ✅ SPEC-PAYOUT-002
+│   │   │   ├── calculator.ts     # 정수 산술 정산 산식 순수 함수 (ANCHOR: 모든 INSERT 경로 source-of-truth)
+│   │   │   ├── generate.ts       # 배치 정산 생성 로직 (UNIQUE INDEX race 방지)
+│   │   │   ├── errors.ts         # PAYOUT_ERRORS 상수
+│   │   │   └── types.ts          # SettlementFlow 등 타입
+│   │   ├── sessions/             # lecture_sessions 도메인 ✅ SPEC-PAYOUT-002
+│   │   │   ├── queries.ts        # cancelSession / rescheduleSession / bulkCancelFutureSessions
+│   │   │   ├── status-machine.ts # 세션 상태 전환 검증 (ANCHOR: completed/canceled/rescheduled freeze)
+│   │   │   ├── validation.ts     # zod 스키마 (rescheduleInputSchema, withdrawInstructorInputSchema)
+│   │   │   ├── errors.ts         # SESSION_ERRORS 상수
+│   │   │   └── types.ts          # LectureSession, LectureSessionStatus 타입
 │   │   ├── projects/             # 프로젝트 CRUD (list-query, list-queries, status-machine, errors) ✅ SPEC-PROJECT-001
 │   │   ├── recommend/            # AI 추천 엔진 ✅ SPEC-PROJECT-001
 │   │   │   ├── engine.ts         # 추천 실행 오케스트레이터
