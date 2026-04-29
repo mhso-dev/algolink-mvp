@@ -13,7 +13,7 @@
 
 ---
 
-## EARS 요구사항 (9 모듈, 49 항목 — v0.2.0 PII + CLEANUP 모듈 추가, COLUMNS 007/008 추가, COLUMNS-003a split)
+## EARS 요구사항 (9 모듈, 48 항목 — v0.2.0 PII + CLEANUP 모듈 추가, COLUMNS 007/008 추가, COLUMNS-003a split)
 
 ### REQ-RECEIPT-FLOW — settlement_flow 확장 + CHECK 제약 (6개)
 

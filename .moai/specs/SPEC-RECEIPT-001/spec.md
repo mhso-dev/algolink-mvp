@@ -233,7 +233,7 @@ GRANT EXECUTE ON FUNCTION app.next_receipt_number() TO authenticated;
 - **라우트** (Server Actions + 페이지):
   - `(app)/(instructor)/me/payouts/[id]/remit/actions.ts` (planned) — `registerInstructorRemittance` Server Action (pending → requested + 컬럼 UPDATE + 첨부 업로드)
   - `(app)/(instructor)/me/payouts/[id]/remit/page.tsx` (planned, optional) — 송금 등록 dedicated form 페이지 (또는 기존 `/me/payouts/[id]` 모달 통합)
-  - `(app)/(operator)/settlements/[id]/confirm-remittance/actions.ts` (planned) — `confirmRemittanceAndIssueReceipt` Server Action (atomic 6-step transaction)
+  - `(app)/(operator)/settlements/[id]/confirm-remittance/actions.ts` (planned) — `confirmRemittanceAndIssueReceipt` Server Action (atomic 8-step transaction + 1 compensating cleanup)
   - `(app)/(operator)/settlements/[id]/page.tsx` (기존 확장) — `client_direct` + status=`requested` 시 RemittanceConfirmationPanel 노출
   - `(app)/(instructor)/me/payouts/[id]/page.tsx` (기존 확장) — `client_direct` + status=`pending` 시 "송금 완료 등록" CTA 노출 + status=`paid` 시 영수증 다운로드 링크 노출
 
@@ -249,7 +249,7 @@ GRANT EXECUTE ON FUNCTION app.next_receipt_number() TO authenticated;
   - `src/lib/payouts/__tests__/client-direct-validation.test.ts` — 송금 금액 mismatch 거부, 영수증 재발급 차단
   - 통합 시나리오 (`__tests__/integration/receipt-flow.test.ts`):
     - 강사 송금 등록 → status pending → requested 전환 + 컬럼 UPDATE
-    - 운영자 수취 확인 → atomic 6-step 트랜잭션 + 영수증 PDF 생성 + Storage 업로드 + 알림 INSERT
+    - 운영자 수취 확인 → atomic 8-step 트랜잭션 + 1 compensating Storage cleanup + 영수증 PDF 생성 + Storage 업로드 + 알림 INSERT
     - 영수증 번호 동시성 (병렬 5건)
     - paid 동결 후 재발급 거부
     - 송금 금액 불일치 거부

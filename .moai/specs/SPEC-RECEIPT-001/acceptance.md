@@ -58,7 +58,7 @@ RC-D는 사전에 receipt_file_id, receipt_number(`RCP-2026-0001`, 4-digit zero-
 ### 환경
 - 브라우저: Chromium 최신, JavaScript 활성
 - 서버: `pnpm dev`
-- DB: 로컬 Supabase (마이그레이션 6건 적용 완료)
+- DB: 로컬 Supabase (마이그레이션 7건 적용 완료)
 - 환경 변수: `NEXT_PUBLIC_APP_URL=http://localhost:3000`, `ORG_*` 변수 (organization_info DB가 우선이므로 fallback 검증용에만 사용)
 - 시간: 시나리오 실행 시각 ≤ 2026-12-31 (영수증 번호 연도 검증을 위해 2026 가정)
 - 폰트: `public/fonts/NotoSansKR-Regular.ttf`, `public/fonts/NotoSansKR-Bold.ttf` 존재 (SPEC-ME-001 M8 산출물)
