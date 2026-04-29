@@ -24,10 +24,15 @@ interface MobileNavProps {
 export function MobileNav({ sections }: MobileNavProps) {
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
-
-  React.useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+  // React 19 공식 권장 패턴 (Adjusting state when a prop changes):
+  // pathname 스냅샷을 state로 보관하고, 변화 시 두 setState를 동시 호출.
+  // useEffect+setState가 cascading render를 만드는 반면 render 중 비교는 1-render에 수렴.
+  // ref 변경(react-hooks/refs)도 회피.
+  const [lastPathname, setLastPathname] = React.useState(pathname);
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
+    if (open) setOpen(false);
+  }
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

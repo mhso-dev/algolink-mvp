@@ -35,7 +35,7 @@ export function Sidebar({ sections, collapsed = false, forceVisible = false }: S
             ? "var(--layout-sidebar-width-collapsed)"
             : "var(--layout-sidebar-width)",
         }}
-        aria-label="주 네비게이션"
+        aria-label="주 내비게이션"
       >
         {/* Logo */}
         <div className="flex h-[var(--layout-topbar-height)] items-center gap-2 border-b border-white/10 px-4">
