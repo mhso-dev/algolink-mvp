@@ -86,6 +86,10 @@ export function defaultEnumForUserStep(step: UserStep): ProjectStatus {
  * SPEC-PAYOUT-002 §M6 — `instructor_withdrawn`은 강사 재배정 단계로의 regression entry이며,
  * 다른 status에서 자유롭게 전환되지 않는다. 진입은 `withdrawInstructorAction` Server Action으로만,
  * 회복은 다시 `lecture_requested`/`instructor_sourcing`로의 forward 전환만 허용.
+ *
+ * SPEC-PROJECT-AMEND-001 — `assignment_confirmed → assignment_review` backward edge는
+ * SPEC-CONFIRM-001 §HIGH-2 1시간 변경 윈도 내 강사 응답 다운그레이드(accepted → declined/conditional)
+ * 보상 트랜잭션 (REQ-CONFIRM-EFFECTS-008)의 정식 경로다. 그 외 호출 사이트에서 사용 금지.
  */
 export const ALLOWED_TRANSITIONS: Record<ProjectStatus, readonly ProjectStatus[]> = {
   proposal: ["contract_confirmed", "lecture_requested"],
@@ -93,7 +97,13 @@ export const ALLOWED_TRANSITIONS: Record<ProjectStatus, readonly ProjectStatus[]
   lecture_requested: ["instructor_sourcing", "assignment_review", "instructor_withdrawn"],
   instructor_sourcing: ["assignment_review", "instructor_withdrawn"],
   assignment_review: ["assignment_confirmed", "instructor_withdrawn"],
-  assignment_confirmed: ["education_confirmed", "recruiting", "instructor_withdrawn"],
+  // SPEC-PROJECT-AMEND-001 — `assignment_review`은 SPEC-CONFIRM-001 §HIGH-2 보상 경로 (REQ-CONFIRM-EFFECTS-008).
+  assignment_confirmed: [
+    "education_confirmed",
+    "recruiting",
+    "instructor_withdrawn",
+    "assignment_review",
+  ],
   education_confirmed: ["recruiting", "progress_confirmed", "instructor_withdrawn"],
   recruiting: ["progress_confirmed", "instructor_withdrawn"],
   progress_confirmed: ["in_progress", "instructor_withdrawn"],

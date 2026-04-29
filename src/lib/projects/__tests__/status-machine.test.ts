@@ -1,8 +1,10 @@
 // SPEC-PROJECT-001 §2.5 — status machine pure unit tests.
+// SPEC-PROJECT-AMEND-001 — assignment_confirmed → assignment_review backward edge tests.
 // Runs via: tsx --test
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  ALLOWED_TRANSITIONS,
   USER_STEPS,
   defaultEnumForUserStep,
   userStepFromEnum,
@@ -108,4 +110,96 @@ test("validateTransition: 정상 흐름 proposal → contract_confirmed", () => 
 test("validateTransition: 동일 상태 거부", () => {
   const r = validateTransition("proposal", "proposal", { instructorId: null });
   assert.equal(r.ok, false);
+});
+
+// =============================================================================
+// SPEC-PROJECT-AMEND-001 — assignment_confirmed → assignment_review backward edge
+// SPEC-CONFIRM-001 §HIGH-2 (REQ-CONFIRM-EFFECTS-008) reverse compensation 정식 경로.
+// =============================================================================
+
+test("AMEND-001 REQ-AMEND-TESTS-001-A: assignment_confirmed → assignment_review (instructorId=null) OK", () => {
+  const r = validateTransition("assignment_confirmed", "assignment_review", {
+    instructorId: null,
+  });
+  assert.equal(r.ok, true);
+});
+
+test("AMEND-001 REQ-AMEND-TESTS-001-B: assignment_confirmed → assignment_review (instructorId=uuid) OK — REQ-PROJECT-STATUS-003 가드는 to=assignment_confirmed에만 적용", () => {
+  const r = validateTransition("assignment_confirmed", "assignment_review", {
+    instructorId: "instructor-uuid-123",
+  });
+  assert.equal(r.ok, true);
+});
+
+test("AMEND-001 REQ-AMEND-TESTS-001-C: assignment_review → assignment_review 자기참조 거부", () => {
+  const r = validateTransition("assignment_review", "assignment_review", {
+    instructorId: null,
+  });
+  assert.equal(r.ok, false);
+  if (!r.ok) {
+    assert.match(r.reason, /동일한 단계로 전환할 수 없습니다/);
+  }
+});
+
+test("AMEND-001 REQ-AMEND-TESTS-001-D: ALLOWED_TRANSITIONS.assignment_confirmed.length === 4 + includes 'assignment_review'", () => {
+  assert.equal(ALLOWED_TRANSITIONS.assignment_confirmed.length, 4);
+  assert.ok(
+    ALLOWED_TRANSITIONS.assignment_confirmed.includes("assignment_review"),
+    "assignment_review must be present in ALLOWED_TRANSITIONS.assignment_confirmed",
+  );
+});
+
+test("AMEND-001 회귀 가드: forward edge assignment_review → assignment_confirmed OK (강사 배정 시)", () => {
+  const r = validateTransition("assignment_review", "assignment_confirmed", {
+    instructorId: "uuid-A",
+  });
+  assert.equal(r.ok, true);
+});
+
+test("AMEND-001 회귀 가드: assignment_confirmed → education_confirmed OK (다른 forward edge 보존)", () => {
+  const r = validateTransition("assignment_confirmed", "education_confirmed", {
+    instructorId: "uuid-A",
+  });
+  assert.equal(r.ok, true);
+});
+
+test("AMEND-001 회귀 가드: assignment_confirmed → recruiting OK (다른 forward edge 보존)", () => {
+  const r = validateTransition("assignment_confirmed", "recruiting", {
+    instructorId: "uuid-A",
+  });
+  assert.equal(r.ok, true);
+});
+
+test("AMEND-001 회귀 가드: assignment_confirmed → instructor_withdrawn OK (regression entry 보존)", () => {
+  const r = validateTransition("assignment_confirmed", "instructor_withdrawn", {
+    instructorId: "uuid-A",
+  });
+  assert.equal(r.ok, true);
+});
+
+test("AMEND-001 회귀 가드: ALLOWED_TRANSITIONS exhaustiveness 14 keys", () => {
+  const expectedKeys: ProjectStatus[] = [
+    "proposal",
+    "contract_confirmed",
+    "lecture_requested",
+    "instructor_sourcing",
+    "assignment_review",
+    "assignment_confirmed",
+    "education_confirmed",
+    "recruiting",
+    "progress_confirmed",
+    "in_progress",
+    "education_done",
+    "settlement_in_progress",
+    "task_done",
+    "instructor_withdrawn",
+  ];
+  for (const k of expectedKeys) {
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(ALLOWED_TRANSITIONS, k),
+      `ALLOWED_TRANSITIONS must contain key ${k}`,
+    );
+    assert.ok(Array.isArray(ALLOWED_TRANSITIONS[k]));
+  }
+  assert.equal(Object.keys(ALLOWED_TRANSITIONS).length, 14);
 });
