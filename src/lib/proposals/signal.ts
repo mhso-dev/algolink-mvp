@@ -1,10 +1,8 @@
-// SPEC-PROPOSAL-001 §M2 REQ-PROPOSAL-SIGNAL-001/004 — instructor_inquiry_history 시그널 헬퍼.
-// REQ-PROPOSAL-SIGNAL-003: SPEC-RECOMMEND-001 score.ts 변경 0건. 본 헬퍼는 ad-hoc 분석용.
-// REQ-PROPOSAL-SIGNAL-004: runRecommendationAction에서 호출 안 함.
-//
-// NOTE: 본 모듈은 server-only — Server Component / Server Action / Route Handler에서만 호출.
-// (테스트 환경에서 import 가능하도록 server-only import는 명시하지 않음 —
-//  의도는 호출 측이 서버 컨텍스트에서만 실행하는 것.)
+// @MX:NOTE: SPEC-PROPOSAL-001 §M2 REQ-PROPOSAL-SIGNAL-001/004 — instructor_inquiry_history 시그널 헬퍼.
+// @MX:REASON: SPEC-RECOMMEND-001 score.ts 변경 0건. 본 헬퍼는 ad-hoc 분석용. REQ-PROPOSAL-SIGNAL-004: runRecommendationAction에서 호출 안 함.
+// @MX:WARN: 본 모듈은 server-only — Server Component / Server Action / Route Handler에서만 호출.
+// @MX:REASON: Drizzle db 클라이언트 직접 참조 — 클라이언트 번들 노출 시 DB 접속 정보 유출 위험.
+// @MX:SPEC: SPEC-PROPOSAL-001
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 

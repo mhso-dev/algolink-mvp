@@ -79,6 +79,15 @@
 - [F-104] 정산 조회 — **✅ 완료** (SPEC-ME-001 M5/M7 완료, 2026-04-28)
   - 인건비(3.3%/8.8%) / 세금계산서 처리 선택 ✅ (월별 그룹 + 분기 UI)
   - 본인 지급 정보 등록(통장사본 첨부) ✅ (pgcrypto RPC 암호화, payout-queries.ts)
+- [F-X] 영업 단계 제안서 도메인 — **✅ 완료** (SPEC-PROPOSAL-001 M1~M7 완료, 2026-04-29)
+  - `proposals` 테이블 + 상태 머신 (draft → submitted → won|lost|withdrawn) ✅
+  - `proposal_inquiries` 사전 강사 문의 디스패치 + idempotent UNIQUE (proposal_id × instructor_id) ✅
+  - `proposal-attachments` Storage 버킷 + RLS ✅
+  - `instructor_inquiry_history` view — 90일 `prior_accepted_count` 시그널 (SPEC-RECOMMEND-001 연동 준비) ✅
+  - convertProposalToProject Server Action — canonical 6-step READ COMMITTED + 멱등 early-return + race guard ✅
+  - `/proposals` 라우트 4종 (리스트/new/상세/edit) + UI 컴포넌트 7종 ✅
+  - 73 unit tests + 24 통합 시나리오 PASS / typecheck 0 / build PASS / db:verify 40/40 ✅
+  - 4-SPEC 시퀀스 완료: SPEC-PAYOUT-002 → SPEC-RECEIPT-001 → SPEC-CONFIRM-001 → **SPEC-PROPOSAL-001** ✅
 - [F-X] 강사 응답 시스템 — **✅ 완료** (SPEC-CONFIRM-001 M1~M4 완료, 2026-04-29)
   - `instructor_responses` 통합 응답 모델 (`CHECK XOR` + partial UNIQUE idempotency) ✅
   - `/me/assignments` 정식 배정 요청 inbox + 응답 패널 (3-state + 1시간 카운트다운 타이머) ✅
@@ -214,5 +223,5 @@
 
 ---
 
-Version: 1.3.0
+Version: 1.4.0
 Last Updated: 2026-04-29

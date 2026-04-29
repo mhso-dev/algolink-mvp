@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+### Added (SPEC-PROPOSAL-001 — 제안서 도메인 + 사전 강사 문의, Issue #17)
+
+- **M1**: 마이그레이션 6건 — `proposals` 테이블 (status 5종: draft/submitted/won/lost/withdrawn + proposal_status enum), `proposal_required_skills` junction, `proposal_inquiries` 확장 (`proposal_id` / `instructor_id` / `status` 4종: pending/accepted/declined/conditional + inquiry_status enum), `notification_type=inquiry_request` enum 값 추가, Storage 버킷 `proposal-attachments` + RLS, `instructor_inquiry_history` view (90일 시그널). Drizzle schema `proposal.ts` + `index.ts` barrel export. db:verify 32 → 40 (+8 신규 검증) PASS
+- **M2**: 도메인 순수 함수 9개 (`src/lib/proposals/`) — `status-machine.ts` (validateProposalTransition, timestampUpdatesForTransition, rejectIfFrozen), `inquiry.ts` (buildInquiryRecords idempotent UNIQUE, buildInquiryNotificationPayload, formatInquiryDispatchLog), `convert.ts` (buildProjectFromProposal, buildAcceptedTop3Entry, buildAcceptedRecommendationFromInquiries), `signal.ts` (selectInstructorPriorAcceptedCount, selectInstructorInquirySignal — instructor_inquiry_history view 90일 쿼리), `list-query.ts`, `queries.ts`, `validation.ts`, `errors.ts`, `types.ts`/`labels.ts`
+- **M3~M6**: 라우트 4종 (`/proposals` 리스트 + 필터, `/proposals/new` 등록, `/proposals/[id]` 상세 7섹션, `/proposals/[id]/edit` 수정) + Server Actions 4종 (createProposal, updateProposal + transitionProposalStatus, dispatchInquiries idempotent UNIQUE 위반 catch, convertProposalToProject canonical 6-step READ COMMITTED + 멱등 early-return) + UI 컴포넌트 7종 (ProposalForm / ProposalFiltersBar / ProposalStatusBadge / InquiryDispatchTrigger / InquiryResponseBoard / StatusControls / ConvertToProjectButton)
+- **M7**: 통합 테스트 73 신규 unit tests (status-machine 16, validation 14, inquiry 9, convert 12, signal 4, list-query 17) + 24 통합 시나리오 PASS. typecheck 0 errors, pnpm build PASS, pnpm test:unit 743 → 840 (+97 PASS)
+
+### Notes (SPEC-PROPOSAL-001)
+
+- Convert canonical 6-step 멱등: `converted_project_id NOT NULL` early-return + `UPDATE WHERE converted_project_id IS NULL` race guard (REQ-PROPOSAL-CONVERT-003/007)
+- SPEC-CONFIRM-001 stub 정식 schema로 보강 — `proposal_inquiries` SPEC §5.1 컬럼 정합 (FK 무결성 보존)
+- Frozen 검증: SPEC-PROJECT-001 schema 변경 0건, SPEC-RECOMMEND-001 score.ts 변경 0건, SPEC-DB-001 기존 테이블 schema 변경 0건
+- 4-SPEC 시퀀스 (SPEC-PAYOUT-002 → SPEC-RECEIPT-001 → SPEC-CONFIRM-001 → SPEC-PROPOSAL-001) 완료
+- Closes Issue #17
+
 ### Added (SPEC-CONFIRM-001 — 강사 응답 시스템, Issue #16 / SPEC-PROJECT-AMEND-001, Issue #22)
 
 - **M1**: 마이그레이션 3건 — `instructor_responses` 테이블 신설 (`CHECK XOR` + 두 partial UNIQUE 인덱스: `(project_id, instructor_id) WHERE project_id IS NOT NULL`, `(proposal_inquiry_id, instructor_id) WHERE proposal_inquiry_id IS NOT NULL`), `notification_type` enum 5개 신규 값 추가 (`assignment_accepted`, `assignment_declined`, `inquiry_accepted`, `inquiry_declined`, `inquiry_conditional`), `notifications` 테이블에 `source_kind`/`source_id` 컬럼 + partial UNIQUE 인덱스 (`idx_notifications_idempotency`) 추가 — 알림 idempotency 정확히-1행 보장. db:verify 32/32 PASS
