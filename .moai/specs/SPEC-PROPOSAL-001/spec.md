@@ -1,7 +1,7 @@
 ---
 id: SPEC-PROPOSAL-001
-version: 0.2.1
-status: draft
+version: 0.2.2
+status: completed
 created: 2026-04-29
 updated: 2026-04-29
 author: 철
@@ -12,6 +12,8 @@ issue_number: 17
 # SPEC-PROPOSAL-001: 제안서 도메인 + 사전 강사 문의 (Proposal Domain + Pre-Contract Instructor Inquiry)
 
 ## HISTORY
+
+- **2026-04-29 (v0.2.2) — P4 Implementation 완료 (status: draft → completed)**: M1~M7 마일스톤 7건 모두 완료. 마이그레이션 6건 (`20260429180000_proposals.sql` ~ `20260429180050_instructor_inquiry_history_view.sql`), 신규 테이블 2건 (proposals, proposal_required_skills) + CONFIRM-001 stub 보강 (proposal_inquiries: SPEC §5.1 컬럼 정합), 신규 enum 2건 (proposal_status 5종, inquiry_status 4종), notification_type에 inquiry_request 추가, Storage bucket proposal-attachments + RLS, 시그널 view instructor_inquiry_history. Drizzle schema (proposal.ts) + index.ts barrel export. 도메인 모듈 9개 (status-machine / inquiry / convert / signal / list-query / queries / validation / errors / types / labels), 단위 테스트 7개 파일 (status-machine 16 cases, validation 14, inquiry 9, convert 12, signal 4, list-query 17, integration 24) — 합산 +97 신규 tests 모두 PASS. 라우트 4개 (/proposals 리스트, /proposals/new 등록, /proposals/[id] 상세 7섹션, /proposals/[id]/edit 수정), Server Actions 4개 (createProposal, updateProposal+transitionProposalStatus, dispatchInquiries, convertProposalToProject canonical 6-step), UI 컴포넌트 7개 (ProposalForm / ProposalFiltersBar / ProposalStatusBadge / InquiryDispatchTrigger / InquiryResponseBoard / StatusControls / ConvertToProjectButton). db:verify 32 → 40 (+8 신규 검증), pnpm typecheck 0 errors, pnpm build 0 errors, pnpm test:unit 743 → 840 (+97 PASS, 6 baseline FAIL 동일). Frozen 검증: SPEC-PROJECT-001 schema 변경 0건, SPEC-RECOMMEND-001 score.ts 변경 0건, SPEC-DB-001 기존 테이블 schema 변경 0건. CONFIRM-001 contract: instructor_responses 미참조 (Scenario 16 grep 0 hits). RLS service-role 미사용 (REQ-RLS-003 grep 0 hits).
 
 - **2026-04-29 (v0.2.1) — Cross-SPEC schema refresh (CONFIRM-001 v0.2.0 Pattern A 반영)**: SPEC-CONFIRM-001 v0.2.0 §HIGH-1 amendment 결과(폐기된 `(source_kind text, source_id uuid)` polymorphic discriminator → 두 nullable FK Pattern A `(project_id uuid NULL + proposal_inquiry_id uuid NULL + CHECK XOR + 두 partial UNIQUE)`)를 본 SPEC의 cross-reference 6건에 반영. 정정 위치: spec.md REQ-PROPOSAL-INQUIRY-009 + L227 cross-SPEC contract 표 + L794 sibling reference, spec-compact.md L56 + L201, acceptance.md L583 시뮬레이션 INSERT statement. 콘텐츠 변경 없음 — Pattern A schema 표기 동기화만. SPEC-CONFIRM-001 `status: completed` 머지 완료(PR #23, 2026-04-29) 사실 반영해 "선행 머지 의존" → "선행 머지 완료" 표기 갱신. P4 implementation 진입 직전 v0.2.1로 freeze.
 
