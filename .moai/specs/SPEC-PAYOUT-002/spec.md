@@ -6,7 +6,7 @@ created: 2026-04-29
 updated: 2026-04-29
 author: 철
 priority: high
-issue_number: null
+issue_number: 14
 ---
 
 # SPEC-PAYOUT-002: 시간당 사업비 기반 자동 정산 산정 (Hourly-Rate-Based Settlement Automation — Sessions, Generation, Exceptions)
