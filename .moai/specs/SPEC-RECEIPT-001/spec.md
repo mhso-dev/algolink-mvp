@@ -6,7 +6,7 @@ created: 2026-04-29
 updated: 2026-04-29
 author: 철
 priority: high
-issue_number: null
+issue_number: 15
 ---
 
 # SPEC-RECEIPT-001: 고객 직접 정산 + 자동 영수증 발급 (Client-Direct Settlement Flow + Automated Receipt Issuance)
