@@ -2,6 +2,18 @@
 
 AI Agentic Platform — 한국 교육 컨설팅 워크플로우 MVP.
 
+## 모바일/태블릿 지원 (320~1024px)
+
+320px(iPhone SE) ~ 1024px(iPad landscape) 전 범위 반응형 지원. SPEC-MOBILE-001 구현 완료.
+
+- **AppShell 모바일 분기** + **MobileNav**: Sheet 기반 off-canvas drawer (hamburger 진입)
+- **Container 컴포넌트**: gutter 16/20/24/32px 자동 스케일, 21개 페이지 단일 표준 wrapper
+- **Topbar 모바일 검색**: inline expand 패턴 (검색창 전체폭 전환)
+- **복합 컴포넌트 모바일 분기**: KPI / Kanban / Calendar / Table 4종
+- **Form 모바일 입력** + CardHeader 7곳 + 터치 타겟 ≥44px (WCAG 2.5.5 준수)
+- **Playwright matrix smoke**: 5 viewport (320 / 375 / 768 / 1024 / 1440px) 자동 회귀
+- SPEC 참조: `.moai/specs/SPEC-MOBILE-001/`
+
 ## 기술 스택
 
 - Next.js 16 (App Router) + React 19 + TypeScript 5
