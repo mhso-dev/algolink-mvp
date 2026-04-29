@@ -1,6 +1,6 @@
 ---
 id: SPEC-RECEIPT-001
-version: 0.2.0
+version: 0.2.1
 status: draft
 created: 2026-04-29
 updated: 2026-04-29
@@ -12,6 +12,8 @@ issue_number: 15
 # SPEC-RECEIPT-001: 고객 직접 정산 + 자동 영수증 발급 (Client-Direct Settlement Flow + Automated Receipt Issuance)
 
 ## HISTORY
+
+- **2026-04-29 (v0.2.1) — PAYOUT-RECEIPT ownership 결정 formalize**: SPEC-PAYOUT-002가 `status: completed`로 main에 머지된 후(PR #18, fff7778) v0.2.0 §HIGH-8에서 잠정 결정한 Option A를 본 amendment로 정식 확정. SPEC-PAYOUT-002 v0.1.3 amendment HISTORY에 동일 cross-SPEC contract 명시(`generate.ts`가 `flow='client_direct'` 정산 행을 생성할 때 `instructor_remittance_amount_krw` 컬럼을 함께 populate, derive 식 `business_amount_krw - instructor_fee_krw = profit_krw`). RECEIPT-001 M1 마이그레이션(`20260429000010_settlement_flow_client_direct`)이 컬럼을 추가한 후 본 SPEC M5(운영자 수취 확인) 단계 또는 별도 PAYOUT-002 amendment branch에서 generate.ts 확장 코드 변경 통합 적용 예정. 본 SPEC은 컬럼을 read-only로 소비하며 자체 산출 책임 없음. minor sweep(PR #19) 카운트 정합성 정정 이후 적용.
 
 - **2026-04-29 (v0.2.0)**: plan-auditor FAIL 판정에 따른 8건 결함(CRITICAL 2건 + HIGH 6건) 및 MEDIUM/LOW 항목 수정 amendment. 핵심 변경:
   1. **CRITICAL-1/2 (영수증 번호 형식)**: `RCP-YYYY-NNN`(3자리) → `RCP-YYYY-NNNN`(4자리)로 확장하고 단순 SEQUENCE 대신 `receipt_counters(year integer PRIMARY KEY, counter bigint)` 테이블 + `app.next_receipt_number()` 함수로 **연도별 카운터 reset**을 적용. 1000번째 발급에서 regex 위반하던 문제와 연도 경계 break 모두 해소. UNIQUE 인덱스는 그대로 유지.
