@@ -10,11 +10,12 @@ import type { ResponseStatus } from "@/lib/responses";
 
 export interface InquiryCardData {
   id: string;
+  proposal_id: string | null;
   status: string;
-  requested_start: string | null;
-  requested_end: string | null;
-  skill_stack: string[] | null;
-  operator_memo: string | null;
+  operator_id: string | null;
+  proposed_time_slot_start: string | null;
+  proposed_time_slot_end: string | null;
+  question_note: string | null;
   created_at: string;
   response_status: ResponseStatus | null;
   response_responded_at: string | null;
@@ -74,25 +75,19 @@ export function InquiryCard({ data, responseAction }: InquiryCardProps) {
           <div className="sm:col-span-2">
             <dt className="text-xs text-[var(--color-text-muted)]">문의 일정</dt>
             <dd className="font-tabular">
-              {formatKstDateRange(data.requested_start, data.requested_end)}
+              {formatKstDateTime(data.proposed_time_slot_start)}
             </dd>
           </div>
-          {data.skill_stack && data.skill_stack.length > 0 && (
+          <div>
+            <dt className="text-xs text-[var(--color-text-muted)]">종료</dt>
+            <dd className="font-tabular">
+              {formatKstDateTime(data.proposed_time_slot_end)}
+            </dd>
+          </div>
+          {data.question_note && (
             <div className="sm:col-span-2">
-              <dt className="text-xs text-[var(--color-text-muted)]">기술 스택</dt>
-              <dd className="flex gap-1 flex-wrap mt-1">
-                {data.skill_stack.map((s) => (
-                  <Badge key={s} variant="secondary" className="text-xs">
-                    {s}
-                  </Badge>
-                ))}
-              </dd>
-            </div>
-          )}
-          {data.operator_memo && (
-            <div className="sm:col-span-2">
-              <dt className="text-xs text-[var(--color-text-muted)]">운영자 메모</dt>
-              <dd className="text-sm mt-1">{data.operator_memo}</dd>
+              <dt className="text-xs text-[var(--color-text-muted)]">문의 내용</dt>
+              <dd className="text-sm mt-1">{data.question_note}</dd>
             </div>
           )}
         </dl>
