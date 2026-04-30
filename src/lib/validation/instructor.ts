@@ -141,6 +141,32 @@ export const skillsBulkInputSchema = z.object({
 
 // ---------- 일정 schema ----------
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseScheduleBoundary(value: string, boundary: "start" | "end"): Date {
+  if (DATE_ONLY_RE.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    if (!year || !month || !day) return new Date(Number.NaN);
+    // Date-only personal/unavailable schedules are all-day ranges. Keep the
+    // user-facing end date inclusive by storing it as exclusive next-day 00:00.
+    const offsetDays = boundary === "end" ? 1 : 0;
+    return new Date(Date.UTC(year, month - 1, day + offsetDays));
+  }
+  return new Date(value);
+}
+
+export function normalizeScheduleDateRange(input: {
+  startsAt: string;
+  endsAt: string;
+}): { startsAt: Date; endsAt: Date } | null {
+  const startsAt = parseScheduleBoundary(input.startsAt, "start");
+  const endsAt = parseScheduleBoundary(input.endsAt, "end");
+  if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime())) {
+    return null;
+  }
+  return { startsAt, endsAt };
+}
+
 export const scheduleInputSchema = z
   .object({
     scheduleKind: z.enum(["personal", "unavailable"]),
@@ -151,15 +177,15 @@ export const scheduleInputSchema = z
   })
   .refine(
     (d) => {
-      const s = new Date(d.startsAt).getTime();
-      const e = new Date(d.endsAt).getTime();
-      return Number.isFinite(s) && Number.isFinite(e) && s < e;
+      const range = normalizeScheduleDateRange(d);
+      return Boolean(range && range.startsAt < range.endsAt);
     },
-    { path: ["endsAt"], message: "종료 시각은 시작 시각보다 뒤여야 합니다." },
+    { path: ["endsAt"], message: "종료일은 시작일보다 빠를 수 없습니다." },
   )
   .refine(
     (d) => {
-      const s = new Date(d.startsAt).getTime();
+      const range = normalizeScheduleDateRange(d);
+      const s = range?.startsAt.getTime() ?? Number.NaN;
       const now = Date.now();
       const TWO_YEARS = 1000 * 60 * 60 * 24 * 365 * 2;
       return Math.abs(s - now) <= TWO_YEARS;
