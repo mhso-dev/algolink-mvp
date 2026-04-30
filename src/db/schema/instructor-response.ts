@@ -35,6 +35,7 @@ export const proposalInquiries = pgTable(
     proposalId: uuid("proposal_id").references(() => proposals.id, {
       onDelete: "cascade",
     }),
+    operatorId: uuid("operator_id"),
     instructorId: uuid("instructor_id")
       .notNull()
       .references(() => instructors.id, { onDelete: "cascade" }),
@@ -57,6 +58,7 @@ export const proposalInquiries = pgTable(
       .defaultNow(),
   },
   (t) => [
+    index("idx_proposal_inquiries_operator").on(t.operatorId),
     index("idx_proposal_inquiries_instructor_status").on(
       t.instructorId,
       t.status,
