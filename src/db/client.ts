@@ -6,7 +6,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import * as schema from "./schema";
 
 const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
+
+function requireDatabaseUrl(): never {
   throw new Error("DATABASE_URL is required (see .env.example)");
 }
 
@@ -14,14 +15,33 @@ if (!databaseUrl) {
  * postgres-js 연결 풀.
  * RLS를 위해 매 요청마다 set_config로 JWT를 주입할 수 있도록 prepared: false 권장.
  * pgcrypto 키도 SET LOCAL로 connection-level 주입 (애플리케이션 레이어 책임).
+ *
+ * Next build imports route modules to collect metadata even for force-dynamic pages.
+ * Keep module evaluation side-effect safe when DATABASE_URL is absent; actual DB use
+ * still fails loudly at request/runtime boundaries via the proxy below.
  */
-const queryClient = postgres(databaseUrl, {
-  max: 10,
-  idle_timeout: 20,
-  prepare: false,
-});
+const queryClient = databaseUrl
+  ? postgres(databaseUrl, {
+      max: 10,
+      idle_timeout: 20,
+      prepare: false,
+    })
+  : null;
 
-export const db = drizzle(queryClient, { schema });
+const missingDbProxy = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      // Avoid thenable detection treating the proxy like a Promise during framework introspection.
+      if (prop === "then") return undefined;
+      return requireDatabaseUrl();
+    },
+  },
+);
+
+const realDb = queryClient ? drizzle(queryClient, { schema }) : null;
+
+export const db = (realDb ?? missingDbProxy) as NonNullable<typeof realDb>;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 // 신규 publishable key (sb_publishable_*) — 레거시 anon JWT 대체.
