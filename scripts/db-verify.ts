@@ -490,6 +490,7 @@ async function main() {
       const required = [
         "id",
         "proposal_id",
+        "operator_id",
         "instructor_id",
         "proposed_time_slot_start",
         "proposed_time_slot_end",
