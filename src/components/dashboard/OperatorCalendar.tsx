@@ -14,7 +14,7 @@ import {
   shiftMonth,
   startOfMonthKst,
 } from "@/lib/dashboard/calendar-events";
-import { formatKstDateRange, toKstDate } from "@/lib/dashboard/format";
+import { toKstDate } from "@/lib/dashboard/format";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
@@ -148,14 +148,8 @@ export function OperatorCalendar({
                     return (
                       <div
                         key={ev.id}
-                        title={`${ev.instructorName} - ${ev.projectTitle ?? "프로젝트"} (${formatKstDateRange(
-                          ev.startsAt,
-                          ev.endsAt,
-                        )})`}
-                        aria-label={`${ev.instructorName} ${ev.projectTitle ?? ""} ${formatKstDateRange(
-                          ev.startsAt,
-                          ev.endsAt,
-                        )}`}
+                        title={`${ev.instructorName} - ${ev.projectTitle ?? "프로젝트"}`}
+                        aria-label={`${ev.instructorName} ${ev.projectTitle ?? "강의"}`}
                         className="truncate rounded-sm px-1 py-0.5 text-[10px] text-white"
                         style={{ backgroundColor: color }}
                       >
