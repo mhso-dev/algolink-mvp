@@ -8,6 +8,50 @@ import type {
   InquiryRecordToInsert,
 } from "./types";
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseInquiryBoundary(
+  value: string | null | undefined,
+  boundary: "start" | "end",
+): Date | null {
+  if (!value) return null;
+  if (DATE_ONLY_RE.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    if (!year || !month || !day) return new Date(Number.NaN);
+    const offsetDays = boundary === "end" ? 1 : 0;
+    return new Date(Date.UTC(year, month - 1, day + offsetDays));
+  }
+  return new Date(value);
+}
+
+export function canonicalizeInquiryTimeSlot(input: {
+  proposedTimeSlotStart: string | null | undefined;
+  proposedTimeSlotEnd: string | null | undefined;
+}): { proposedTimeSlotStart: string | null; proposedTimeSlotEnd: string | null } {
+  const start = parseInquiryBoundary(input.proposedTimeSlotStart, "start");
+  const end = parseInquiryBoundary(input.proposedTimeSlotEnd, "end");
+  return {
+    proposedTimeSlotStart:
+      start && Number.isFinite(start.getTime()) ? start.toISOString() : null,
+    proposedTimeSlotEnd:
+      end && Number.isFinite(end.getTime()) ? end.toISOString() : null,
+  };
+}
+
+export function isValidInquiryTimeSlot(input: {
+  proposedTimeSlotStart: string | null | undefined;
+  proposedTimeSlotEnd: string | null | undefined;
+}): boolean {
+  const startRaw = input.proposedTimeSlotStart;
+  const endRaw = input.proposedTimeSlotEnd;
+  const start = parseInquiryBoundary(startRaw, "start");
+  const end = parseInquiryBoundary(endRaw, "end");
+  if (start && !Number.isFinite(start.getTime())) return false;
+  if (end && !Number.isFinite(end.getTime())) return false;
+  if (start && end) return start < end;
+  return true;
+}
+
 /**
  * 디스패치 입력 → DB INSERT 페이로드 N개 생성 (REQ-PROPOSAL-INQUIRY-003).
  *
@@ -34,8 +78,10 @@ export function buildInquiryRecords(
     proposalId,
     operatorId: operatorId ?? null,
     instructorId,
-    proposedTimeSlotStart: proposedTimeSlotStart ?? null,
-    proposedTimeSlotEnd: proposedTimeSlotEnd ?? null,
+    ...canonicalizeInquiryTimeSlot({
+      proposedTimeSlotStart,
+      proposedTimeSlotEnd,
+    }),
     questionNote: questionNote ?? null,
   }));
 }
