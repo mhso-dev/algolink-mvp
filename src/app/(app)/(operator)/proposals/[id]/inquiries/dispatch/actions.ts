@@ -52,11 +52,11 @@ export async function dispatchInquiriesAction(
   // 1. proposal 상태 검증 (REQ-PROPOSAL-INQUIRY-005)
   const { data: proposal, error: propErr } = (await supabase
     .from("proposals")
-    .select("id, title, status")
+    .select("id, title, status, operator_id")
     .eq("id", parsed.data.proposalId)
     .is("deleted_at", null)
     .maybeSingle()) as {
-    data: { id: string; title: string; status: string } | null;
+    data: { id: string; title: string; status: string; operator_id: string | null } | null;
     error: unknown;
   };
   if (propErr || !proposal) {
@@ -71,6 +71,7 @@ export async function dispatchInquiriesAction(
   try {
     inquiryRecords = buildInquiryRecords({
       proposalId: parsed.data.proposalId,
+      operatorId: proposal.operator_id,
       instructorIds: parsed.data.instructorIds,
       proposedTimeSlotStart: parsed.data.proposedTimeSlotStart ?? null,
       proposedTimeSlotEnd: parsed.data.proposedTimeSlotEnd ?? null,
@@ -82,6 +83,7 @@ export async function dispatchInquiriesAction(
 
   const inquiryRows = inquiryRecords.map((r) => ({
     proposal_id: r.proposalId,
+    operator_id: r.operatorId,
     instructor_id: r.instructorId,
     proposed_time_slot_start: r.proposedTimeSlotStart,
     proposed_time_slot_end: r.proposedTimeSlotEnd,

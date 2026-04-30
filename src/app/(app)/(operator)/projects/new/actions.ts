@@ -11,6 +11,7 @@ import { createClient } from "@/utils/supabase/server";
 import { getCurrentUser } from "@/auth/server";
 import { createProjectSchema } from "@/lib/validation/project";
 import { PROJECT_ERRORS } from "@/lib/projects/errors";
+import { normalizeDateOnlyRangeForProject } from "@/lib/date-only";
 
 export interface CreateProjectFormState {
   ok: boolean;
@@ -69,13 +70,14 @@ export async function createProjectAction(
   const data = parsed.data;
   const supabase = createClient(await cookies());
 
+  const educationRange = normalizeDateOnlyRangeForProject(data.startAt, data.endAt);
+
   const insertPayload = {
     title: data.title,
     client_id: data.clientId,
     project_type: data.projectType,
     operator_id: user.id,
-    education_start_at: data.startAt ? data.startAt.toISOString() : null,
-    education_end_at: data.endAt ? data.endAt.toISOString() : null,
+    ...educationRange,
     business_amount_krw: data.businessAmountKrw,
     instructor_fee_krw: data.instructorFeeKrw,
     // SPEC-PAYOUT-002 §M4 — 시급 + 분배율 (REQ-PROJECT-FIELDS-001/-004)

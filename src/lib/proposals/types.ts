@@ -52,6 +52,7 @@ export interface ProposalRecord {
 /** 디스패치 입력. */
 export interface InquiryDispatchInput {
   proposalId: string;
+  operatorId: string | null;
   instructorIds: readonly string[];
   proposedTimeSlotStart: string | null; // ISO timestamp
   proposedTimeSlotEnd: string | null;
@@ -61,6 +62,7 @@ export interface InquiryDispatchInput {
 /** 디스패치 결과 (도메인 빌더 출력) — 순수 INSERT payload. */
 export interface InquiryRecordToInsert {
   proposalId: string;
+  operatorId: string | null;
   instructorId: string;
   proposedTimeSlotStart: string | null;
   proposedTimeSlotEnd: string | null;

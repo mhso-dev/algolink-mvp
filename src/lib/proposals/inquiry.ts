@@ -19,7 +19,7 @@ import type {
 export function buildInquiryRecords(
   input: InquiryDispatchInput,
 ): InquiryRecordToInsert[] {
-  const { proposalId, instructorIds, proposedTimeSlotStart, proposedTimeSlotEnd, questionNote } = input;
+  const { proposalId, operatorId, instructorIds, proposedTimeSlotStart, proposedTimeSlotEnd, questionNote } = input;
 
   // 클라이언트 측 중복 검출 (DB UNIQUE 제약 보다 일찍)
   const seen = new Set<string>();
@@ -32,6 +32,7 @@ export function buildInquiryRecords(
 
   return instructorIds.map((instructorId) => ({
     proposalId,
+    operatorId,
     instructorId,
     proposedTimeSlotStart: proposedTimeSlotStart ?? null,
     proposedTimeSlotEnd: proposedTimeSlotEnd ?? null,
