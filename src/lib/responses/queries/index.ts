@@ -141,7 +141,6 @@ export async function getMyAssignmentRequests(
     .in("source_id", projectIds)
     .order("created_at", { ascending: false });
   const notifMap = new Map<string, string>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const n of (notifData ?? []) as Array<{ source_id: string | null; created_at: string }>) {
     if (typeof n.source_id === "string" && !notifMap.has(n.source_id)) {
       notifMap.set(n.source_id, n.created_at);

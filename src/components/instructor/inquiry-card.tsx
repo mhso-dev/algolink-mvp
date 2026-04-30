@@ -24,7 +24,6 @@ export interface InquiryCardData {
 
 interface InquiryCardProps {
   data: InquiryCardData;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   responseAction: (input: { status: ResponseStatus; conditionalNote?: string | null }) => Promise<{
     ok: boolean;
     reason?: string;
