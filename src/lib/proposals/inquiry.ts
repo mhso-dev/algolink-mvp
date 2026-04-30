@@ -32,7 +32,7 @@ export function buildInquiryRecords(
 
   return instructorIds.map((instructorId) => ({
     proposalId,
-    operatorId,
+    operatorId: operatorId ?? null,
     instructorId,
     proposedTimeSlotStart: proposedTimeSlotStart ?? null,
     proposedTimeSlotEnd: proposedTimeSlotEnd ?? null,
