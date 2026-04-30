@@ -30,6 +30,7 @@ export function buildProjectFromProposal(
     title: proposal.title,
     clientId: proposal.clientId,
     operatorId: proposal.operatorId,
+    scheduledAt: proposal.proposedPeriodStart ?? null,
     startDate: proposal.proposedPeriodStart ?? null,
     endDate: proposal.proposedPeriodEnd ?? null,
     businessAmountKrw: proposal.proposedBusinessAmountKrw ?? 0,

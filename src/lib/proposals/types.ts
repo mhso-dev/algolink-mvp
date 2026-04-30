@@ -81,6 +81,7 @@ export interface ProjectInsertPayload {
   title: string;
   clientId: string;
   operatorId: string;
+  scheduledAt: string | null;
   startDate: string | null; // ISO date — 매핑은 educationStartAt 등 별도
   endDate: string | null;
   businessAmountKrw: number;

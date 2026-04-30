@@ -140,7 +140,7 @@ export async function convertProposalToProjectAction(
       client_id: projectInsert.clientId,
       operator_id: projectInsert.operatorId,
       // SPEC-PROJECT-001 컬럼 매핑: scheduled_at은 시작일 기반 단순화
-      scheduled_at: projectInsert.startDate,
+      scheduled_at: projectInsert.scheduledAt,
       education_start_at: educationStartAt,
       education_end_at: educationEndAt,
       business_amount_krw: projectInsert.businessAmountKrw,

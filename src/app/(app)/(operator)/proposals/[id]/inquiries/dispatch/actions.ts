@@ -71,7 +71,7 @@ export async function dispatchInquiriesAction(
   try {
     inquiryRecords = buildInquiryRecords({
       proposalId: parsed.data.proposalId,
-      operatorId: proposal.operator_id,
+      operatorId: proposal.operator_id ?? user.id,
       instructorIds: parsed.data.instructorIds,
       proposedTimeSlotStart: parsed.data.proposedTimeSlotStart ?? null,
       proposedTimeSlotEnd: parsed.data.proposedTimeSlotEnd ?? null,
