@@ -8,7 +8,11 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { ensureInstructorRow } from "@/lib/instructor/me-queries";
-import { scheduleInputSchema, type ScheduleInput } from "@/lib/validation/instructor";
+import {
+  normalizeScheduleDateRange,
+  scheduleInputSchema,
+  type ScheduleInput,
+} from "@/lib/validation/instructor";
 import { checkScheduleConflict } from "@/lib/notifications/triggers/schedule-conflict";
 
 export interface ScheduleActionResult {
@@ -61,6 +65,10 @@ export async function createSchedule(input: ScheduleInput): Promise<ScheduleActi
   if (!r.success) {
     return { ok: false, message: "입력 값을 확인해 주세요.", fieldErrors: fieldErrorsFromZod(r.error.issues) };
   }
+  const range = normalizeScheduleDateRange(r.data);
+  if (!range) {
+    return { ok: false, message: "입력 값을 확인해 주세요." };
+  }
   const supabase = createClient(await cookies());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
@@ -69,8 +77,8 @@ export async function createSchedule(input: ScheduleInput): Promise<ScheduleActi
       instructor_id: ctx.instructorId,
       schedule_kind: r.data.scheduleKind,
       title: r.data.title || (r.data.scheduleKind === "unavailable" ? "강의 불가" : "개인 일정"),
-      starts_at: new Date(r.data.startsAt).toISOString(),
-      ends_at: new Date(r.data.endsAt).toISOString(),
+      starts_at: range.startsAt.toISOString(),
+      ends_at: range.endsAt.toISOString(),
       notes: r.data.notes || null,
     })
     .select("id")
@@ -82,8 +90,8 @@ export async function createSchedule(input: ScheduleInput): Promise<ScheduleActi
   // SPEC-NOTIFY-001 §M4 — 일정 등록 직후 충돌 검사 (silent failure).
   try {
     await checkScheduleConflict(supabase, ctx.instructorId, {
-      start: new Date(r.data.startsAt).toISOString(),
-      end: new Date(r.data.endsAt).toISOString(),
+      start: range.startsAt.toISOString(),
+      end: range.endsAt.toISOString(),
     });
   } catch (e) {
     console.warn("[notify.trigger] schedule-conflict failed", e);
@@ -100,6 +108,10 @@ export async function updateSchedule(id: string, input: ScheduleInput): Promise<
   if (!r.success) {
     return { ok: false, message: "입력 값을 확인해 주세요.", fieldErrors: fieldErrorsFromZod(r.error.issues) };
   }
+  const range = normalizeScheduleDateRange(r.data);
+  if (!range) {
+    return { ok: false, message: "입력 값을 확인해 주세요." };
+  }
   const supabase = createClient(await cookies());
   const owner = await loadScheduleOwner(supabase, id);
   if (!owner) return { ok: false, message: "일정을 찾을 수 없습니다." };
@@ -112,8 +124,8 @@ export async function updateSchedule(id: string, input: ScheduleInput): Promise<
     .update({
       schedule_kind: r.data.scheduleKind,
       title: r.data.title || (r.data.scheduleKind === "unavailable" ? "강의 불가" : "개인 일정"),
-      starts_at: new Date(r.data.startsAt).toISOString(),
-      ends_at: new Date(r.data.endsAt).toISOString(),
+      starts_at: range.startsAt.toISOString(),
+      ends_at: range.endsAt.toISOString(),
       notes: r.data.notes || null,
       updated_at: new Date().toISOString(),
     })
