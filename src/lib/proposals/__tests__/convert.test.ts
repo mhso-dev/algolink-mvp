@@ -48,6 +48,21 @@ test("buildProjectFromProposal: SPEC-PROJECT-001 default 필드 매핑", () => {
   assert.equal(result.projectType, "education");
 });
 
+test("buildProjectFromProposal: date-only proposal period populates scheduled/range fields consistently", () => {
+  const result = buildProjectFromProposal({
+    ...baseProposal,
+    title: "동일일 교육",
+    proposedPeriodStart: "2026-05-15",
+    proposedPeriodEnd: "2026-05-15",
+    proposedBusinessAmountKrw: 1_000_000,
+    proposedHourlyRateKrw: null,
+  });
+
+  assert.equal(result.startDate, "2026-05-15");
+  assert.equal(result.endDate, "2026-05-15");
+  assert.equal((result as { scheduledAt?: string | null }).scheduledAt, "2026-05-15");
+});
+
 test("buildProjectFromProposal: businessAmountKrw NULL → 0 default", () => {
   const proposal = { ...baseProposal, proposedBusinessAmountKrw: null };
   const result = buildProjectFromProposal(proposal);

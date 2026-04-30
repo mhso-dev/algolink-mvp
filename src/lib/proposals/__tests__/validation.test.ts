@@ -156,6 +156,16 @@ test("inquiryDispatchSchema: time-slot null 허용", () => {
   assert.equal(result.success, true);
 });
 
+test("inquiryDispatchSchema: proposedTimeSlotEnd < proposedTimeSlotStart 거부", () => {
+  const result = inquiryDispatchSchema.safeParse({
+    proposalId: VALID_UUID,
+    instructorIds: [VALID_UUID_2],
+    proposedTimeSlotStart: "2026-05-15T18:00:00.000Z",
+    proposedTimeSlotEnd: "2026-05-15T09:00:00.000Z",
+  });
+  assert.equal(result.success, false);
+});
+
 test("convertProposalSchema: 정상 UUID PASS", () => {
   const result = convertProposalSchema.safeParse({
     proposalId: VALID_UUID,

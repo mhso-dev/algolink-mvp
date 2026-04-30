@@ -78,3 +78,22 @@ test("groupEventsByDay: 시작일 KST 기준으로 묶음", () => {
   assert.equal(m.get(10)?.length, 2);
   assert.equal(m.get(11)?.length, 1);
 });
+
+test("groupEventsByDay: date-only multi-day all-day events are expanded across days", () => {
+  const events: ScheduleEvent[] = [
+    {
+      id: "multi-day",
+      instructorId: "i1",
+      instructorName: "강사1",
+      projectId: "p1",
+      projectTitle: "3일 교육",
+      startsAt: "2026-05-10T00:00:00+09:00",
+      endsAt: "2026-05-12T23:59:59+09:00",
+    },
+  ];
+
+  const m = groupEventsByDay(events);
+  assert.equal(m.get(10)?.[0]?.id, "multi-day");
+  assert.equal(m.get(11)?.[0]?.id, "multi-day");
+  assert.equal(m.get(12)?.[0]?.id, "multi-day");
+});

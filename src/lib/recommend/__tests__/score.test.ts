@@ -144,6 +144,21 @@ test("computeAvailability: 기간 외 일정 → 1", () => {
   assert.equal(v, 1);
 });
 
+test("computeAvailability: date-only same-day project overlaps all-day unavailable", () => {
+  const v = computeAvailability(
+    [
+      {
+        kind: "unavailable",
+        startsAt: new Date("2026-05-10T00:00:00+09:00"),
+        endsAt: new Date("2026-05-11T00:00:00+09:00"),
+      },
+    ],
+    new Date("2026-05-10T00:00:00+09:00"),
+    new Date("2026-05-10T00:00:00+09:00"),
+  );
+  assert.equal(v, 0);
+});
+
 test("computeSatisfaction: 리뷰 0건 → SATISFACTION_PRIOR (0.6)", () => {
   assert.equal(
     computeSatisfaction({ meanScore: null, count: 0 }),
