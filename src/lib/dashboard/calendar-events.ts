@@ -33,16 +33,39 @@ export function daysInMonthKst(year: number, monthIndex0: number): number {
  */
 export function groupEventsByDay(
   events: ScheduleEvent[],
+  visibleMonth?: { year: number; monthIndex0: number },
 ): Map<number, ScheduleEvent[]> {
   const m = new Map<number, ScheduleEvent[]>();
+  const monthStart = visibleMonth
+    ? startOfMonthKst(visibleMonth.year, visibleMonth.monthIndex0)
+    : null;
+  const monthEnd = visibleMonth
+    ? startOfNextMonthKst(visibleMonth.year, visibleMonth.monthIndex0)
+    : null;
+
   for (const ev of events) {
-    const k = toKstDate(ev.startsAt);
-    const day = k.getUTCDate();
-    const arr = m.get(day) ?? [];
-    arr.push(ev);
-    m.set(day, arr);
+    const start = new Date(ev.startsAt);
+    const end = new Date(ev.endsAt);
+    const clampedStart =
+      monthStart && start < monthStart ? monthStart : start;
+    const clampedEnd = monthEnd && end > monthEnd ? monthEnd : end;
+    if (clampedEnd <= clampedStart) continue;
+
+    const firstDay = kstDayNumber(clampedStart);
+    const lastTouched = new Date(clampedEnd.getTime() - 1);
+    const lastDay = kstDayNumber(lastTouched);
+
+    for (let day = firstDay; day <= lastDay; day++) {
+      const arr = m.get(day) ?? [];
+      arr.push(ev);
+      m.set(day, arr);
+    }
   }
   return m;
+}
+
+function kstDayNumber(input: Date | string | number): number {
+  return toKstDate(input).getUTCDate();
 }
 
 /** 다음/이전 월 계산 (KST 기준). */

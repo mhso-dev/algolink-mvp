@@ -2,7 +2,7 @@ import "server-only";
 // @MX:ANCHOR: SPEC-DASHBOARD-001 §M2 — 대시보드 read 쿼리 단일 진입점.
 // @MX:REASON: KPI / 칸반 / 캘린더 / 알림 모든 Server Component가 본 모듈을 호출.
 // @MX:SPEC: SPEC-DASHBOARD-001
-import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { notifications } from "@/db/schema/notifications";
 import { projects } from "@/db/schema/project";
@@ -173,8 +173,8 @@ export async function getInstructorScheduleRange(
     .where(
       and(
         eq(scheduleItems.scheduleKind, "system_lecture"),
-        gte(scheduleItems.startsAt, from),
         lt(scheduleItems.startsAt, to),
+        gt(scheduleItems.endsAt, from),
       ),
     )
     .orderBy(sql`${scheduleItems.startsAt} ASC`)
