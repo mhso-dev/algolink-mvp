@@ -11,7 +11,6 @@ import { formatKRW } from "@/lib/utils";
 import { ResponsePanel } from "./response-panel";
 import type { ResponseStatus } from "@/lib/responses";
 
-const KST_TZ = "Asia/Seoul";
 
 export interface AssignmentCardData {
   id: string;
@@ -29,7 +28,6 @@ export interface AssignmentCardData {
 
 interface AssignmentCardProps {
   data: AssignmentCardData;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   responseAction: (input: { status: ResponseStatus; conditionalNote?: string | null }) => Promise<{
     ok: boolean;
     reason?: string;
