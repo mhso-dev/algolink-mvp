@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
 import { formatKRW } from "@/lib/utils";
+import { formatKstDateRange } from "@/lib/dashboard/format";
 import {
   STATUS_LABELS,
   statusBadgeVariant,
@@ -48,24 +49,6 @@ interface ProjectDetailRow {
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
-}
-
-function formatKstDateTime(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
-    .format(d)
-    .replace(/\./g, "-")
-    .replace(/-\s/g, " ")
-    .trim() + " KST";
 }
 
 interface PageProps {
@@ -309,12 +292,8 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           <CardContent className="text-sm space-y-2">
             <DetailRow label="프로젝트 ID" value={project.id} />
             <DetailRow
-              label="시작"
-              value={formatKstDateTime(project.education_start_at)}
-            />
-            <DetailRow
-              label="종료"
-              value={formatKstDateTime(project.education_end_at)}
+              label="교육 기간"
+              value={formatKstDateRange(project.education_start_at, project.education_end_at)}
             />
             <DetailRow
               label="배정 강사"

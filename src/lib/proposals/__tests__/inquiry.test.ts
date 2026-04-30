@@ -43,6 +43,19 @@ test("buildInquiryRecords: time-slot null 허용", () => {
   assert.equal(records[0]!.questionNote, null);
 });
 
+test("buildInquiryRecords: date-only slot stores canonical KST all-day half-open range", () => {
+  const records = buildInquiryRecords({
+    proposalId: PROPOSAL_ID,
+    instructorIds: [INSTR_A],
+    proposedTimeSlotStart: "2026-05-15",
+    proposedTimeSlotEnd: "2026-05-15",
+    questionNote: null,
+  });
+
+  assert.equal(records[0]!.proposedTimeSlotStart, "2026-05-14T15:00:00.000Z");
+  assert.equal(records[0]!.proposedTimeSlotEnd, "2026-05-15T15:00:00.000Z");
+});
+
 test("buildInquiryRecords: 중복 instructorId 검출 → throw", () => {
   assert.throws(
     () =>
@@ -107,6 +120,7 @@ test("buildInquiryNotificationPayload: title/body/linkUrl 한국어", () => {
   assert.match(payload.title, /데이터 분석 강의/);
   assert.match(payload.title, /사전 문의/);
   assert.match(payload.body, /데이터 분석 강의/);
+  assert.match(payload.body, /2026-05-15/);
   assert.equal(payload.linkUrl, `/me/inquiries/${inquiryId}`);
 });
 

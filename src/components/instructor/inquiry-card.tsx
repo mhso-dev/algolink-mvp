@@ -74,13 +74,7 @@ export function InquiryCard({ data, responseAction }: InquiryCardProps) {
           <div className="sm:col-span-2">
             <dt className="text-xs text-[var(--color-text-muted)]">문의 일정</dt>
             <dd className="font-tabular">
-              {formatKstDateTime(data.proposed_time_slot_start)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-[var(--color-text-muted)]">종료</dt>
-            <dd className="font-tabular">
-              {formatKstDateTime(data.proposed_time_slot_end)}
+              {formatKstDateRange(data.proposed_time_slot_start, data.proposed_time_slot_end)}
             </dd>
           </div>
           {data.question_note && (

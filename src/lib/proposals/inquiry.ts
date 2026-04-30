@@ -7,34 +7,35 @@ import type {
   InquiryDispatchInput,
   InquiryRecordToInsert,
 } from "./types";
+import {
+  dateOnlyToKstEndIso,
+  dateOnlyToKstStartIso,
+} from "@/lib/date-only";
+import { formatKstDateRange } from "@/lib/dashboard/format";
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function parseInquiryBoundary(
+function canonicalizeInquiryBoundary(
   value: string | null | undefined,
   boundary: "start" | "end",
-): Date | null {
+): string | null {
   if (!value) return null;
   if (DATE_ONLY_RE.test(value)) {
-    const [year, month, day] = value.split("-").map(Number);
-    if (!year || !month || !day) return new Date(Number.NaN);
-    const offsetDays = boundary === "end" ? 1 : 0;
-    return new Date(Date.UTC(year, month - 1, day + offsetDays));
+    return boundary === "start"
+      ? dateOnlyToKstStartIso(value)
+      : dateOnlyToKstEndIso(value);
   }
-  return new Date(value);
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
 }
 
 export function canonicalizeInquiryTimeSlot(input: {
   proposedTimeSlotStart?: string | null | undefined;
   proposedTimeSlotEnd?: string | null | undefined;
 }): { proposedTimeSlotStart: string | null; proposedTimeSlotEnd: string | null } {
-  const start = parseInquiryBoundary(input.proposedTimeSlotStart, "start");
-  const end = parseInquiryBoundary(input.proposedTimeSlotEnd, "end");
   return {
-    proposedTimeSlotStart:
-      start && Number.isFinite(start.getTime()) ? start.toISOString() : null,
-    proposedTimeSlotEnd:
-      end && Number.isFinite(end.getTime()) ? end.toISOString() : null,
+    proposedTimeSlotStart: canonicalizeInquiryBoundary(input.proposedTimeSlotStart, "start"),
+    proposedTimeSlotEnd: canonicalizeInquiryBoundary(input.proposedTimeSlotEnd, "end"),
   };
 }
 
@@ -44,11 +45,11 @@ export function isValidInquiryTimeSlot(input: {
 }): boolean {
   const startRaw = input.proposedTimeSlotStart;
   const endRaw = input.proposedTimeSlotEnd;
-  const start = parseInquiryBoundary(startRaw, "start");
-  const end = parseInquiryBoundary(endRaw, "end");
-  if (start && !Number.isFinite(start.getTime())) return false;
-  if (end && !Number.isFinite(end.getTime())) return false;
-  if (start && end) return start < end;
+  const startIso = canonicalizeInquiryBoundary(startRaw, "start");
+  const endIso = canonicalizeInquiryBoundary(endRaw, "end");
+  if (startRaw && !startIso) return false;
+  if (endRaw && !endIso) return false;
+  if (startIso && endIso) return new Date(startIso) < new Date(endIso);
   return true;
 }
 
@@ -96,7 +97,10 @@ export function buildInquiryNotificationPayload(args: {
   const { proposalTitle, proposedTimeSlotStart, proposedTimeSlotEnd, inquiryId } = args;
   let body: string;
   if (proposedTimeSlotStart && proposedTimeSlotEnd) {
-    body = `${proposalTitle} 강의 가능 여부 사전 문의 (${proposedTimeSlotStart} ~ ${proposedTimeSlotEnd})`;
+    body = `${proposalTitle} 강의 가능 여부 사전 문의 (${formatKstDateRange(
+      proposedTimeSlotStart,
+      proposedTimeSlotEnd,
+    )})`;
   } else {
     body = `${proposalTitle} 강의 가능 여부 사전 문의`;
   }

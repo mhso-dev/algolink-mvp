@@ -77,9 +77,6 @@ export function ProjectForm({ clients, instructors }: ProjectFormProps) {
             <Field label="교육 종료일">
               <Input name="educationEnd" type="date" />
             </Field>
-            <Field label="교육 시간" hint="예: 10:00~18:00 (반복 옵션은 추후)">
-              <Input name="hours" placeholder="10:00 ~ 18:00" />
-            </Field>
             <Field label="시수" hint="자동 계산도 가능">
               <Input name="totalHours" type="number" placeholder="80" inputMode="numeric" />
             </Field>

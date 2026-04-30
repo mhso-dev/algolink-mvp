@@ -121,6 +121,17 @@ test("inquiryDispatchSchema: 정상 입력 PASS", () => {
   assert.equal(result.success, true);
 });
 
+test("inquiryDispatchSchema: date-only same-day time slot PASS", () => {
+  const result = inquiryDispatchSchema.safeParse({
+    proposalId: VALID_UUID,
+    instructorIds: [VALID_UUID_2],
+    proposedTimeSlotStart: "2026-05-15",
+    proposedTimeSlotEnd: "2026-05-15",
+    questionNote: "강의 가능?",
+  });
+  assert.equal(result.success, true);
+});
+
 test("inquiryDispatchSchema: instructorIds 빈 배열 거부", () => {
   const result = inquiryDispatchSchema.safeParse({
     proposalId: VALID_UUID,

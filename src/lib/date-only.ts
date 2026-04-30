@@ -33,8 +33,7 @@ export function dateOnlyToKstStartIso(value: string | null | undefined): string 
 }
 
 export function dateOnlyToKstEndIso(value: string | null | undefined): string | null {
-  if (!isDateOnlyString(value)) return null;
-  return new Date(`${value}T23:59:59.999${KST_OFFSET}`).toISOString();
+  return dateOnlyToKstNextDayStartIso(value);
 }
 
 export function dateOnlyToKstNextDayStartIso(value: string | null | undefined): string | null {

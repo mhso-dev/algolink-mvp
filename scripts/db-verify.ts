@@ -18,10 +18,13 @@
  *   1: 1개 이상 실패 (CI 차단).
  *   2: 환경 설정 오류 (DB 연결 실패 등).
  */
-import "dotenv/config";
+import { config } from "dotenv";
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import postgres from "postgres";
+
+config({ path: ".env.local" });
+config();
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {

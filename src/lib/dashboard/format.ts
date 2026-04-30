@@ -60,7 +60,17 @@ export function formatKstDateRange(
   const startLabel = formatKstDate(start);
   if (!end) return startLabel;
   const startD = toKstDate(start);
-  const endD = toKstDate(end);
+  const rawEnd = end instanceof Date ? end : new Date(end);
+  const shiftedEnd = toKstDate(rawEnd);
+  const isExclusiveKstMidnight =
+    rawEnd.getTime() > (start instanceof Date ? start : new Date(start)).getTime() &&
+    shiftedEnd.getUTCHours() === 0 &&
+    shiftedEnd.getUTCMinutes() === 0 &&
+    shiftedEnd.getUTCSeconds() === 0 &&
+    shiftedEnd.getUTCMilliseconds() === 0;
+  const endD = isExclusiveKstMidnight
+    ? toKstDate(new Date(rawEnd.getTime() - 1))
+    : shiftedEnd;
   if (
     startD.getUTCFullYear() === endD.getUTCFullYear() &&
     startD.getUTCMonth() === endD.getUTCMonth() &&

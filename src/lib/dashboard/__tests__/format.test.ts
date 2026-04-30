@@ -42,6 +42,11 @@ test("formatKstDateRange: 다른 일자는 ~ 구분", () => {
   assert.equal(v, "2026-05-10 (일) ~ 05-12");
 });
 
+test("formatKstDateRange: canonical exclusive KST midnight end displays inclusive domain date", () => {
+  const v = formatKstDateRange("2026-04-30T15:00:00.000Z", "2026-05-01T15:00:00.000Z");
+  assert.equal(v, "2026-05-01 (금)");
+});
+
 test("formatKstDateRange: start만 있으면 단일 일자", () => {
   assert.equal(formatKstDateRange("2026-05-10T00:00:00Z", null), "2026-05-10 (일)");
 });

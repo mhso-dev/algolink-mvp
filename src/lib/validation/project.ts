@@ -20,10 +20,10 @@ function coerceDateLike(v: unknown, boundary: "start" | "end"): Date | undefined
   if (DATE_ONLY_RE.test(v)) {
     const [year, month, day] = v.split("-").map(Number);
     if (!year || !month || !day) return new Date(Number.NaN);
-    // Date-only 교육 기간은 inclusive end date를 허용한다. DB timestamp range는
-    // [start, end) 로 다루기 위해 종료일만 다음 날 00:00 UTC로 정규화한다.
-    const offsetDays = boundary === "end" ? 1 : 0;
-    return new Date(Date.UTC(year, month - 1, day + offsetDays));
+    void boundary;
+    // Date-only 교육 기간은 UI/domain에서 inclusive range이다. Storage canonicalization
+    // happens in src/lib/date-only.ts as a KST half-open all-day range.
+    return new Date(`${v}T00:00:00.000+09:00`);
   }
   return new Date(v);
 }
@@ -81,10 +81,10 @@ export const createProjectSchema = z
     notes: z.string().max(2000).optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.startAt && data.endAt && data.endAt <= data.startAt) {
+    if (data.startAt && data.endAt && data.endAt < data.startAt) {
       ctx.addIssue({
         code: "custom",
-        message: "종료일은 시작일보다 늦어야 합니다.",
+        message: "종료일은 시작일보다 빠를 수 없습니다.",
         path: ["endAt"],
       });
     }
