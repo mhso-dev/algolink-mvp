@@ -122,19 +122,19 @@ export function InquiryDispatchTrigger({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label htmlFor="start">시작</Label>
+                  <Label htmlFor="start">시작일</Label>
                   <Input
                     id="start"
-                    type="datetime-local"
+                    type="date"
                     value={start}
                     onChange={(e) => setStart(e.target.value)}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="end">종료</Label>
+                  <Label htmlFor="end">종료일</Label>
                   <Input
                     id="end"
-                    type="datetime-local"
+                    type="date"
                     value={end}
                     onChange={(e) => setEnd(e.target.value)}
                   />
@@ -148,7 +148,7 @@ export function InquiryDispatchTrigger({
                   rows={3}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="해당 시간대에 강의가 가능하신가요?"
+                  placeholder="해당 날짜 범위에 강의가 가능하신가요?"
                 />
               </div>
 
