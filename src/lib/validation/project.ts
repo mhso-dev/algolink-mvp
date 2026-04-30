@@ -13,10 +13,26 @@ const uuidLike = z
     { message: "UUID 형식이 아닙니다." },
   );
 
-const isoDateLike = z.preprocess(
-  (v) => (typeof v === "string" && v.length > 0 ? new Date(v) : undefined),
-  z.date({ error: "유효한 날짜를 입력해야 합니다." }),
-);
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function coerceDateLike(v: unknown, boundary: "start" | "end"): Date | undefined {
+  if (typeof v !== "string" || v.length === 0) return undefined;
+  if (DATE_ONLY_RE.test(v)) {
+    const [year, month, day] = v.split("-").map(Number);
+    if (!year || !month || !day) return new Date(Number.NaN);
+    // Date-only 교육 기간은 inclusive end date를 허용한다. DB timestamp range는
+    // [start, end) 로 다루기 위해 종료일만 다음 날 00:00 UTC로 정규화한다.
+    const offsetDays = boundary === "end" ? 1 : 0;
+    return new Date(Date.UTC(year, month - 1, day + offsetDays));
+  }
+  return new Date(v);
+}
+
+const isoDateLike = (boundary: "start" | "end") =>
+  z.preprocess(
+    (v) => coerceDateLike(v, boundary),
+    z.date({ error: "유효한 날짜를 입력해야 합니다." }),
+  );
 
 const optionalNonNegativeInt = z.preprocess(
   (v) => {
@@ -53,8 +69,8 @@ export const createProjectSchema = z
       message: "고객사를 선택해야 합니다.",
     }),
     projectType: z.enum(["education", "material_development"]).default("education"),
-    startAt: isoDateLike.optional(),
-    endAt: isoDateLike.optional(),
+    startAt: isoDateLike("start").optional(),
+    endAt: isoDateLike("end").optional(),
     // SPEC-SKILL-ABSTRACT-001: required_skills는 9개 추상 카테고리 중 선택.
     requiredSkillIds: z.array(uuidLike).max(9, "최대 9개까지 선택 가능합니다.").default([]),
     businessAmountKrw: optionalNonNegativeInt,
