@@ -36,7 +36,7 @@ interface DispatchInput {
 export async function dispatchInquiriesAction(
   input: DispatchInput,
 ): Promise<DispatchResult> {
-  const user = await requireUser();
+  await requireUser();
   const supabase = createClient(await cookies()) as unknown as Sb;
 
   // Zod 검증
