@@ -14,7 +14,7 @@ import {
   shiftMonth,
   startOfMonthKst,
 } from "@/lib/dashboard/calendar-events";
-import { formatKstTime, toKstDate } from "@/lib/dashboard/format";
+import { toKstDate } from "@/lib/dashboard/format";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
@@ -39,7 +39,10 @@ export function OperatorCalendar({
     monthIndex0: initialMonthIndex0,
   });
 
-  const grouped = React.useMemo(() => groupEventsByDay(events), [events]);
+  const grouped = React.useMemo(
+    () => groupEventsByDay(events, { year, monthIndex0 }),
+    [events, monthIndex0, year],
+  );
   const dim = daysInMonthKst(year, monthIndex0);
   const first = startOfMonthKst(year, monthIndex0);
   // KST 기준 요일 (1일).
@@ -145,12 +148,8 @@ export function OperatorCalendar({
                     return (
                       <div
                         key={ev.id}
-                        title={`${ev.instructorName} - ${ev.projectTitle ?? "프로젝트"} (${formatKstTime(
-                          ev.startsAt,
-                        )} ~ ${formatKstTime(ev.endsAt)})`}
-                        aria-label={`${ev.instructorName} ${ev.projectTitle ?? ""} ${formatKstTime(
-                          ev.startsAt,
-                        )}부터 ${formatKstTime(ev.endsAt)}까지`}
+                        title={`${ev.instructorName} - ${ev.projectTitle ?? "프로젝트"}`}
+                        aria-label={`${ev.instructorName} ${ev.projectTitle ?? "강의"}`}
                         className="truncate rounded-sm px-1 py-0.5 text-[10px] text-white"
                         style={{ backgroundColor: color }}
                       >
