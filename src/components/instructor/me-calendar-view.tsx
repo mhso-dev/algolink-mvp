@@ -249,9 +249,9 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
           existing={events.map<ScheduleSpan>((e) => ({
             id: e.id,
             scheduleKind: e.scheduleKind,
-          startsAt: new Date(e.startsAt),
-          endsAt: dateOnlyEndExclusive(toKstDateInput(e.endsAt)),
-        }))}
+            startsAt: dateOnlyStart(toKstDateInput(e.startsAt)),
+            endsAt: dateOnlyEndExclusive(toKstDateInput(e.endsAt)),
+          }))}
           onClose={() => setDialogState({ kind: "closed" })}
           onSaved={(saved) => {
             setEvents((prev) => {
@@ -328,7 +328,7 @@ function ScheduleDialog({
       const conflicts = detectConflicts(
         {
           scheduleKind: form.scheduleKind,
-          startsAt: new Date(form.startsAt),
+          startsAt: dateOnlyStart(form.startsAt),
           endsAt: dateOnlyEndExclusive(form.endsAt),
           id: state.id,
         },
@@ -497,6 +497,10 @@ function fromCalendarExclusiveEnd(exclusiveEnd: Date, start: Date): string {
   const startDate = toKstDateInput(start);
   const inclusiveEndDate = addDays(toKstDateInput(exclusiveEnd), -1);
   return inclusiveEndDate < startDate ? startDate : inclusiveEndDate;
+}
+
+function dateOnlyStart(dateInput: string): Date {
+  return new Date(`${dateInput}T00:00:00+09:00`);
 }
 
 function dateOnlyEndExclusive(inclusiveEndDate: string): Date {
