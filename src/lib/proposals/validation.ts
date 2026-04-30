@@ -2,6 +2,7 @@
 // 한국어 에러는 PROPOSAL_ERRORS 참조.
 import { z } from "zod";
 import { PROPOSAL_ERRORS } from "./errors";
+import { isValidInquiryTimeSlot } from "./inquiry";
 import { INQUIRY_STATUSES } from "./types";
 
 /** ISO date 문자열 (YYYY-MM-DD). 빈 문자열은 null로 변환. */
@@ -63,17 +64,38 @@ export const proposalUpdateSchema = proposalCreateSchema.safeExtend({
 
 export type ProposalUpdateInput = z.infer<typeof proposalUpdateSchema>;
 
+const dateOrDateTime = z
+  .string()
+  .refine(
+    (v) =>
+      /^\d{4}-\d{2}-\d{2}$/.test(v) ||
+      Number.isFinite(new Date(v).getTime()),
+    { message: "유효한 날짜를 입력해주세요." },
+  )
+  .nullable()
+  .optional();
+
 /** 디스패치 입력 (REQ-PROPOSAL-INQUIRY-003). */
-export const inquiryDispatchSchema = z.object({
-  proposalId: z.string().uuid(),
-  instructorIds: z
-    .array(z.string().uuid())
-    .min(1, { message: PROPOSAL_ERRORS.INQUIRY_NO_INSTRUCTORS })
-    .max(50, { message: "최대 50명까지 선택할 수 있습니다." }),
-  proposedTimeSlotStart: z.string().datetime().nullable().optional(),
-  proposedTimeSlotEnd: z.string().datetime().nullable().optional(),
-  questionNote: z.string().max(2000).nullable().optional(),
-});
+export const inquiryDispatchSchema = z
+  .object({
+    proposalId: z.string().uuid(),
+    instructorIds: z
+      .array(z.string().uuid())
+      .min(1, { message: PROPOSAL_ERRORS.INQUIRY_NO_INSTRUCTORS })
+      .max(50, { message: "최대 50명까지 선택할 수 있습니다." }),
+    proposedTimeSlotStart: dateOrDateTime,
+    proposedTimeSlotEnd: dateOrDateTime,
+    questionNote: z.string().max(2000).nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!isValidInquiryTimeSlot(data)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["proposedTimeSlotEnd"],
+        message: "종료일은 시작일보다 빠를 수 없습니다.",
+      });
+    }
+  });
 
 export type InquiryDispatchInputZ = z.infer<typeof inquiryDispatchSchema>;
 
