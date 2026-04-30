@@ -97,12 +97,24 @@ export async function runRecommendationAction(
     return { ok: false, message: PROJECT_ERRORS.PROJECT_NOT_FOUND };
   }
 
-  const startAt = project.education_start_at
-    ? new Date(project.education_start_at)
-    : new Date();
-  const endAt = project.education_end_at
-    ? new Date(project.education_end_at)
-    : new Date(startAt.getTime() + 24 * 3600 * 1000);
+  if (!project.education_start_at || !project.education_end_at) {
+    return {
+      ok: false,
+      message: "추천 실행 전에 교육 시작일과 종료일을 입력해주세요.",
+    };
+  }
+  const startAt = new Date(project.education_start_at);
+  const endAt = new Date(project.education_end_at);
+  if (
+    !Number.isFinite(startAt.getTime()) ||
+    !Number.isFinite(endAt.getTime()) ||
+    endAt <= startAt
+  ) {
+    return {
+      ok: false,
+      message: "교육 기간이 올바르지 않습니다. 시작일과 종료일을 확인해주세요.",
+    };
+  }
 
   // required_skill_ids
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
