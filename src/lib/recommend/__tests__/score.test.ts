@@ -114,6 +114,21 @@ test("computeAvailability: system_lecture 오버랩 → 0", () => {
   assert.equal(v, 0);
 });
 
+test("computeAvailability: 같은 날 date-only 프로젝트도 all-day로 충돌 판정", () => {
+  const v = computeAvailability(
+    [
+      {
+        kind: "unavailable",
+        startsAt: new Date("2026-05-09T15:00:00Z"), // KST 2026-05-10 00:00
+        endsAt: new Date("2026-05-10T15:00:00Z"), // KST 2026-05-11 00:00
+      },
+    ],
+    new Date("2026-05-10T00:00:00Z"),
+    new Date("2026-05-10T00:00:00Z"),
+  );
+  assert.equal(v, 0);
+});
+
 test("computeAvailability: personal 일정은 무시 → 1", () => {
   const v = computeAvailability(
     [
