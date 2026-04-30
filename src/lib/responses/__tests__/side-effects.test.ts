@@ -28,10 +28,24 @@ test("computeAssignmentAcceptanceEffects: 정상 — schedule_items 1행 + nextS
   assert.equal(r.scheduleItems[0].instructorId, "ia");
   assert.equal(r.scheduleItems[0].projectId, "p1");
   assert.equal(r.scheduleItems[0].scheduleKind, "system_lecture");
-  assert.deepEqual(r.scheduleItems[0].startsAt, educationStartAt);
-  assert.deepEqual(r.scheduleItems[0].endsAt, educationEndAt);
+  assert.equal(r.scheduleItems[0].startsAt.toISOString(), "2026-05-31T15:00:00.000Z");
+  assert.equal(r.scheduleItems[0].endsAt.toISOString(), "2026-06-03T15:00:00.000Z");
   assert.equal(r.nextStatus, "assignment_confirmed");
   assert.equal(r.scheduleSkippedReason, null);
+});
+
+test("computeAssignmentAcceptanceEffects: 같은 날짜 start/end → KST 1일 all-day 일정", () => {
+  const project = {
+    id: "p1",
+    status: "assignment_review",
+    educationStartAt: new Date("2026-06-01T00:00:00Z"),
+    educationEndAt: new Date("2026-06-01T00:00:00Z"),
+    operatorId: "u-op",
+  };
+  const r = computeAssignmentAcceptanceEffects(project, "ia");
+  assert.equal(r.scheduleItems.length, 1);
+  assert.equal(r.scheduleItems[0].startsAt.toISOString(), "2026-05-31T15:00:00.000Z");
+  assert.equal(r.scheduleItems[0].endsAt.toISOString(), "2026-06-01T15:00:00.000Z");
 });
 
 test("computeAssignmentAcceptanceEffects: education_start_at null → schedule skip + 경고 사유", () => {
