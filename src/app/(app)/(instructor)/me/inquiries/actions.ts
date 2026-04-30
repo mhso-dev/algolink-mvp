@@ -28,8 +28,9 @@ const NOTIF_LOG_PREFIX = "[notif]";
 
 interface InquiryRow {
   id: string;
+  proposal_id: string | null;
   status: string;
-  created_by_user_id: string | null;
+  operator_id: string | null;
   instructor_id: string;
 }
 
@@ -63,7 +64,7 @@ export async function respondToInquiry(input: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: inquiryData, error: iErr } = await (supabase as any)
     .from("proposal_inquiries")
-    .select("id, status, created_by_user_id, instructor_id")
+    .select("id, proposal_id, status, operator_id, instructor_id")
     .eq("id", inquiryId)
     .maybeSingle();
   if (iErr || !inquiryData) {
@@ -144,7 +145,7 @@ export async function respondToInquiry(input: {
 
   // notifications INSERT (HIGH-3 idempotency)
   await insertNotificationIdempotent({
-    recipientId: inquiry.created_by_user_id,
+    recipientId: inquiry.operator_id,
     notifType: mapResponseToNotificationType("proposal_inquiry", status),
     sourceKind: "proposal_inquiry",
     sourceId: inquiryId,
@@ -152,8 +153,8 @@ export async function respondToInquiry(input: {
       status === "accepted" ? "수락" : status === "declined" ? "거절" : "조건부"
     }`,
     body: buildInquiryBody({ status, conditionalNote: conditionalNote ?? null }),
-    linkUrl: `/proposals/${inquiryId}`,
-    logContext: `operator_id=${inquiry.created_by_user_id ?? "unknown"} source_id=${inquiryId}`,
+    linkUrl: inquiry.proposal_id ? `/proposals/${inquiry.proposal_id}` : "/proposals",
+    logContext: `operator_id=${inquiry.operator_id ?? "unknown"} proposal_id=${inquiry.proposal_id ?? "unknown"} source_id=${inquiryId}`,
   });
 
   // accept→decline 다운그레이드 audit
