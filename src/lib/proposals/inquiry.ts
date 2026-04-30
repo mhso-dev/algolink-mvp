@@ -25,8 +25,8 @@ function parseInquiryBoundary(
 }
 
 export function canonicalizeInquiryTimeSlot(input: {
-  proposedTimeSlotStart: string | null | undefined;
-  proposedTimeSlotEnd: string | null | undefined;
+  proposedTimeSlotStart?: string | null | undefined;
+  proposedTimeSlotEnd?: string | null | undefined;
 }): { proposedTimeSlotStart: string | null; proposedTimeSlotEnd: string | null } {
   const start = parseInquiryBoundary(input.proposedTimeSlotStart, "start");
   const end = parseInquiryBoundary(input.proposedTimeSlotEnd, "end");
@@ -39,8 +39,8 @@ export function canonicalizeInquiryTimeSlot(input: {
 }
 
 export function isValidInquiryTimeSlot(input: {
-  proposedTimeSlotStart: string | null | undefined;
-  proposedTimeSlotEnd: string | null | undefined;
+  proposedTimeSlotStart?: string | null | undefined;
+  proposedTimeSlotEnd?: string | null | undefined;
 }): boolean {
   const startRaw = input.proposedTimeSlotStart;
   const endRaw = input.proposedTimeSlotEnd;
