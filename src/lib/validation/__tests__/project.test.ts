@@ -13,8 +13,8 @@ test("createProjectSchema: 정상 입력", () => {
     title: "AI 워크샵",
     clientId: VALID_UUID,
     projectType: "education",
-    startAt: "2026-05-01T09:00",
-    endAt: "2026-05-01T18:00",
+    startAt: "2026-05-01",
+    endAt: "2026-05-03",
     requiredSkillIds: [VALID_UUID],
     businessAmountKrw: 1000000,
     instructorFeeKrw: 800000,
@@ -38,12 +38,12 @@ test("createProjectSchema: title 빈 문자열 거부", () => {
   }
 });
 
-test("createProjectSchema: end <= start 거부", () => {
+test("createProjectSchema: date-only 종료일 < 시작일 거부", () => {
   const r = createProjectSchema.safeParse({
     title: "x",
     clientId: VALID_UUID,
-    startAt: "2026-05-01T18:00",
-    endAt: "2026-05-01T09:00",
+    startAt: "2026-05-02",
+    endAt: "2026-05-01",
     requiredSkillIds: [],
     businessAmountKrw: 0,
     instructorFeeKrw: 0,
@@ -51,17 +51,17 @@ test("createProjectSchema: end <= start 거부", () => {
   assert.equal(r.success, false);
 });
 
-test("createProjectSchema: end == start 거부", () => {
+test("createProjectSchema: date-only 같은 날 시작/종료 허용", () => {
   const r = createProjectSchema.safeParse({
     title: "x",
     clientId: VALID_UUID,
-    startAt: "2026-05-01T09:00",
-    endAt: "2026-05-01T09:00",
+    startAt: "2026-05-01",
+    endAt: "2026-05-01",
     requiredSkillIds: [],
     businessAmountKrw: 0,
     instructorFeeKrw: 0,
   });
-  assert.equal(r.success, false);
+  assert.equal(r.success, true);
 });
 
 test("createProjectSchema: clientId 비-UUID 거부", () => {
