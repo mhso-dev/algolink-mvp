@@ -28,6 +28,23 @@ interface ConvertInput {
   proposalId: string;
 }
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function dateOnlyBoundaryToIso(
+  value: string | null,
+  boundary: "start" | "end",
+): string | null {
+  if (!value) return null;
+  if (!DATE_ONLY_RE.test(value)) {
+    const d = new Date(value);
+    return Number.isFinite(d.getTime()) ? d.toISOString() : null;
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  const offsetDays = boundary === "end" ? 1 : 0;
+  return new Date(Date.UTC(year, month - 1, day + offsetDays)).toISOString();
+}
+
 export async function convertProposalToProjectAction(
   input: ConvertInput,
 ): Promise<ConvertResult> {
@@ -113,6 +130,8 @@ export async function convertProposalToProjectAction(
     convertedProjectId: null,
   };
   const projectInsert = buildProjectFromProposal(proposalRecord);
+  const educationStartAt = dateOnlyBoundaryToIso(projectInsert.startDate, "start");
+  const educationEndAt = dateOnlyBoundaryToIso(projectInsert.endDate, "end");
 
   const { data: newProject, error: projectErr } = (await supabase
     .from("projects")
@@ -122,6 +141,8 @@ export async function convertProposalToProjectAction(
       operator_id: projectInsert.operatorId,
       // SPEC-PROJECT-001 컬럼 매핑: scheduled_at은 시작일 기반 단순화
       scheduled_at: projectInsert.startDate,
+      education_start_at: educationStartAt,
+      education_end_at: educationEndAt,
       business_amount_krw: projectInsert.businessAmountKrw,
       instructor_fee_krw: projectInsert.instructorFeeKrw,
       hourly_rate_krw: 0,
