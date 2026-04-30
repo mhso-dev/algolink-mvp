@@ -7,7 +7,6 @@
 import * as React from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import koLocale from "@fullcalendar/core/locales/ko";
@@ -72,11 +71,14 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
     () =>
       events.map((e) => {
         const c = KIND_COLORS[e.scheduleKind];
+        const startDate = toKstDateInput(e.startsAt);
+        const endDate = toKstDateInput(e.endsAt);
         return {
           id: e.id,
           title: e.title ?? c.label,
-          start: e.startsAt,
-          end: e.endsAt,
+          start: startDate,
+          end: toCalendarExclusiveEnd(endDate),
+          allDay: true,
           backgroundColor: c.bg,
           borderColor: c.border,
           textColor: c.text,
@@ -89,15 +91,15 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
 
   function openNew(start?: Date, end?: Date) {
     const s = start ?? new Date();
-    const e = end ?? new Date(s.getTime() + 60 * 60 * 1000);
+    const startDate = toKstDateInput(s);
     setDialogState({
       kind: "edit",
       mode: "add",
       form: {
         scheduleKind: "unavailable",
         title: "",
-        startsAt: toLocalInput(s),
-        endsAt: toLocalInput(e),
+        startsAt: startDate,
+        endsAt: end ? fromCalendarExclusiveEnd(end, s) : startDate,
         notes: "",
       },
     });
@@ -117,8 +119,8 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
       form: {
         scheduleKind: ev.scheduleKind,
         title: ev.title ?? "",
-        startsAt: toLocalInput(new Date(ev.startsAt)),
-        endsAt: toLocalInput(new Date(ev.endsAt)),
+        startsAt: toKstDateInput(ev.startsAt),
+        endsAt: toKstDateInput(ev.endsAt),
         notes: ev.notes ?? "",
       },
     });
@@ -143,7 +145,7 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
       {mounted ? (
         <div className="rounded-md border border-[var(--color-border)] p-2 bg-[var(--color-surface)]">
           <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
+            plugins={[dayGridPlugin, interactionPlugin, listPlugin]}
             initialView={isMobile ? "listWeek" : "dayGridMonth"}
             locale={koLocale}
             timeZone="Asia/Seoul"
@@ -158,7 +160,7 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
                 : {
                     left: "prev,next today",
                     center: "title",
-                    right: "dayGridMonth,timeGridWeek,timeGridDay",
+                    right: "dayGridMonth",
                   }
             }
             buttonText={{
@@ -177,13 +179,16 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
               const ev = events.find((e) => e.id === info.event.id);
               if (!ev || ev.scheduleKind === "system_lecture") return info.revert();
               const newStart = info.event.start;
-              const newEnd = info.event.end ?? new Date((info.event.start?.getTime() ?? 0) + 60 * 60 * 1000);
-              if (!newStart || !newEnd) return info.revert();
+              if (!newStart) return info.revert();
+              const startsAt = toKstDateInput(newStart);
+              const endsAt = info.event.end
+                ? fromCalendarExclusiveEnd(info.event.end, newStart)
+                : startsAt;
               const r = await updateSchedule(ev.id, {
                 scheduleKind: ev.scheduleKind,
                 title: ev.title ?? "",
-                startsAt: toLocalInput(newStart),
-                endsAt: toLocalInput(newEnd),
+                startsAt,
+                endsAt,
                 notes: ev.notes ?? "",
               });
               if (!r.ok) {
@@ -192,10 +197,10 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
               } else {
                 setEvents((prev) =>
                   prev.map((e) =>
-                    e.id === ev.id ? { ...e, startsAt: newStart.toISOString(), endsAt: newEnd.toISOString() } : e,
+                    e.id === ev.id ? { ...e, startsAt, endsAt } : e,
                   ),
                 );
-                toast.success("일정이 이동되었습니다.");
+                toast.success("일정 날짜가 이동되었습니다.");
               }
             }}
             eventResize={async (info) => {
@@ -204,11 +209,13 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
               const newStart = info.event.start;
               const newEnd = info.event.end;
               if (!newStart || !newEnd) return info.revert();
+              const startsAt = toKstDateInput(newStart);
+              const endsAt = fromCalendarExclusiveEnd(newEnd, newStart);
               const r = await updateSchedule(ev.id, {
                 scheduleKind: ev.scheduleKind,
                 title: ev.title ?? "",
-                startsAt: toLocalInput(newStart),
-                endsAt: toLocalInput(newEnd),
+                startsAt,
+                endsAt,
                 notes: ev.notes ?? "",
               });
               if (!r.ok) {
@@ -217,10 +224,10 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
               } else {
                 setEvents((prev) =>
                   prev.map((e) =>
-                    e.id === ev.id ? { ...e, startsAt: newStart.toISOString(), endsAt: newEnd.toISOString() } : e,
+                    e.id === ev.id ? { ...e, startsAt, endsAt } : e,
                   ),
                 );
-                toast.success("일정 시간이 변경되었습니다.");
+                toast.success("일정 날짜가 변경되었습니다.");
               }
             }}
           />
@@ -242,9 +249,9 @@ export function MeCalendarView({ initialEvents }: { initialEvents: MeScheduleEve
           existing={events.map<ScheduleSpan>((e) => ({
             id: e.id,
             scheduleKind: e.scheduleKind,
-            startsAt: new Date(e.startsAt),
-            endsAt: new Date(e.endsAt),
-          }))}
+          startsAt: new Date(e.startsAt),
+          endsAt: dateOnlyEndExclusive(toKstDateInput(e.endsAt)),
+        }))}
           onClose={() => setDialogState({ kind: "closed" })}
           onSaved={(saved) => {
             setEvents((prev) => {
@@ -322,7 +329,7 @@ function ScheduleDialog({
         {
           scheduleKind: form.scheduleKind,
           startsAt: new Date(form.startsAt),
-          endsAt: new Date(form.endsAt),
+          endsAt: dateOnlyEndExclusive(form.endsAt),
           id: state.id,
         },
         existing,
@@ -337,8 +344,8 @@ function ScheduleDialog({
         id,
         scheduleKind: form.scheduleKind,
         title: form.title,
-        startsAt: new Date(form.startsAt).toISOString(),
-        endsAt: new Date(form.endsAt).toISOString(),
+        startsAt: form.startsAt,
+        endsAt: form.endsAt,
         notes: form.notes,
       });
       onClose();
