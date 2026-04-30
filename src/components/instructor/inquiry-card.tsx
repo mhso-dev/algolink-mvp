@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatKstDateRange } from "@/lib/dashboard/format";
 import { ResponsePanel } from "./response-panel";
 import type { ResponseStatus } from "@/lib/responses";
 
@@ -70,16 +71,10 @@ export function InquiryCard({ data, responseAction }: InquiryCardProps) {
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-          <div>
-            <dt className="text-xs text-[var(--color-text-muted)]">시작</dt>
+          <div className="sm:col-span-2">
+            <dt className="text-xs text-[var(--color-text-muted)]">문의 일정</dt>
             <dd className="font-tabular">
-              {formatKstDateTime(data.requested_start)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-[var(--color-text-muted)]">종료</dt>
-            <dd className="font-tabular">
-              {formatKstDateTime(data.requested_end)}
+              {formatKstDateRange(data.requested_start, data.requested_end)}
             </dd>
           </div>
           {data.skill_stack && data.skill_stack.length > 0 && (

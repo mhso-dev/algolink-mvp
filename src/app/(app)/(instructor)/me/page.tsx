@@ -1,7 +1,5 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { format } from "date-fns";
-import { ko } from "date-fns/locale";
 import { CalendarDays, Receipt, FileText, ChevronRight, Sparkles } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
@@ -14,6 +12,7 @@ import {
   summarizeSettlements,
   type SettlementInput,
 } from "@/lib/instructor/settlement-summary";
+import { formatKstDateRange } from "@/lib/dashboard/format";
 import { Container } from "@/components/app/container";
 
 export const dynamic = "force-dynamic";
@@ -120,9 +119,7 @@ export default async function InstructorDashboardPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm line-clamp-1">{p.title}</p>
                     <p className="text-sm md:text-xs text-[var(--color-text-muted)] font-tabular mt-0.5">
-                      {p.education_start_at
-                        ? format(new Date(p.education_start_at), "yyyy.MM.dd HH:mm", { locale: ko })
-                        : "일정 미정"}
+                      {formatKstDateRange(p.education_start_at, p.education_end_at)}
                     </p>
                   </div>
                 </div>
