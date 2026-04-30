@@ -406,10 +406,10 @@ function ScheduleDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="schedStart" required>시작</Label>
+              <Label htmlFor="schedStart" required>시작일</Label>
               <Input
                 id="schedStart"
-                type="datetime-local"
+                type="date"
                 value={form.startsAt}
                 onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
                 aria-invalid={errors.startsAt ? "true" : undefined}
@@ -419,10 +419,10 @@ function ScheduleDialog({
               )}
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="schedEnd" required>종료</Label>
+              <Label htmlFor="schedEnd" required>종료일</Label>
               <Input
                 id="schedEnd"
-                type="datetime-local"
+                type="date"
                 value={form.endsAt}
                 onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
                 aria-invalid={errors.endsAt ? "true" : undefined}
@@ -464,17 +464,41 @@ function ScheduleDialog({
   );
 }
 
-function toLocalInput(d: Date): string {
-  const fmt = new Intl.DateTimeFormat("ko-KR", {
+function toKstDateInput(input: Date | string): string {
+  if (typeof input === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    return input;
+  }
+  const d = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const fmt = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
   });
   const parts = fmt.formatToParts(d);
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
-  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function addDays(dateInput: string, days: number): string {
+  const [year, month, day] = dateInput.split("-").map(Number);
+  if (!year || !month || !day) return dateInput;
+  const d = new Date(Date.UTC(year, month - 1, day + days));
+  return d.toISOString().slice(0, 10);
+}
+
+function toCalendarExclusiveEnd(inclusiveEndDate: string): string {
+  return addDays(inclusiveEndDate, 1);
+}
+
+function fromCalendarExclusiveEnd(exclusiveEnd: Date, start: Date): string {
+  const startDate = toKstDateInput(start);
+  const inclusiveEndDate = addDays(toKstDateInput(exclusiveEnd), -1);
+  return inclusiveEndDate < startDate ? startDate : inclusiveEndDate;
+}
+
+function dateOnlyEndExclusive(inclusiveEndDate: string): Date {
+  return new Date(`${toCalendarExclusiveEnd(inclusiveEndDate)}T00:00:00+09:00`);
 }
