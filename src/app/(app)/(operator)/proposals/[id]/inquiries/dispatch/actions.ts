@@ -85,7 +85,6 @@ export async function dispatchInquiriesAction(
     proposal_id: r.proposalId,
     operator_id: r.operatorId,
     instructor_id: r.instructorId,
-    operator_id: user.id,
     proposed_time_slot_start: r.proposedTimeSlotStart,
     proposed_time_slot_end: r.proposedTimeSlotEnd,
     question_note: r.questionNote,
