@@ -49,12 +49,22 @@ interface Props {
 
 const initialState: UpdateProjectFormState = { ok: false };
 
-/** ISO → date input value (YYYY-MM-DD) in local timezone. */
-function isoToLocalInput(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** ISO/date-only → date input value (YYYY-MM-DD) in Asia/Seoul, not browser timezone. */
+function isoToKstDateInput(value: string | null): string {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 export function ProjectEditForm({ project, clients, skills, locked }: Props) {
@@ -133,7 +143,7 @@ export function ProjectEditForm({ project, clients, skills, locked }: Props) {
                 id="startAt"
                 name="startAt"
                 type="date"
-                defaultValue={isoToLocalInput(project.startAt)}
+                defaultValue={isoToKstDateInput(project.startAt)}
                 disabled={locked}
               />
             </Field>
@@ -142,7 +152,7 @@ export function ProjectEditForm({ project, clients, skills, locked }: Props) {
                 id="endAt"
                 name="endAt"
                 type="date"
-                defaultValue={isoToLocalInput(project.endAt)}
+                defaultValue={isoToKstDateInput(project.endAt)}
                 disabled={locked}
               />
             </Field>

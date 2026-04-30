@@ -72,10 +72,10 @@ export function ProjectForm({ clients, instructors }: ProjectFormProps) {
               <Input name="operatorName" placeholder="담당자 이름" />
             </Field>
             <Field label="교육 시작일">
-              <Input name="educationStart" type="datetime-local" />
+              <Input name="educationStart" type="date" />
             </Field>
             <Field label="교육 종료일">
-              <Input name="educationEnd" type="datetime-local" />
+              <Input name="educationEnd" type="date" />
             </Field>
             <Field label="교육 시간" hint="예: 10:00~18:00 (반복 옵션은 추후)">
               <Input name="hours" placeholder="10:00 ~ 18:00" />
