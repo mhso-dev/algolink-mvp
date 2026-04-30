@@ -170,12 +170,12 @@ export async function getMyAssignmentRequests(
 
 export interface InquiryRow {
   id: string;
+  proposal_id: string | null;
   status: string;
-  created_by_user_id: string | null;
-  requested_start: string | null;
-  requested_end: string | null;
-  skill_stack: string[] | null;
-  operator_memo: string | null;
+  operator_id: string | null;
+  proposed_time_slot_start: string | null;
+  proposed_time_slot_end: string | null;
+  question_note: string | null;
   created_at: string;
   response_status: ResponseStatus | null;
   response_responded_at: string | null;
@@ -191,7 +191,7 @@ export async function getMyInquiries(instructorId: string): Promise<InquiryRow[]
   const { data, error } = await (supabase as any)
     .from("proposal_inquiries")
     .select(
-      "id, status, created_by_user_id, requested_start, requested_end, skill_stack, operator_memo, created_at",
+      "id, proposal_id, status, operator_id, proposed_time_slot_start, proposed_time_slot_end, question_note, created_at",
     )
     .eq("instructor_id", instructorId)
     .order("created_at", { ascending: false });
@@ -220,12 +220,12 @@ export async function getMyInquiries(instructorId: string): Promise<InquiryRow[]
     const resp = respRows.find((r) => r.proposal_inquiry_id === q.id);
     return {
       id: q.id,
+      proposal_id: q.proposal_id,
       status: q.status,
-      created_by_user_id: q.created_by_user_id,
-      requested_start: q.requested_start,
-      requested_end: q.requested_end,
-      skill_stack: q.skill_stack,
-      operator_memo: q.operator_memo,
+      operator_id: q.operator_id,
+      proposed_time_slot_start: q.proposed_time_slot_start,
+      proposed_time_slot_end: q.proposed_time_slot_end,
+      question_note: q.question_note,
       created_at: q.created_at,
       response_status: (resp?.status as ResponseStatus | undefined) ?? null,
       response_responded_at: resp?.responded_at ?? null,
