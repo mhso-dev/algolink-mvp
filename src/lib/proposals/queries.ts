@@ -39,11 +39,11 @@ export async function listProposals(
   let q = supabase
     .from("proposals")
     .select(
-      `id, title, client_id, operator_id, status,
+       `id, title, client_id, operator_id, status,
        proposed_period_start, proposed_period_end,
        proposed_business_amount_krw, created_at,
        clients(company_name),
-       users:operator_id(display_name)`,
+       users:operator_id(name_kr)`,
       { count: "exact" },
     )
     .is("deleted_at", null);
@@ -83,7 +83,7 @@ export async function listProposals(
           proposed_business_amount_krw: number | null;
           created_at: string;
           clients: { company_name: string } | null;
-          users: { display_name: string } | null;
+          users: { name_kr: string } | null;
         }>
       | null;
     count: number | null;
@@ -101,7 +101,7 @@ export async function listProposals(
     client_id: r.client_id,
     client_name: r.clients?.company_name ?? null,
     operator_id: r.operator_id,
-    operator_name: r.users?.display_name ?? null,
+    operator_name: r.users?.name_kr ?? null,
     status: r.status,
     proposed_period_start: r.proposed_period_start,
     proposed_period_end: r.proposed_period_end,
@@ -150,7 +150,7 @@ export async function getProposalById(
        notes, submitted_at, decided_at, converted_project_id,
        created_at, updated_at,
        clients(company_name),
-       users:operator_id(display_name)`,
+       users:operator_id(name_kr)`,
     )
     .eq("id", id)
     .is("deleted_at", null)
@@ -161,7 +161,7 @@ export async function getProposalById(
           "client_name" | "operator_name"
         > & {
           clients: { company_name: string } | null;
-          users: { display_name: string } | null;
+          users: { name_kr: string } | null;
         })
       | null;
     error: unknown;
@@ -175,7 +175,7 @@ export async function getProposalById(
     client_id: data.client_id,
     client_name: data.clients?.company_name ?? null,
     operator_id: data.operator_id,
-    operator_name: data.users?.display_name ?? null,
+    operator_name: data.users?.name_kr ?? null,
     proposed_period_start: data.proposed_period_start,
     proposed_period_end: data.proposed_period_end,
     proposed_business_amount_krw: data.proposed_business_amount_krw,
@@ -410,7 +410,7 @@ export async function getInquiriesForProposal(
     .from("proposal_inquiries")
     .select(
       `id, instructor_id, status, responded_at, conditional_note,
-       instructors(display_name, name)`,
+       instructors(name_kr)`,
     )
     .eq("proposal_id", proposalId)
     .order("created_at", { ascending: true })) as {
@@ -421,7 +421,7 @@ export async function getInquiriesForProposal(
           status: "pending" | "accepted" | "declined" | "conditional";
           responded_at: string | null;
           conditional_note: string | null;
-          instructors: { display_name?: string; name?: string } | null;
+          instructors: { name_kr?: string | null } | null;
         }>
       | null;
     error: unknown;
@@ -430,8 +430,7 @@ export async function getInquiriesForProposal(
   return data.map((r) => ({
     id: r.id,
     instructor_id: r.instructor_id,
-    instructor_name:
-      r.instructors?.display_name ?? r.instructors?.name ?? null,
+    instructor_name: r.instructors?.name_kr ?? null,
     status: r.status,
     responded_at: r.responded_at,
     conditional_note: r.conditional_note,

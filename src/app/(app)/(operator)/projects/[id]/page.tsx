@@ -22,6 +22,7 @@ import {
 import { PROJECT_ERRORS } from "@/lib/projects/errors";
 import { RecommendationPanel } from "@/components/projects/recommendation-panel";
 import { StatusTransitionPanel } from "@/components/projects/status-transition-panel";
+import { DeleteProjectButton } from "@/components/projects/DeleteProjectButton";
 import {
   AssignmentHistoryList,
   type RecommendationHistoryEntry,
@@ -171,17 +172,17 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     changedByIds.length > 0
       ? supabase
           .from("users")
-          .select("id, display_name")
+          .select("id, name_kr")
           .in("id", changedByIds)
-          .returns<{ id: string; display_name: string | null }[]>()
-      : Promise.resolve({ data: [] as { id: string; display_name: string | null }[] }),
+          .returns<{ id: string; name_kr: string | null }[]>()
+      : Promise.resolve({ data: [] as { id: string; name_kr: string | null }[] }),
   ]);
 
   const instructorNameMap = new Map(
     (instructorNamesRaw ?? []).map((i) => [i.id, i.name_kr ?? "(이름 미공개)"]),
   );
   const userNameMap = new Map(
-    (userNamesRaw ?? []).map((u) => [u.id, u.display_name ?? null]),
+    (userNamesRaw ?? []).map((u) => [u.id, u.name_kr ?? null]),
   );
 
   // 추천 이력 변환
@@ -265,6 +266,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           <Button asChild variant="outline">
             <Link href={`/projects/${id}/edit`}>수정</Link>
           </Button>
+          <DeleteProjectButton projectId={id} title={project.title} />
         </div>
       </header>
 

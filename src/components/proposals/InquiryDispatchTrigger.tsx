@@ -20,8 +20,7 @@ import { dispatchInquiriesAction } from "@/app/(app)/(operator)/proposals/[id]/i
 
 interface Instructor {
   id: string;
-  name: string | null;
-  display_name?: string | null;
+  name_kr: string | null;
 }
 
 interface Props {
@@ -113,7 +112,7 @@ export function InquiryDispatchTrigger({
                           onChange={() => toggle(i.id)}
                         />
                         <span className="text-sm">
-                          {i.display_name ?? i.name ?? "(이름 없음)"}
+                          {i.name_kr ?? "(이름 없음)"}
                         </span>
                       </label>
                     ))

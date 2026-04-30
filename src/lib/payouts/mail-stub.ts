@@ -70,7 +70,7 @@ export async function sendSettlementRequestStub(
     type: "settlement_requested",
     title,
     body,
-    linkUrl: "/me/payouts",
+    linkUrl: "/me/settlements",
     logContext: `instructor_id=${input.instructorId} settlement_id=${input.settlementId}`,
   });
 

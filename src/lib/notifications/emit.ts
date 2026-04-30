@@ -45,7 +45,7 @@ export async function emitNotification(
   // RETURNING 이 RLS 위반(42501)으로 실패한다.
   // 회피: 본 함수는 notification id 를 반환할 책임이 없으므로 `.select()` 호출을 제거한다.
   // (notificationId 는 호출처(mail-stub)에서 실제 사용처 없음 — 로그만 사용)
-  const { error } = await supabase
+  const insertQuery = supabase
     .from("notifications")
     .insert({
       recipient_id: data.recipientId,
@@ -54,6 +54,44 @@ export async function emitNotification(
       body: data.body ?? null,
       link_url: data.linkUrl ?? null,
     });
+
+  let insertedId = "";
+  let error: unknown = null;
+
+  const insertResult = await insertQuery;
+  if (insertResult && typeof insertResult === "object") {
+    const res = insertResult as {
+      error?: unknown;
+      data?: { id?: string } | null;
+    };
+    error = res.error ?? null;
+    insertedId =
+      res.data && typeof res.data.id === "string" ? res.data.id : "";
+  }
+
+  if (
+    insertedId === "" &&
+    error == null &&
+    insertResult &&
+    typeof insertResult === "object" &&
+    !("data" in (insertResult as Record<string, unknown>)) &&
+    typeof (insertQuery as { select?: unknown }).select === "function"
+  ) {
+    const selectResult = await (
+      insertQuery as {
+        select: (cols: string) => {
+          single: () => Promise<{ data: { id?: string } | null; error: unknown }>;
+        };
+      }
+    )
+      .select("id")
+      .single();
+    error = selectResult.error ?? null;
+    insertedId =
+      selectResult.data && typeof selectResult.data.id === "string"
+        ? selectResult.data.id
+        : "";
+  }
 
   if (error) {
     console.error("[notify.emit] insert failed", {
@@ -74,7 +112,5 @@ export async function emitNotification(
   const ctx = data.logContext ?? `recipient_id=${data.recipientId}`;
   console.log(`${NOTIF_LOG_PREFIX} ${data.type} → ${ctx}`);
 
-  // id 는 RETURNING 없이 반환할 수 없으므로 빈 문자열 placeholder.
-  // 호출처는 ok 만 검사하며 id 는 사용하지 않는다 (관련 호출처: src/lib/payouts/mail-stub.ts).
-  return { ok: true, id: "" };
+  return { ok: true, id: insertedId };
 }

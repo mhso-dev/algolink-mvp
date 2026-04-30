@@ -245,6 +245,33 @@ export interface AssignActionResult {
   message?: string;
 }
 
+export async function softDeleteProjectAction(
+  projectId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const auth = await ensureOperator();
+  if (!auth.ok) return { ok: false, error: auth.error ?? "권한 없음" };
+
+  const supabase = createClient(await cookies());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from("projects")
+    .update({
+      deleted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", projectId)
+    .is("deleted_at", null);
+
+  if (error) {
+    console.error("[softDeleteProject] failed", error);
+    return { ok: false, error: "프로젝트 삭제에 실패했습니다." };
+  }
+
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${projectId}`);
+  return { ok: true };
+}
+
 /** 1-클릭 배정 요청 — projects.instructor_id + adopted_instructor_id + notification INSERT. */
 export async function assignInstructorAction(input: {
   projectId: string;

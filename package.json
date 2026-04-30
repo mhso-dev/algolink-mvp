@@ -17,6 +17,8 @@
     "db:verify": "tsx scripts/db-verify.ts",
     "db:seed-users": "tsx scripts/seed-users.ts",
     "auth:bootstrap-admin": "tsx scripts/auth/bootstrap-admin.ts",
+    "supabase:link:cloud": "supabase link --project-ref nqwbhkdqwwhqpgemahul",
+    "supabase:push:cloud": "pnpm supabase:link:cloud && supabase db push --linked --include-all",
     "supabase:reset": "supabase db reset",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",

@@ -78,15 +78,22 @@ export async function createInstructorAndInvite(
   const instructorId = (createdRaw as { id: string }).id;
 
   // SPEC-SKILL-ABSTRACT-001: proficiency 컬럼 제거 — binary 매칭.
-  // 3. INSERT instructor_skills (best-effort; 부분 실패 시 운영 점검).
+  // 3. INSERT instructor_skills — 데모 안정성을 위해 부분 성공 허용하지 않고
+  //    실패 시 instructor row를 롤백한다.
   if (parsed.data.skillIds.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).from("instructor_skills").insert(
+    const { error: skillsErr } = await (supabase as any).from("instructor_skills").insert(
       parsed.data.skillIds.map((skillId) => ({
         instructor_id: instructorId,
         skill_id: skillId,
       })),
     );
+    if (skillsErr) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("instructors").delete().eq("id", instructorId);
+      console.error("[instructors/new] instructor_skills insert failed", skillsErr);
+      return { ok: false, error: "기술스택 저장에 실패했습니다. 다시 시도해주세요." };
+    }
   }
 
   // 4. 초대 발송 (service role).

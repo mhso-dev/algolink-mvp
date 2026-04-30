@@ -65,10 +65,10 @@ export const createProjectSchema = z
     notes: z.string().max(2000).optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.startAt && data.endAt && data.endAt < data.startAt) {
+    if (data.startAt && data.endAt && data.endAt <= data.startAt) {
       ctx.addIssue({
         code: "custom",
-        message: "종료일은 시작일과 같거나 늦어야 합니다.",
+        message: "종료일은 시작일보다 늦어야 합니다.",
         path: ["endAt"],
       });
     }

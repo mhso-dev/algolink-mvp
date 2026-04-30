@@ -30,14 +30,15 @@ pnpm install
 
 # 환경변수 설정 — .env.local 파일 생성
 cp .env.example .env.local
-# 필수 값:
-#   DATABASE_URL=postgresql://...
-#   SUPABASE_URL=...
-#   SUPABASE_ANON_KEY=...
+# 로컬 개발에서는 .env.local 을 반드시 로컬 Supabase 값으로 유지:
+#   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+#   NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+#   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 #   SUPABASE_SERVICE_ROLE_KEY=...
+#   NEXT_PUBLIC_APP_URL=http://localhost:3000
 #   PII_ENCRYPTION_KEY=...   # pgcrypto symmetric key (32+ byte 권장)
 
-# Supabase 로컬 실행 (선택)
+# Supabase 로컬 실행
 pnpm supabase:start
 pnpm supabase:reset
 
@@ -48,12 +49,37 @@ pnpm db:verify
 pnpm dev
 ```
 
+## 운영 방식 (단일 브랜치)
+
+- **로컬 실행**: 항상 `.env.local` → **로컬 Supabase**
+- **Vercel 배포**: Vercel 환경변수 → **클라우드 Supabase**
+- **배포 브랜치**: `main`
+
+### 로컬에서 클라우드 DB 반영
+
+마이그레이션을 만든 뒤 클라우드 Supabase에 반영할 때만 아래를 실행한다.
+
+```bash
+pnpm supabase:push:cloud
+```
+
+위 명령은 현재 연결된 클라우드 프로젝트(`nqwbhkdqwwhqpgemahul`)에 `supabase/migrations/**`를 반영한다.
+
+### 배포 플로우
+
+1. 로컬 Supabase에서 개발/검증
+2. 필요 시 `pnpm supabase:push:cloud`
+3. `git push origin main`
+4. Vercel이 `main` 기준으로 자동 production 배포
+
+> Vercel Dashboard에서는 **Production Branch를 `main`으로 설정**해야 한다.
+
 ## 테스트
 
 ```bash
 pnpm typecheck       # tsc --noEmit
 pnpm lint            # ESLint
-pnpm test:unit       # node:test 기반 단위 테스트 (332 tests)
+pnpm test:unit       # node:test 기반 단위 테스트
 pnpm e2e             # Playwright E2E (Phase 1 SPEC 시나리오)
 ```
 
@@ -67,7 +93,7 @@ pnpm e2e             # Playwright E2E (Phase 1 SPEC 시나리오)
 - `supabase/migrations/` — SQL 마이그레이션 (RLS, pgcrypto, auth hook, invitations, audit)
 - `e2e/` — Playwright E2E 시나리오 (auth + dashboard + instructor + project + me)
 - `scripts/` — 검증 및 운영 스크립트 (`pnpm auth:bootstrap-admin`, `pnpm db:verify`)
-- `docs/` — 운영 문서 (`auth-architecture.md`, `auth-bootstrap.md`)
+- `docs/` — 운영 문서 (`auth-architecture.md`, `auth-bootstrap.md`, `deployment.md`)
 - `.moai/specs/SPEC-*/` — SPEC 문서 (요구사항, 계획, 수용 기준)
 
 ## SPEC 추적 (Phase 1)

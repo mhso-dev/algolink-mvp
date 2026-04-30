@@ -6,7 +6,13 @@ export type NotificationType =
   | "schedule_conflict"
   | "low_satisfaction_assignment"
   | "dday_unprocessed"
-  | "settlement_requested";
+  | "settlement_requested"
+  | "receipt_issued"
+  | "assignment_accepted"
+  | "assignment_declined"
+  | "inquiry_accepted"
+  | "inquiry_declined"
+  | "inquiry_conditional";
 
 export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   "assignment_request",
@@ -15,6 +21,12 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   "low_satisfaction_assignment",
   "dday_unprocessed",
   "settlement_requested",
+  "receipt_issued",
+  "assignment_accepted",
+  "assignment_declined",
+  "inquiry_accepted",
+  "inquiry_declined",
+  "inquiry_conditional",
 ] as const;
 
 export interface NotificationRow {

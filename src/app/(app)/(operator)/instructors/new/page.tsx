@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
 import { getAllSkillCategories } from "@/lib/instructor/queries";
 import { InstructorForm } from "@/components/instructor/instructor-form";
+import { createInstructorAndInvite } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export default async function NewInstructorPage() {
         레코드는 자동으로 롤백됩니다.
       </p>
 
-      <InstructorForm skills={skills} />
+      <InstructorForm skills={skills} action={createInstructorAndInvite} />
     </div>
   );
 }

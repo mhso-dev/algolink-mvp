@@ -2,6 +2,7 @@
 // 가드: admin layout이 1차, 본 페이지에서 추가 검사.
 import Link from "next/link";
 import { Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -33,14 +34,19 @@ export default async function AdminUsersPage({
 
   return (
     <Container variant="narrow" className="flex flex-col gap-5 py-6">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Settings className="h-6 w-6 text-[var(--color-primary)]" />
-          회원 / 권한
-        </h1>
-        <p className="text-sm text-[var(--color-text-muted)] mt-1">
-          시스템 사용자의 역할과 활성 상태를 관리합니다. (관리자 전용)
-        </p>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Settings className="h-6 w-6 text-[var(--color-primary)]" />
+            회원 / 권한
+          </h1>
+          <p className="text-sm text-[var(--color-text-muted)] mt-1">
+            시스템 사용자의 역할과 활성 상태를 관리합니다. (관리자 전용)
+          </p>
+        </div>
+        <Button asChild>
+          <Link href="/admin/users/invite">새 사용자 초대</Link>
+        </Button>
       </header>
 
       <form className="flex flex-wrap gap-2 items-end" action="/admin/users">

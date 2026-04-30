@@ -21,6 +21,7 @@ import { InquiryResponseBoard } from "@/components/proposals/InquiryResponseBoar
 import { StatusControls } from "@/components/proposals/StatusControls";
 import { InquiryDispatchTrigger } from "@/components/proposals/InquiryDispatchTrigger";
 import { ConvertToProjectButton } from "@/components/proposals/ConvertToProjectButton";
+import { DeleteProposalButton } from "@/components/proposals/DeleteProposalButton";
 
 export const dynamic = "force-dynamic";
 
@@ -41,14 +42,13 @@ export default async function ProposalDetailPage({ params }: Props) {
     getInquiriesForProposal(supabase, id),
     supabase
       .from("instructors")
-      .select("id, name, display_name")
-      .order("name"),
+      .select("id, name_kr")
+      .order("name_kr"),
   ]);
 
   const instructors = (instructorsRes.data ?? []) as Array<{
     id: string;
-    name: string | null;
-    display_name?: string | null;
+    name_kr: string | null;
   }>;
 
   const frozen = isFrozenProposalStatus(proposal.status);
@@ -135,6 +135,7 @@ export default async function ProposalDetailPage({ params }: Props) {
           <Link href={`/proposals/${proposal.id}/edit`}>
             <Button variant="outline">수정</Button>
           </Link>
+          <DeleteProposalButton proposalId={proposal.id} title={proposal.title} />
         </div>
       )}
 

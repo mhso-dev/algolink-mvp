@@ -4,6 +4,7 @@ import "server-only";
 // @MX:SPEC: SPEC-DASHBOARD-001
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { notifications } from "@/db/schema/notifications";
 import { projects } from "@/db/schema/project";
 import { clients } from "@/db/schema/client";
 import { instructors } from "@/db/schema/instructor";
@@ -205,21 +206,27 @@ export async function getInstructorScheduleRange(
  * SPEC-NOTIF-001 구현 시 본 함수 body만 교체. 시그니처/타입 변경 금지.
  */
 export async function getNotificationPreview(
-  _operatorId: string,
+  operatorId: string,
   _limit: number = 5,
 ): Promise<NotificationPreview> {
+  const rows = await db
+    .select({
+      unanswered: sql<number>`count(*) filter (where ${notifications.type} in ('assignment_request', 'assignment_overdue') and ${notifications.readAt} is null)::int`,
+      conflict: sql<number>`count(*) filter (where ${notifications.type} = 'schedule_conflict' and ${notifications.readAt} is null)::int`,
+      deadline: sql<number>`count(*) filter (where ${notifications.type} = 'dday_unprocessed' and ${notifications.readAt} is null)::int`,
+      updatedAt: sql<string>`to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`,
+    })
+    .from(notifications)
+    .where(eq(notifications.recipientId, operatorId));
+
+  const row = rows[0];
   return {
-    unanswered: 0,
-    conflict: 0,
-    deadline: 0,
-    updatedAt: null,
+    unanswered: Number(row?.unanswered ?? 0),
+    conflict: Number(row?.conflict ?? 0),
+    deadline: Number(row?.deadline ?? 0),
+    updatedAt: row?.updatedAt ?? new Date().toISOString(),
   };
 }
-
-/**
- * SPEC-NOTIF-001 후속을 위한 시그니처 lock alias.
- * 미리 export 해둠으로써 호출처가 본 alias만 import 하면 본문 swap 시 변경 0 보장.
- */
 export const getRecentNotifications = getNotificationPreview;
 
 /**

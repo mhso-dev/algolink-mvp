@@ -55,9 +55,9 @@ export default async function ProjectsListPage({ searchParams }: PageProps) {
         .returns<{ id: string; company_name: string | null }[]>(),
       supabase
         .from("users")
-        .select("id, display_name, role")
+        .select("id, name_kr, role")
         .in("role", ["operator", "admin"])
-        .returns<{ id: string; display_name: string | null; role: string }[]>(),
+        .returns<{ id: string; name_kr: string | null; role: string }[]>(),
     ]);
 
   const instructorMap = new Map(
@@ -67,7 +67,7 @@ export default async function ProjectsListPage({ searchParams }: PageProps) {
     (clientsRes.data ?? []).map((c) => [c.id, c.company_name]),
   );
   const operatorMap = new Map(
-    (operatorsRes.data ?? []).map((o) => [o.id, o.display_name ?? o.id.slice(0, 8)]),
+    (operatorsRes.data ?? []).map((o) => [o.id, o.name_kr ?? o.id.slice(0, 8)]),
   );
 
   const pagination = computePagination(total, query.page, query.pageSize);
@@ -87,7 +87,7 @@ export default async function ProjectsListPage({ searchParams }: PageProps) {
   }));
   const operatorOptions = (operatorsRes.data ?? []).map((o) => ({
     id: o.id,
-    name: o.display_name ?? o.id.slice(0, 8),
+    name: o.name_kr ?? o.id.slice(0, 8),
   }));
 
   return (

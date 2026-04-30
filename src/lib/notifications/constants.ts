@@ -16,6 +16,12 @@ export const NOTIFICATION_TYPE_LABEL: Record<NotificationType, string> = {
   low_satisfaction_assignment: "만족도 경고",
   dday_unprocessed: "D-Day 미처리",
   settlement_requested: "정산 요청",
+  receipt_issued: "영수증 발급",
+  assignment_accepted: "배정 수락",
+  assignment_declined: "배정 거절",
+  inquiry_accepted: "문의 수락",
+  inquiry_declined: "문의 거절",
+  inquiry_conditional: "문의 조건부 응답",
 };
 
 export const NOTIFICATION_TYPE_BADGE_CLASS: Record<NotificationType, string> = {
@@ -25,4 +31,10 @@ export const NOTIFICATION_TYPE_BADGE_CLASS: Record<NotificationType, string> = {
   low_satisfaction_assignment: "bg-orange-100 text-orange-800",
   dday_unprocessed: "bg-purple-100 text-purple-800",
   settlement_requested: "bg-emerald-100 text-emerald-800",
+  receipt_issued: "bg-cyan-100 text-cyan-800",
+  assignment_accepted: "bg-green-100 text-green-800",
+  assignment_declined: "bg-rose-100 text-rose-800",
+  inquiry_accepted: "bg-lime-100 text-lime-800",
+  inquiry_declined: "bg-red-100 text-red-800",
+  inquiry_conditional: "bg-yellow-100 text-yellow-800",
 };

@@ -8,6 +8,7 @@ import { createClient } from "@/utils/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { proposalCreateSchema } from "@/lib/proposals/validation";
 import {
+  softDeleteProposal,
   transitionProposalStatus,
   updateProposal,
 } from "@/lib/proposals/queries";
@@ -147,6 +148,20 @@ export async function transitionProposalStatusAction(args: {
   }
 
   revalidatePath(`/proposals/${args.proposalId}`);
+  revalidatePath("/proposals");
+  return { ok: true };
+}
+
+export async function deleteProposalAction(
+  proposalId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireUser();
+  const supabase = createClient(await cookies());
+  const result = await softDeleteProposal(supabase, proposalId);
+  if (!result.ok) {
+    return { ok: false, error: PROPOSAL_ERRORS.UPDATE_FAILED_GENERIC };
+  }
+  revalidatePath(`/proposals/${proposalId}`);
   revalidatePath("/proposals");
   return { ok: true };
 }

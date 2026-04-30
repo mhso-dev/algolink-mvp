@@ -46,10 +46,13 @@
 ## 3. DB 마이그레이션 적용
 
 ```bash
-supabase db reset                  # 로컬: 전체 리셋 + seed 적용
-# 또는
-supabase db push                   # 변경분만 적용
+pnpm supabase:reset               # 로컬: 전체 리셋 + seed 적용
+pnpm supabase:push:cloud          # 클라우드: linked project 에 변경분 반영
 ```
+
+- 로컬 개발은 항상 `.env.local` + 로컬 Supabase 기준으로 진행
+- 클라우드 반영은 배포 직전에만 `pnpm supabase:push:cloud` 실행
+- 현재 클라우드 프로젝트 ref: `nqwbhkdqwwhqpgemahul`
 
 신규 마이그레이션 (M4 산출물):
 

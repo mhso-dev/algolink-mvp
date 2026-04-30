@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,6 +20,7 @@ import { formatKoreanPhone } from "@/lib/utils";
 import { formatKstDate } from "@/lib/instructor/format";
 import { InstructorHistoryTable } from "@/components/instructor/instructor-history-table";
 import { SatisfactionSummaryCard } from "@/components/instructor/satisfaction-summary-card";
+import { DeleteInstructorButton } from "../_components/delete-instructor-button";
 import { getOrGenerateInstructorSummary } from "@/lib/ai/instructor-summary-server";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +67,18 @@ export default async function InstructorDetailPage({
               </p>
             ) : null}
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href={`/instructors/${detail.id}/edit`}>
+              <Pencil className="h-4 w-4" />
+              수정
+            </Link>
+          </Button>
+          <DeleteInstructorButton
+            instructorId={detail.id}
+            instructorName={detail.nameKr}
+          />
         </div>
       </header>
 
