@@ -50,14 +50,50 @@ export function computeAvailability(
   projectStart: Date,
   projectEnd: Date,
 ): 0 | 1 {
+  const { startsAt: projectRangeStart, endsAt: projectRangeEnd } =
+    canonicalProjectDateRange(projectStart, projectEnd);
+
   for (const item of scheduleItems) {
     if (item.kind === "personal") continue;
     // overlap: a.start < b.end && a.end > b.start
-    if (item.startsAt < projectEnd && item.endsAt > projectStart) {
+    if (item.startsAt < projectRangeEnd && item.endsAt > projectRangeStart) {
       return 0;
     }
   }
   return 1;
+}
+
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * 프로젝트 교육 기간은 date-only inclusive range로 취급한다.
+ *
+ * DB 컬럼은 timestamptz지만 운영 입력은 날짜 단위이므로 추천 충돌 판정에서는
+ * KST 일자 시작(포함) ~ 종료일 다음 KST 일자 시작(제외)로 확장한다.
+ * 이렇게 해야 같은 날 프로젝트(start=end)와 all-day schedule이 빈 구간으로
+ * 판정되지 않는다.
+ */
+export function canonicalProjectDateRange(
+  projectStart: Date,
+  projectEnd: Date,
+): { startsAt: Date; endsAt: Date } {
+  const startsAt = startOfKstDay(projectStart);
+  const endDayStart = startOfKstDay(projectEnd);
+  const endsAt = new Date(endDayStart.getTime() + DAY_MS);
+
+  if (endsAt <= startsAt) {
+    return { startsAt, endsAt: new Date(startsAt.getTime() + DAY_MS) };
+  }
+  return { startsAt, endsAt };
+}
+
+function startOfKstDay(input: Date): Date {
+  const kst = new Date(input.getTime() + KST_OFFSET_MS);
+  return new Date(
+    Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()) -
+      KST_OFFSET_MS,
+  );
 }
 
 /**

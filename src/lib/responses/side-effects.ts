@@ -35,12 +35,13 @@ export function computeAssignmentAcceptanceEffects(
     };
   }
 
+  const range = canonicalProjectDateRange(educationStartAt, educationEndAt);
   const scheduleItem: ScheduleItemDraft = {
     instructorId,
     projectId: project.id,
     scheduleKind: "system_lecture",
-    startsAt: educationStartAt,
-    endsAt: educationEndAt,
+    startsAt: range.startsAt,
+    endsAt: range.endsAt,
   };
 
   return {
@@ -48,6 +49,36 @@ export function computeAssignmentAcceptanceEffects(
     nextStatus: "assignment_confirmed",
     scheduleSkippedReason: null,
   };
+}
+
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * assignment acceptance creates system_lecture schedule items from project
+ * date-only ranges. Treat project education_start/end as inclusive KST dates
+ * and persist schedule_items as [start day 00:00 KST, day after end 00:00 KST).
+ */
+export function canonicalProjectDateRange(
+  educationStartAt: Date,
+  educationEndAt: Date,
+): { startsAt: Date; endsAt: Date } {
+  const startsAt = startOfKstDay(educationStartAt);
+  const endDayStart = startOfKstDay(educationEndAt);
+  const endsAt = new Date(endDayStart.getTime() + DAY_MS);
+
+  if (endsAt <= startsAt) {
+    return { startsAt, endsAt: new Date(startsAt.getTime() + DAY_MS) };
+  }
+  return { startsAt, endsAt };
+}
+
+function startOfKstDay(input: Date): Date {
+  const kst = new Date(input.getTime() + KST_OFFSET_MS);
+  return new Date(
+    Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()) -
+      KST_OFFSET_MS,
+  );
 }
 
 /**
