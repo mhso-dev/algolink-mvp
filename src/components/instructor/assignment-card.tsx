@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatKstDateRange } from "@/lib/dashboard/format";
 import { formatKRW } from "@/lib/utils";
 import { ResponsePanel } from "./response-panel";
 import type { ResponseStatus } from "@/lib/responses";
@@ -80,16 +81,10 @@ export function AssignmentCard({ data, responseAction }: AssignmentCardProps) {
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-          <div>
-            <dt className="text-xs text-[var(--color-text-muted)]">시작</dt>
+          <div className="sm:col-span-2">
+            <dt className="text-xs text-[var(--color-text-muted)]">교육 일정</dt>
             <dd className="font-tabular">
-              {formatKstDateTime(data.education_start_at)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-[var(--color-text-muted)]">종료</dt>
-            <dd className="font-tabular">
-              {formatKstDateTime(data.education_end_at)}
+              {formatKstDateRange(data.education_start_at, data.education_end_at)}
             </dd>
           </div>
           <div>
